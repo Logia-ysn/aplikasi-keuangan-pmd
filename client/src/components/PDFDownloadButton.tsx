@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 import { FileDown, Loader2 } from 'lucide-react';
 
@@ -21,16 +21,15 @@ const PDFDownloadButton: React.FC<Props> = ({
   className,
   variant = 'button',
 }) => {
-  const [hovered, setHovered] = useState(false);
+  // Cast to satisfy @react-pdf/renderer's strict DocumentProps type
+  const pdfDoc = doc as React.ReactElement<any>;
 
   if (variant === 'icon') {
     return (
-      <PDFDownloadLink document={doc} fileName={fileName}>
+      <PDFDownloadLink document={pdfDoc} fileName={fileName}>
         {({ loading }) => (
           <button
             title={label}
-            onMouseEnter={() => setHovered(true)}
-            onMouseLeave={() => setHovered(false)}
             className={
               className ??
               'p-1.5 hover:bg-red-50 rounded text-gray-400 hover:text-red-500 transition-colors'
@@ -49,7 +48,7 @@ const PDFDownloadButton: React.FC<Props> = ({
 
   if (variant === 'menu-item') {
     return (
-      <PDFDownloadLink document={doc} fileName={fileName}>
+      <PDFDownloadLink document={pdfDoc} fileName={fileName}>
         {({ loading }) => (
           <button
             className={
@@ -71,11 +70,9 @@ const PDFDownloadButton: React.FC<Props> = ({
 
   // default: 'button'
   return (
-    <PDFDownloadLink document={doc} fileName={fileName}>
+    <PDFDownloadLink document={pdfDoc} fileName={fileName}>
       {({ loading }) => (
         <button
-          onMouseEnter={() => setHovered(true)}
-          onMouseLeave={() => setHovered(false)}
           className={
             className ??
             'flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium border border-gray-200 text-gray-600 hover:bg-red-50 hover:border-red-200 hover:text-red-600 transition-colors'
