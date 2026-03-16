@@ -98,7 +98,7 @@ app.use('/api/inventory', inventoryRoutes);
 // In production, serve the built React client from ../client/dist
 const clientDist = path.resolve(__dirname, '../../client/dist');
 app.use(express.static(clientDist));
-app.get('*', (_req, res, next) => {
+app.get('*path', (_req, res, next) => {
   // Only serve index.html for non-API routes (SPA fallback)
   if (_req.path.startsWith('/api')) return next();
   res.sendFile(path.join(clientDist, 'index.html'), (err) => {
