@@ -1,0 +1,170 @@
+import { Router } from 'express';
+import { Prisma } from '@prisma/client';
+import { prisma } from '../lib/prisma';
+import { AuthRequest, roleMiddleware } from '../middleware/auth';
+import { updateAccountBalance } from '../utils/accountBalance';
+import { validateBody } from '../utils/validate';
+import { CreateFiscalYearSchema } from '../utils/schemas';
+import { BusinessError } from '../utils/errors';
+import { ACCOUNT_NUMBERS } from '../constants/accountNumbers';
+import { logger } from '../lib/logger';
+
+const router = Router();
+
+// GET /api/fiscal-years
+router.get('/', async (req, res) => {
+  try {
+    const years = await prisma.fiscalYear.findMany({ orderBy: { startDate: 'desc' } });
+    return res.json(years);
+  } catch (error) {
+    logger.error({ error }, 'GET /fiscal-years error');
+    return res.status(500).json({ error: 'Gagal mengambil data tahun fiskal.' });
+  }
+});
+
+// POST /api/fiscal-years (Admin only)
+router.post('/', roleMiddleware(['Admin']), async (req, res) => {
+  const body = validateBody(CreateFiscalYearSchema, req.body, res);
+  if (!body) return;
+
+  const start = new Date(body.startDate);
+  const end = new Date(body.endDate);
+
+  if (start >= end) {
+    return res.status(400).json({ error: 'Tanggal mulai harus sebelum tanggal akhir.' });
+  }
+
+  try {
+    const overlapping = await prisma.fiscalYear.findFirst({
+      where: { OR: [{ startDate: { lte: end }, endDate: { gte: start } }] },
+    });
+
+    if (overlapping) {
+      return res.status(409).json({
+        error: `Tahun fiskal bertumpang tindih dengan "${overlapping.name}". Periksa rentang tanggal.`,
+      });
+    }
+
+    const year = await prisma.fiscalYear.create({
+      data: { name: body.name, startDate: start, endDate: end, isClosed: false },
+    });
+    return res.status(201).json(year);
+  } catch (error: any) {
+    logger.error({ error }, 'POST /fiscal-years error');
+    if (error.code === 'P2002') return res.status(409).json({ error: 'Nama tahun fiskal sudah digunakan.' });
+    return res.status(500).json({ error: 'Gagal membuat tahun fiskal.' });
+  }
+});
+
+// POST /api/fiscal-years/:id/close — close fiscal year (Admin only)
+router.post('/:id/close', roleMiddleware(['Admin']), async (req: AuthRequest, res) => {
+  const id = req.params.id as string;
+
+  try {
+    const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      const year = await tx.fiscalYear.findUnique({ where: { id } });
+      if (!year) throw new BusinessError('Tahun buku tidak ditemukan.');
+      if (year.isClosed) throw new BusinessError('Tahun buku sudah ditutup.');
+
+      // 1. Calculate net profit for the year
+      const [revAgg, expAgg] = await Promise.all([
+        tx.accountingLedgerEntry.aggregate({
+          where: { fiscalYearId: id, isCancelled: false, account: { rootType: 'REVENUE' as any } },
+          _sum: { debit: true, credit: true },
+        }),
+        tx.accountingLedgerEntry.aggregate({
+          where: { fiscalYearId: id, isCancelled: false, account: { rootType: 'EXPENSE' as any } },
+          _sum: { debit: true, credit: true },
+        }),
+      ]);
+
+      const netRevenue = Number(revAgg._sum?.credit || 0) - Number(revAgg._sum?.debit || 0);
+      const netExpense = Number(expAgg._sum?.debit || 0) - Number(expAgg._sum?.credit || 0);
+      const profit = netRevenue - netExpense;
+
+      const retainedEarningsAcc = await tx.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.RETAINED_EARNINGS } });
+      const currentProfitAcc = await tx.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.CURRENT_PROFIT } });
+
+      if (retainedEarningsAcc && currentProfitAcc && profit !== 0) {
+        // 2. Transfer profit/loss to Retained Earnings
+        const closeEntry = await tx.journalEntry.create({
+          data: {
+            entryNumber: `CLOSE-${year.name}`,
+            date: year.endDate,
+            narration: `Tutup Buku Tahun ${year.name}`,
+            status: 'Submitted',
+            fiscalYearId: id,
+            createdBy: req.user!.userId,
+            submittedAt: new Date(),
+            items: {
+              create: [
+                {
+                  accountId: currentProfitAcc.id,
+                  debit: profit > 0 ? profit : 0,
+                  credit: profit < 0 ? Math.abs(profit) : 0,
+                  description: `Tutup akun laba tahun berjalan ${year.name}`,
+                },
+                {
+                  accountId: retainedEarningsAcc.id,
+                  debit: profit < 0 ? Math.abs(profit) : 0,
+                  credit: profit > 0 ? profit : 0,
+                  description: `Transfer ke laba ditahan ${year.name}`,
+                },
+              ],
+            },
+          },
+        });
+
+        await tx.accountingLedgerEntry.createMany({
+          data: [
+            {
+              date: year.endDate,
+              accountId: currentProfitAcc.id,
+              debit: profit > 0 ? profit : 0,
+              credit: profit < 0 ? Math.abs(profit) : 0,
+              referenceType: 'JournalEntry',
+              referenceId: closeEntry.id,
+              description: `Tutup buku ${year.name}`,
+              fiscalYearId: id,
+            },
+            {
+              date: year.endDate,
+              accountId: retainedEarningsAcc.id,
+              debit: profit < 0 ? Math.abs(profit) : 0,
+              credit: profit > 0 ? profit : 0,
+              referenceType: 'JournalEntry',
+              referenceId: closeEntry.id,
+              description: `Laba ditahan ${year.name}`,
+              fiscalYearId: id,
+            },
+          ],
+        });
+
+        await updateAccountBalance(tx, currentProfitAcc.id, profit > 0 ? profit : 0, profit < 0 ? Math.abs(profit) : 0);
+        await updateAccountBalance(tx, retainedEarningsAcc.id, profit < 0 ? Math.abs(profit) : 0, profit > 0 ? profit : 0);
+      }
+
+      // 3. Zero out all Revenue and Expense account balances for next year
+      await tx.account.updateMany({
+        where: { OR: [{ rootType: 'REVENUE' as any }, { rootType: 'EXPENSE' as any }] },
+        data: { balance: 0 },
+      });
+
+      // 4. Mark fiscal year as closed
+      return tx.fiscalYear.update({
+        where: { id },
+        data: { isClosed: true, closedAt: new Date(), closedBy: req.user!.userId },
+      });
+    });
+
+    return res.json(result);
+  } catch (error: any) {
+    if (error instanceof BusinessError) {
+      return res.status(400).json({ error: error.message });
+    }
+    logger.error({ error }, 'POST /fiscal-years/:id/close error');
+    return res.status(500).json({ error: 'Gagal menutup tahun buku.' });
+  }
+});
+
+export default router;

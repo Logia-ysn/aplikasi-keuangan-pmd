@@ -1,0 +1,382 @@
+import React, { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import api from '../lib/api';
+import { X, Plus, Trash2, Loader2, AlertCircle, ChevronDown } from 'lucide-react';
+import { formatRupiah } from '../lib/formatters';
+
+
+interface InvoiceItem {
+  itemName: string;
+  description: string;
+  quantity: number;
+  unit: string;
+  rate: number;
+  discount: number; // percent
+}
+
+const UNITS = ['Kg', 'Ton', 'Sak', 'Liter', 'Pcs', 'Box', 'Unit', 'Set', 'Meter', 'Jasa'];
+
+const defaultItem = (): InvoiceItem => ({
+  itemName: '', description: '', quantity: 1, unit: 'Kg', rate: 0, discount: 0
+});
+
+const SalesInvoiceModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, onClose }) => {
+  const today = new Date().toISOString().split('T')[0];
+  const due30 = new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0];
+
+  const [invoiceDate, setInvoiceDate] = useState(today);
+  const [dueDate, setDueDate] = useState(due30);
+  const [partyId, setPartyId] = useState('');
+  const [notes, setNotes] = useState('');
+  const [terms, setTerms] = useState('Net 30');
+  const [taxPct, setTaxPct] = useState(0);
+  const [potongan, setPotongan] = useState(0);     // deduction amount
+  const [biayaLain, setBiayaLain] = useState(0);   // extra charge amount
+  const [labelPotongan, setLabelPotongan] = useState('Potongan');
+  const [labelBiaya, setLabelBiaya] = useState('Biaya Lain');
+  const [items, setItems] = useState<InvoiceItem[]>([defaultItem()]);
+  const [error, setError] = useState('');
+
+  const queryClient = useQueryClient();
+
+  const { data: parties } = useQuery({
+    queryKey: ['parties-customers'],
+    queryFn: async () => {
+      const res = await api.get('/parties?type=Customer');
+      return res.data.data ?? res.data;
+    }
+  });
+
+  const selectedParty = parties?.find((p: any) => p.id === partyId);
+
+  const mutation = useMutation({
+    mutationFn: (data: any) => api.post('/sales/invoices', data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['sales-invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-metrics'] });
+      setInvoiceDate(today);
+      setDueDate(due30);
+      setPartyId('');
+      setNotes('');
+      setTerms('Net 30');
+      setTaxPct(0);
+      setPotongan(0);
+      setBiayaLain(0);
+      setLabelPotongan('Potongan');
+      setLabelBiaya('Biaya Lain');
+      setItems([defaultItem()]);
+      setError('');
+      onClose();
+    },
+    onError: (err: any) => setError(err.response?.data?.error || 'Gagal menyimpan invoice.')
+  });
+
+  const addItem = () => setItems([...items, defaultItem()]);
+  const removeItem = (i: number) => setItems(items.filter((_, idx) => idx !== i));
+  const updateItem = (i: number, field: keyof InvoiceItem, value: any) => {
+    const next = [...items];
+    next[i] = { ...next[i], [field]: value };
+    setItems(next);
+  };
+
+  const lineTotal = (item: InvoiceItem) => {
+    const base = item.quantity * item.rate;
+    return base - (base * (item.discount / 100));
+  };
+  const subtotal = items.reduce((s, it) => s + lineTotal(it), 0);
+  const taxAmount = subtotal * (taxPct / 100);
+  const grandTotal = subtotal + taxAmount - potongan + biayaLain;
+  const canSubmit = partyId && items.some(i => i.itemName && i.rate > 0) && grandTotal > 0 && !mutation.isPending;
+
+  if (!isOpen) return null;
+
+  return (
+    <div role="dialog" aria-modal="true" aria-labelledby="sales-modal-title" className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4" onKeyDown={(e: React.KeyboardEvent) => e.key === "Escape" && onClose()}>
+      <div className="bg-white rounded-xl w-full max-w-5xl shadow-2xl flex flex-col max-h-[95vh] overflow-hidden">
+
+        {/* ── HEADER BAR ── */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <div>
+            <h2 id="sales-modal-title" className="text-base font-semibold text-gray-900">Invoice Penjualan Baru</h2>
+            <p className="text-xs text-gray-400 mt-0.5">Draft • belum disimpan</p>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 transition-colors">
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* ── BODY ── */}
+        <div className="flex-1 overflow-y-auto">
+
+          {/* Top meta section */}
+          <div className="p-6 grid grid-cols-2 gap-8 border-b border-gray-100">
+
+            {/* LEFT — Bill To */}
+            <div>
+              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-2">Tagihkan Kepada</p>
+              <select
+                value={partyId}
+                onChange={(e) => setPartyId(e.target.value)}
+                className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2"
+              >
+                <option value="">— Pilih Pelanggan —</option>
+                {parties?.map((p: any) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+              {selectedParty && (
+                <div className="text-xs text-gray-500 space-y-0.5 mt-1 pl-1">
+                  {selectedParty.email && <p>{selectedParty.email}</p>}
+                  {selectedParty.phone && <p>{selectedParty.phone}</p>}
+                  {selectedParty.address && <p className="text-gray-400">{selectedParty.address}</p>}
+                </div>
+              )}
+            </div>
+
+            {/* RIGHT — Invoice details */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">Tanggal Invoice</label>
+                <input type="date" value={invoiceDate} onChange={e => setInvoiceDate(e.target.value)}
+                  className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">Jatuh Tempo</label>
+                <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)}
+                  className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">Termin Pembayaran</label>
+                <select value={terms} onChange={e => setTerms(e.target.value)}
+                  className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  {['Cash', 'Net 7', 'Net 14', 'Net 30', 'Net 60'].map(t => (
+                    <option key={t}>{t}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">PPN (%)</label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    value={taxPct === 0 ? '' : taxPct}
+                    onChange={e => setTaxPct(Math.max(0, Math.min(100, Number(e.target.value))))}
+                    placeholder="0"
+                    min={0} max={100}
+                    className="w-full border border-gray-200 rounded-lg py-2 pl-3 pr-8 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 font-medium">%</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* ── ITEMS TABLE ── */}
+          <div className="px-6 pt-5 pb-4">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Daftar Barang / Jasa</p>
+              <button onClick={addItem} className="flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-700">
+                <Plus size={13} /> Tambah Baris
+              </button>
+            </div>
+
+            <div className="border border-gray-200 rounded-xl overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-200 text-[10px] font-semibold text-gray-400 uppercase tracking-wide">
+                    <th className="text-left px-4 py-3 w-8">#</th>
+                    <th className="text-left px-4 py-3 min-w-[200px]">Nama Barang / Jasa</th>
+                    <th className="text-center px-3 py-3 w-20">Qty</th>
+                    <th className="text-left px-3 py-3 w-24">Satuan</th>
+                    <th className="text-right px-3 py-3 w-36">Harga Satuan</th>
+                    <th className="text-right px-3 py-3 w-24">Diskon %</th>
+                    <th className="text-right px-4 py-3 w-36">Jumlah</th>
+                    <th className="w-8"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.map((item, idx) => (
+                    <tr key={idx} className="group border-b border-gray-50 last:border-0 hover:bg-gray-50/50 transition-colors">
+                      <td className="px-4 py-3 text-center text-xs text-gray-300 font-medium">{idx + 1}</td>
+                      <td className="px-4 py-3">
+                        <input
+                          type="text"
+                          value={item.itemName}
+                          onChange={e => updateItem(idx, 'itemName', e.target.value)}
+                          placeholder="Nama barang atau jasa..."
+                          className="w-full bg-transparent text-sm text-gray-800 border-none focus:ring-0 focus:outline-none p-0 placeholder:text-gray-300"
+                        />
+                      </td>
+                      <td className="px-3 py-3">
+                        <input
+                          type="number"
+                          value={item.quantity}
+                          onChange={e => updateItem(idx, 'quantity', Number(e.target.value))}
+                          min={1}
+                          className="w-full bg-transparent text-sm text-gray-800 text-center font-mono border-none focus:ring-0 focus:outline-none p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        />
+                      </td>
+                      <td className="px-3 py-3">
+                        <div className="relative">
+                          <select
+                            value={item.unit}
+                            onChange={e => updateItem(idx, 'unit', e.target.value)}
+                            className="w-full bg-transparent text-sm text-gray-600 border-none focus:ring-0 focus:outline-none p-0 appearance-none cursor-pointer pr-4"
+                          >
+                            {UNITS.map(u => <option key={u}>{u}</option>)}
+                          </select>
+                          <ChevronDown size={10} className="absolute right-0 top-1/2 -translate-y-1/2 text-gray-300 pointer-events-none" />
+                        </div>
+                      </td>
+                      <td className="px-3 py-3 text-right">
+                        <input
+                          type="number"
+                          value={item.rate || ''}
+                          onChange={e => updateItem(idx, 'rate', Number(e.target.value))}
+                          placeholder="0"
+                          className="w-full bg-transparent text-sm text-gray-800 text-right font-mono border-none focus:ring-0 focus:outline-none p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        />
+                      </td>
+                      <td className="px-3 py-3 text-right">
+                        <input
+                          type="number"
+                          value={item.discount || ''}
+                          onChange={e => updateItem(idx, 'discount', Math.min(100, Number(e.target.value)))}
+                          placeholder="0"
+                          min={0} max={100}
+                          className="w-full bg-transparent text-sm text-gray-600 text-right font-mono border-none focus:ring-0 focus:outline-none p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        />
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <span className="font-mono text-sm font-medium text-gray-900 tabular-nums">
+                          {formatRupiah(lineTotal(item))}
+                        </span>
+                      </td>
+                      <td className="pr-3 py-3 text-center">
+                        {items.length > 1 && (
+                          <button onClick={() => removeItem(idx)}
+                            className="p-1 rounded text-gray-200 hover:text-red-400 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all">
+                            <Trash2 size={13} />
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* ── SUMMARY + NOTES ── */}
+          <div className="px-6 pb-6 grid grid-cols-2 gap-8 items-start">
+
+            {/* Notes / Terms */}
+            <div>
+              <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">Catatan untuk Pelanggan</label>
+              <textarea
+                value={notes}
+                onChange={e => setNotes(e.target.value)}
+                placeholder="Misal: Terima kasih atas kepercayaan Anda. Pembayaran via transfer ke rekening BCA..."
+                rows={4}
+                className="w-full border border-gray-200 rounded-lg py-2.5 px-3 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none placeholder:text-gray-300"
+              />
+            </div>
+
+            {/* Totals */}
+            <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
+              <div className="space-y-2.5">
+                {/* Subtotal */}
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">Subtotal</span>
+                  <span className="font-mono text-gray-800 tabular-nums">{formatRupiah(subtotal)}</span>
+                </div>
+
+                {/* PPN */}
+                {taxPct > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">PPN {taxPct}%</span>
+                    <span className="font-mono text-gray-800 tabular-nums">{formatRupiah(taxAmount)}</span>
+                  </div>
+                )}
+
+                {/* Potongan */}
+                <div className="flex items-center gap-2 text-sm">
+                  <input
+                    type="text"
+                    value={labelPotongan}
+                    onChange={e => setLabelPotongan(e.target.value)}
+                    className="flex-1 bg-transparent border-none text-gray-500 text-sm focus:ring-0 focus:outline-none p-0 min-w-0"
+                    placeholder="Label potongan..."
+                  />
+                  <div className="flex items-center gap-1 shrink-0">
+                    <span className="text-gray-400 text-xs">−</span>
+                    <input
+                      type="number"
+                      value={potongan || ''}
+                      onChange={e => setPotongan(Math.max(0, Number(e.target.value)))}
+                      placeholder="0"
+                      className="w-28 text-right font-mono text-red-500 bg-transparent border-none focus:ring-0 focus:outline-none p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none tabular-nums"
+                    />
+                  </div>
+                </div>
+
+                {/* Biaya Lain */}
+                <div className="flex items-center gap-2 text-sm">
+                  <input
+                    type="text"
+                    value={labelBiaya}
+                    onChange={e => setLabelBiaya(e.target.value)}
+                    className="flex-1 bg-transparent border-none text-gray-500 text-sm focus:ring-0 focus:outline-none p-0 min-w-0"
+                    placeholder="Label biaya lain..."
+                  />
+                  <div className="flex items-center gap-1 shrink-0">
+                    <span className="text-gray-400 text-xs">+</span>
+                    <input
+                      type="number"
+                      value={biayaLain || ''}
+                      onChange={e => setBiayaLain(Math.max(0, Number(e.target.value)))}
+                      placeholder="0"
+                      className="w-28 text-right font-mono text-gray-700 bg-transparent border-none focus:ring-0 focus:outline-none p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none tabular-nums"
+                    />
+                  </div>
+                </div>
+
+                {/* Grand Total */}
+                <div className="border-t border-gray-200 pt-2.5 flex justify-between items-baseline">
+                  <span className="text-sm font-semibold text-gray-700">Total</span>
+                  <span className="text-2xl font-bold text-blue-600 font-mono tabular-nums">{formatRupiah(grandTotal)}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {error && (
+            <div className="mx-6 mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-red-700 text-sm">
+              <AlertCircle size={15} /> <span>{error}</span>
+            </div>
+          )}
+        </div>
+
+        {/* ── FOOTER ACTIONS ── */}
+        <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between">
+          <p className="text-xs text-gray-400">
+            {canSubmit ? `Total: ${formatRupiah(grandTotal)}` : 'Lengkapi pelanggan dan minimal 1 item untuk melanjutkan'}
+          </p>
+          <div className="flex gap-3">
+            <button onClick={onClose} className="btn-secondary">Batal</button>
+            <button
+              onClick={() => mutation.mutate({ date: invoiceDate, dueDate, partyId, items, notes, taxPct, terms, potongan, biayaLain, labelPotongan, labelBiaya })}
+              disabled={!canSubmit}
+              className="btn-primary disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {mutation.isPending ? <Loader2 size={15} className="animate-spin" /> : 'Simpan Invoice'}
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  );
+};
+
+export default SalesInvoiceModal;

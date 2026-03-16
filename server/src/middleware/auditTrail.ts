@@ -1,0 +1,37 @@
+import { Response, NextFunction } from 'express';
+import { AuthRequest } from './auth';
+import { prisma } from '../lib/prisma';
+import { logger } from '../lib/logger';
+
+export const auditTrailMiddleware = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  const originalJson = res.json.bind(res);
+
+  res.json = function (body) {
+    if (req.user && ['POST', 'PUT', 'DELETE'].includes(req.method)) {
+      const actionMap: Record<string, string> = {
+        POST: 'CREATE',
+        PUT: 'UPDATE',
+        DELETE: 'DELETE',
+      };
+
+      const entityType = req.path.split('/')[2] || 'unknown';
+
+      prisma.auditLog
+        .create({
+          data: {
+            userId: req.user!.userId,
+            action: actionMap[req.method],
+            entityType,
+            entityId: (body && body.id) ? String(body.id) : 'N/A',
+            newValues: body,
+            ipAddress: req.ip,
+            userAgent: req.headers['user-agent'],
+          },
+        })
+        .catch((err) => logger.error({ err }, 'Audit log write failed'));
+    }
+    return originalJson(body);
+  };
+
+  next();
+};

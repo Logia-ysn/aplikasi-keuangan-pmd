@@ -1,0 +1,118 @@
+import { PrismaClient, AccountType, RootType, UserRole } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
+import { Pool } from 'pg';
+import bcrypt from 'bcrypt';
+import "dotenv/config";
+
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+const adapter = new PrismaPg(pool as any);
+const prisma = new PrismaClient({ adapter });
+
+async function main() {
+  console.log('Seeding PMD Finance...');
+
+  // 1. Seed Fiscal Year
+  const fiscalYear = await prisma.fiscalYear.upsert({
+    where: { name: '2026' },
+    update: {},
+    create: {
+      name: '2026',
+      startDate: new Date('2026-01-01'),
+      endDate: new Date('2026-12-31'),
+    },
+  });
+  console.log('- Created Fiscal Year: 2026');
+
+  // 2. Seed Admin User (S-02: password from env)
+  const adminPassword = process.env.SEED_ADMIN_PASSWORD || 'Admin@PMD2026!';
+  if (!process.env.SEED_ADMIN_PASSWORD) {
+    console.warn('WARNING: SEED_ADMIN_PASSWORD not set, using default password. Change it in production!');
+  }
+  const hashedPassword = await bcrypt.hash(adminPassword, 12);
+  const admin = await prisma.user.upsert({
+    where: { username: 'admin' },
+    update: {},
+    create: {
+      username: 'admin',
+      fullName: 'Logia Admin',
+      email: 'admin@panganmasadepan.com',
+      passwordHash: hashedPassword,
+      role: UserRole.Admin,
+    },
+  });
+  console.log('- Created Admin User: admin');
+
+  // 3. Seed COA
+  const coa = [
+    // ASSET
+    { accountNumber: '1', name: 'Aset', accountType: AccountType.ASSET, rootType: RootType.ASSET, isGroup: true },
+    { accountNumber: '1.1', name: 'Aset Lancar', accountType: AccountType.ASSET, rootType: RootType.ASSET, isGroup: true, parentNumber: '1' },
+    { accountNumber: '1.1.1', name: 'Kas Utama', accountType: AccountType.ASSET, rootType: RootType.ASSET, isGroup: false, parentNumber: '1.1' },
+    { accountNumber: '1.1.2', name: 'Bank BCA', accountType: AccountType.ASSET, rootType: RootType.ASSET, isGroup: false, parentNumber: '1.1' },
+    { accountNumber: '1.1.3', name: 'Piutang Usaha', accountType: AccountType.ASSET, rootType: RootType.ASSET, isGroup: false, parentNumber: '1.1' },
+    { accountNumber: '1.1.4', name: 'Persediaan Gabah', accountType: AccountType.ASSET, rootType: RootType.ASSET, isGroup: false, parentNumber: '1.1' },
+    { accountNumber: '1.1.5', name: 'Persediaan Beras', accountType: AccountType.ASSET, rootType: RootType.ASSET, isGroup: false, parentNumber: '1.1' },
+
+    // LIABILITY
+    { accountNumber: '2', name: 'Liabilitas', accountType: AccountType.LIABILITY, rootType: RootType.LIABILITY, isGroup: true },
+    { accountNumber: '2.1', name: 'Liabilitas Jangka Pendek', accountType: AccountType.LIABILITY, rootType: RootType.LIABILITY, isGroup: true, parentNumber: '2' },
+    { accountNumber: '2.1.1', name: 'Hutang Usaha', accountType: AccountType.LIABILITY, rootType: RootType.LIABILITY, isGroup: false, parentNumber: '2.1' },
+    { accountNumber: '2.1.2', name: 'Hutang Gaji', accountType: AccountType.LIABILITY, rootType: RootType.LIABILITY, isGroup: false, parentNumber: '2.1' },
+
+    // EQUITY
+    { accountNumber: '3', name: 'Ekuitas', accountType: AccountType.EQUITY, rootType: RootType.EQUITY, isGroup: true },
+    { accountNumber: '3.1', name: 'Modal Disetor', accountType: AccountType.EQUITY, rootType: RootType.EQUITY, isGroup: false, parentNumber: '3' },
+    { accountNumber: '3.2', name: 'Laba Ditahan', accountType: AccountType.EQUITY, rootType: RootType.EQUITY, isGroup: true, parentNumber: '3' },
+    { accountNumber: '3.2.1', name: 'Laba Ditahan Akumulasi', accountType: AccountType.EQUITY, rootType: RootType.EQUITY, isGroup: false, parentNumber: '3.2' },
+    { accountNumber: '3.3', name: 'Laba Periode Berjalan', accountType: AccountType.EQUITY, rootType: RootType.EQUITY, isGroup: true, parentNumber: '3' },
+    { accountNumber: '3.3.1', name: 'Laba Tahun Berjalan', accountType: AccountType.EQUITY, rootType: RootType.EQUITY, isGroup: false, parentNumber: '3.3' },
+
+    // REVENUE
+    { accountNumber: '4', name: 'Pendapatan', accountType: AccountType.REVENUE, rootType: RootType.REVENUE, isGroup: true },
+    { accountNumber: '4.1', name: 'Penjualan Beras', accountType: AccountType.REVENUE, rootType: RootType.REVENUE, isGroup: true, parentNumber: '4' },
+    { accountNumber: '4.1.1', name: 'Penjualan Beras Premium', accountType: AccountType.REVENUE, rootType: RootType.REVENUE, isGroup: false, parentNumber: '4.1' },
+    { accountNumber: '4.2', name: 'Penjualan Sekam', accountType: AccountType.REVENUE, rootType: RootType.REVENUE, isGroup: false, parentNumber: '4' },
+    { accountNumber: '4.3', name: 'Penjualan Bekatul', accountType: AccountType.REVENUE, rootType: RootType.REVENUE, isGroup: false, parentNumber: '4' },
+
+    // EXPENSE
+    { accountNumber: '5', name: 'Beban', accountType: AccountType.EXPENSE, rootType: RootType.EXPENSE, isGroup: true },
+    { accountNumber: '5.1', name: 'Harga Pokok Penjualan', accountType: AccountType.EXPENSE, rootType: RootType.EXPENSE, isGroup: true, parentNumber: '5' },
+    { accountNumber: '5.1.1', name: 'Pembelian Gabah', accountType: AccountType.EXPENSE, rootType: RootType.EXPENSE, isGroup: false, parentNumber: '5.1' },
+    { accountNumber: '5.2', name: 'Beban Operasional', accountType: AccountType.EXPENSE, rootType: RootType.EXPENSE, isGroup: true, parentNumber: '5' },
+    { accountNumber: '5.2.1', name: 'Listrik & Air Pabrik', accountType: AccountType.EXPENSE, rootType: RootType.EXPENSE, isGroup: false, parentNumber: '5.2' },
+    { accountNumber: '5.2.2', name: 'Gaji Karyawan', accountType: AccountType.EXPENSE, rootType: RootType.EXPENSE, isGroup: false, parentNumber: '5.2' },
+  ];
+
+  const numberToId: Record<string, string> = {};
+
+  for (const item of coa) {
+    const parentId = item.parentNumber ? numberToId[item.parentNumber] : null;
+
+    const account = await prisma.account.upsert({
+      where: { accountNumber: item.accountNumber },
+      update: { isGroup: item.isGroup },
+      create: {
+        accountNumber: item.accountNumber,
+        name: item.name,
+        accountType: item.accountType,
+        rootType: item.rootType,
+        isGroup: item.isGroup,
+        parentId: parentId,
+      },
+    });
+
+    numberToId[item.accountNumber] = account.id;
+    console.log(`- Created account: ${account.accountNumber} ${account.name}`);
+  }
+
+  console.log('Seeding completed.');
+}
+
+main()
+  .catch((e) => {
+    console.error(e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
