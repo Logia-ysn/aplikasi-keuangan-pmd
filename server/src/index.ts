@@ -2,6 +2,7 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
+import path from 'path';
 import { authMiddleware } from './middleware/auth';
 import { auditTrailMiddleware } from './middleware/auditTrail';
 import { logger } from './lib/logger';
@@ -76,6 +77,18 @@ app.use('/api/reports', reportRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/fiscal-years', fiscalYearRoutes);
 app.use('/api/inventory', inventoryRoutes);
+
+// ─── Serve Frontend (Production) ──────────────────────────────────────────────
+// In production, serve the built React client from ../client/dist
+const clientDist = path.resolve(__dirname, '../../client/dist');
+app.use(express.static(clientDist));
+app.get('*', (_req, res, next) => {
+  // Only serve index.html for non-API routes (SPA fallback)
+  if (_req.path.startsWith('/api')) return next();
+  res.sendFile(path.join(clientDist, 'index.html'), (err) => {
+    if (err) next(); // If file doesn't exist, fall through
+  });
+});
 
 // ─── Global Error Handler ──────────────────────────────────────────────────────
 app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
