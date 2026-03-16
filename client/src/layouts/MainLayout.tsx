@@ -11,6 +11,7 @@ const routeNames: Record<string, string> = {
   'payments': 'Bank & Kas',
   'parties': 'Pelanggan & Vendor',
   'reports': 'Laporan Keuangan',
+  'inventory': 'Stok & Gudang',
   'settings': 'Pengaturan',
 };
 

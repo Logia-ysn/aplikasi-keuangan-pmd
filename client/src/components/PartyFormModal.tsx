@@ -35,6 +35,7 @@ const PartyFormModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ is
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['parties'] });
       queryClient.invalidateQueries({ queryKey: ['parties-customers'] });
+      queryClient.invalidateQueries({ queryKey: ['parties-suppliers'] });
       setForm(defaultForm());
       setError('');
       onClose();

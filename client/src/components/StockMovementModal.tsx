@@ -54,8 +54,8 @@ export function StockMovementModal({ isOpen, onClose }: StockMovementModalProps)
   const items: any[] = itemsRaw ?? [];
 
   const { data: coaData } = useQuery({
-    queryKey: ['coa'],
-    queryFn: () => api.get('/coa').then(r => r.data),
+    queryKey: ['coa-flat'],
+    queryFn: () => api.get('/coa/flat').then(r => r.data),
     enabled: isOpen,
   });
   const nonGroupAccounts = (coaData ?? []).filter((a: any) => !a.isGroup);
@@ -254,7 +254,7 @@ export function StockMovementModal({ isOpen, onClose }: StockMovementModalProps)
                   <option value="">— Tidak Dipilih —</option>
                   {nonGroupAccounts.map((a: any) => (
                     <option key={a.id} value={a.id}>
-                      {a.code} — {a.name}
+                      {a.accountNumber} — {a.name}
                     </option>
                   ))}
                 </select>

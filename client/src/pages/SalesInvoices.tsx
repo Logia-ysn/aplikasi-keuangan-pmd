@@ -94,8 +94,8 @@ export const SalesInvoices = () => {
                     <span className="font-mono text-xs text-gray-800 bg-gray-50 px-1.5 py-0.5 rounded">{invoice.invoiceNumber}</span>
                   </td>
                   <td>
-                    <p className="font-medium text-gray-800">{invoice.customer.name}</p>
-                    <p className="text-[10px] text-gray-400">{invoice.customer.phone || '—'}</p>
+                    <p className="font-medium text-gray-800">{invoice.customer?.name ?? '—'}</p>
+                    <p className="text-[10px] text-gray-400">{invoice.customer?.phone || '—'}</p>
                   </td>
                   <td className="text-right font-mono font-medium text-gray-900 tabular-nums">{formatRupiah(Number(invoice.grandTotal))}</td>
                   <td className="text-right">

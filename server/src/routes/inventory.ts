@@ -151,12 +151,16 @@ router.post('/movements', roleMiddleware(['Admin', 'Accountant']), async (req: A
 
   try {
     const result = await prisma.$transaction(async (tx) => {
-      // 1. Get active fiscal year
+      // 1. Get active fiscal year for this transaction date
+      const txDate = new Date(body.date);
       const fiscalYear = await tx.fiscalYear.findFirst({
-        where: { isClosed: false },
-        orderBy: { startDate: 'asc' },
+        where: {
+          isClosed: false,
+          startDate: { lte: txDate },
+          endDate: { gte: txDate },
+        },
       });
-      if (!fiscalYear) throw new BusinessError('Tidak ada tahun fiskal yang aktif.');
+      if (!fiscalYear) throw new BusinessError('Tidak ada tahun fiskal aktif untuk tanggal transaksi ini.');
 
       // 2. Get item
       const item = await tx.inventoryItem.findUnique({ where: { id: body.itemId } });
@@ -414,12 +418,16 @@ router.post('/production-runs', roleMiddleware(['Admin', 'Accountant']), async (
 
   try {
     const result = await prisma.$transaction(async (tx) => {
-      // 1. Get active fiscal year
+      // 1. Get active fiscal year for this transaction date
+      const txDate = new Date(body.date);
       const fiscalYear = await tx.fiscalYear.findFirst({
-        where: { isClosed: false },
-        orderBy: { startDate: 'asc' },
+        where: {
+          isClosed: false,
+          startDate: { lte: txDate },
+          endDate: { gte: txDate },
+        },
       });
-      if (!fiscalYear) throw new BusinessError('Tidak ada tahun fiskal yang aktif.');
+      if (!fiscalYear) throw new BusinessError('Tidak ada tahun fiskal aktif untuk tanggal transaksi ini.');
 
       // 2. Validate and fetch all input items
       for (const input of body.inputs) {

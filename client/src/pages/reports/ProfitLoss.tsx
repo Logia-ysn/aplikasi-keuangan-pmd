@@ -144,7 +144,9 @@ const ProfitLoss: React.FC = () => {
               </div>
               <span className="text-xs text-gray-500 font-medium">{m.label}</span>
             </div>
-            <p className={cn('text-xl font-semibold tabular-nums', m.color)}>{formatRupiah(Math.abs(m.value))}</p>
+            <p className={cn('text-xl font-semibold tabular-nums', m.color)}>
+              {m.label === 'Laba Bersih' && m.value < 0 ? '- ' : ''}{formatRupiah(Math.abs(m.value))}
+            </p>
           </div>
         ))}
       </div>

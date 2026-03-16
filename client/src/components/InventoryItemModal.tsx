@@ -55,13 +55,13 @@ export function InventoryItemModal({ isOpen, onClose, editItem }: InventoryItemM
   }, [isOpen, onClose]);
 
   const { data: coaData } = useQuery({
-    queryKey: ['coa'],
-    queryFn: () => api.get('/coa').then(r => r.data),
+    queryKey: ['coa-flat'],
+    queryFn: () => api.get('/coa/flat').then(r => r.data),
     enabled: isOpen,
   });
 
   const assetAccounts = (coaData ?? []).filter(
-    (a: any) => a.rootType === 'ASSET' && !a.isGroup
+    (a: any) => a.accountType === 'ASSET' && !a.isGroup
   );
 
   const mutation = useMutation({
@@ -232,7 +232,7 @@ export function InventoryItemModal({ isOpen, onClose, editItem }: InventoryItemM
                 <option value="">— Tidak Dipilih —</option>
                 {assetAccounts.map((a: any) => (
                   <option key={a.id} value={a.id}>
-                    {a.code} — {a.name}
+                    {a.accountNumber} — {a.name}
                   </option>
                 ))}
               </select>

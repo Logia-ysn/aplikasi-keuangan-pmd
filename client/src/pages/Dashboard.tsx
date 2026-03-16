@@ -166,9 +166,9 @@ export const Dashboard = () => {
             )}
           </div>
 
-          <button className="mt-4 text-xs font-medium text-gray-500 hover:text-blue-600 transition-colors text-center pt-3 border-t border-gray-100">
+          <a href="/payments" className="block mt-4 text-xs font-medium text-gray-500 hover:text-blue-600 transition-colors text-center pt-3 border-t border-gray-100">
             Lihat semua →
-          </button>
+          </a>
         </div>
       </div>
     </div>

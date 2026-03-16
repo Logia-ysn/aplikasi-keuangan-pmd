@@ -14,7 +14,9 @@ export const auditTrailMiddleware = async (req: AuthRequest, res: Response, next
         DELETE: 'DELETE',
       };
 
-      const entityType = req.path.split('/')[2] || 'unknown';
+      // req.originalUrl = '/api/sales/invoices' → extract 'sales'
+      const segments = req.originalUrl.replace(/^\/api\//, '').split('/').filter(Boolean);
+      const entityType = segments[0] || 'unknown';
 
       prisma.auditLog
         .create({
