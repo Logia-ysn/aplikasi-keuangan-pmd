@@ -23,24 +23,29 @@ async function main() {
   });
   console.log('- Created Fiscal Year: 2026');
 
-  // 2. Seed Admin User (S-02: password from env)
-  const adminPassword = process.env.SEED_ADMIN_PASSWORD || 'Admin@PMD2026!';
-  if (!process.env.SEED_ADMIN_PASSWORD) {
-    console.warn('WARNING: SEED_ADMIN_PASSWORD not set, using default password. Change it in production!');
+  // 2. Seed Users
+  const hashedPassword = await bcrypt.hash('P4nganterdepan!', 12);
+
+  const users = [
+    { username: 'keuangan', fullName: 'Keuangan PMD', email: 'keuangan@panganmasadepan.com', role: UserRole.Admin },
+    { username: 'info',     fullName: 'Info PMD',     email: 'info@panganmasadepan.com',     role: UserRole.Accountant },
+    { username: 'ysn',      fullName: 'YSN',          email: 'ysn@panganmasadepan.com',      role: UserRole.Viewer },
+  ];
+
+  for (const u of users) {
+    await prisma.user.upsert({
+      where: { email: u.email },
+      update: { username: u.username, fullName: u.fullName, role: u.role, passwordHash: hashedPassword },
+      create: {
+        username: u.username,
+        fullName: u.fullName,
+        email: u.email,
+        passwordHash: hashedPassword,
+        role: u.role,
+      },
+    });
+    console.log(`- Upserted User: ${u.email} (${u.role})`);
   }
-  const hashedPassword = await bcrypt.hash(adminPassword, 12);
-  const admin = await prisma.user.upsert({
-    where: { username: 'admin' },
-    update: {},
-    create: {
-      username: 'admin',
-      fullName: 'Logia Admin',
-      email: 'admin@panganmasadepan.com',
-      passwordHash: hashedPassword,
-      role: UserRole.Admin,
-    },
-  });
-  console.log('- Created Admin User: admin');
 
   // 3. Seed COA
   const coa = [

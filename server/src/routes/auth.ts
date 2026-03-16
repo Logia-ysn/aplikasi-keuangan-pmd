@@ -11,18 +11,26 @@ router.post('/login', loginRateLimiter, async (req, res) => {
   const { username, password } = req.body;
 
   if (!username || !password) {
-    return res.status(400).json({ error: 'Username dan password wajib diisi.' });
+    return res.status(400).json({ error: 'Email dan password wajib diisi.' });
   }
 
   try {
-    const user = await prisma.user.findUnique({ where: { username } });
+    // Support login by email or username
+    const user = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { email: username },
+          { username: username },
+        ],
+      },
+    });
     if (!user || !user.isActive) {
-      return res.status(401).json({ error: 'Username atau password salah.' });
+      return res.status(401).json({ error: 'Email atau password salah.' });
     }
 
     const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
     if (!isPasswordValid) {
-      return res.status(401).json({ error: 'Username atau password salah.' });
+      return res.status(401).json({ error: 'Email atau password salah.' });
     }
 
     await prisma.user.update({

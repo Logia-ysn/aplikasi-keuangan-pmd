@@ -43,7 +43,7 @@ const LoginPage: React.FC = () => {
       localStorage.setItem('user', JSON.stringify(response.data.user));
       navigate('/');
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Login gagal. Periksa kembali username dan password Anda.');
+      setError(err.response?.data?.error || 'Login gagal. Periksa kembali email dan password Anda.');
     } finally {
       setLoading(false);
     }
@@ -139,19 +139,19 @@ const LoginPage: React.FC = () => {
           )}
 
           <form onSubmit={handleLogin} className="space-y-4">
-            {/* Username */}
+            {/* Email */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Username</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Email</label>
               <div className="relative">
                 <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input
                   type="text"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  autoComplete="username"
+                  autoComplete="email"
                   autoFocus
                   className="w-full bg-white border border-gray-200 rounded-xl py-3 pl-10 pr-4 text-gray-900 placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all shadow-sm"
-                  placeholder="Masukkan username"
+                  placeholder="email@panganmasadepan.com"
                   required
                 />
               </div>
