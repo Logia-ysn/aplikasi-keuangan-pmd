@@ -25,7 +25,10 @@ const app = express();
 const port = process.env.PORT || 3001;
 
 // ─── CORS ──────────────────────────────────────────────────────────────────────
-const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:5173,http://localhost:3000')
+const allowedOrigins = (
+  process.env.ALLOWED_ORIGINS ||
+  'http://localhost:5173,http://localhost:3000,https://keuangan.panganmasadepan.com'
+)
   .split(',')
   .map((o) => o.trim());
 
@@ -33,11 +36,24 @@ app.use(
   cors({
     origin: (origin, callback) => {
       // Allow requests with no origin (mobile apps, curl, same-origin)
-      if (!origin || allowedOrigins.includes(origin) || allowedOrigins.includes('*')) {
-        callback(null, true);
-      } else {
-        callback(new Error(`CORS: origin ${origin} not allowed`));
-      }
+      if (!origin) return callback(null, true);
+      // Allow explicitly listed origins
+      if (allowedOrigins.includes(origin) || allowedOrigins.includes('*')) return callback(null, true);
+      // Auto-allow same-origin: if frontend is served by this Express server,
+      // the browser may still send Origin header — always allow it
+      try {
+        const originHost = new URL(origin).hostname;
+        if (
+          originHost === 'localhost' ||
+          originHost === '127.0.0.1' ||
+          originHost.endsWith('.panganmasadepan.com') ||
+          originHost === 'panganmasadepan.com'
+        ) {
+          return callback(null, true);
+        }
+      } catch { /* invalid origin URL, fall through */ }
+      logger.warn({ origin, allowedOrigins }, 'CORS origin blocked');
+      callback(new Error(`CORS: origin ${origin} not allowed`));
     },
     credentials: true,
   })
