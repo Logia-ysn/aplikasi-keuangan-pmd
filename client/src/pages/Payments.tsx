@@ -6,17 +6,13 @@ import api from '../lib/api';
 import { formatRupiah, formatDate } from '../lib/formatters';
 import PaymentModal from '../components/PaymentModal';
 import TransferModal from '../components/TransferModal';
+import ExpenseModal from '../components/ExpenseModal';
 
 export const Payments = () => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [modalType, setModalType] = useState<'Receive' | 'Pay'>('Receive');
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isReceiveOpen, setIsReceiveOpen] = useState(false);
+  const [isExpenseOpen, setIsExpenseOpen] = useState(false);
   const [isTransferOpen, setIsTransferOpen] = useState(false);
-
-  const openModal = (type: 'Receive' | 'Pay') => {
-    setModalType(type);
-    setIsModalOpen(true);
-  };
 
   const { data: payments, isLoading } = useQuery({
     queryKey: ['payments'],
@@ -41,12 +37,12 @@ export const Payments = () => {
           >
             <ArrowRightLeft size={15} /> Pinbuk
           </button>
-          <button className="btn-primary" onClick={() => openModal('Receive')}>
+          <button className="btn-primary" onClick={() => setIsReceiveOpen(true)}>
             <TrendingDown size={15} /> Terima Pembayaran
           </button>
           <button
             className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-medium bg-orange-500 hover:bg-orange-600 text-white transition-colors"
-            onClick={() => openModal('Pay')}
+            onClick={() => setIsExpenseOpen(true)}
           >
             <TrendingUp size={15} /> Catat Pengeluaran
           </button>
@@ -141,9 +137,13 @@ export const Payments = () => {
         </table>
       </div>
       <PaymentModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        defaultType={modalType}
+        isOpen={isReceiveOpen}
+        onClose={() => setIsReceiveOpen(false)}
+        defaultType="Receive"
+      />
+      <ExpenseModal
+        isOpen={isExpenseOpen}
+        onClose={() => setIsExpenseOpen(false)}
       />
       <TransferModal
         isOpen={isTransferOpen}
