@@ -346,6 +346,64 @@ function CFSection({ title, items, total }: { title: string; items: CFItem[]; to
   );
 }
 
+// ── Aging Analysis ───────────────────────────────────────────────────────────
+export interface AgingRow {
+  name: string;
+  current: number;
+  d1_30: number;
+  d31_60: number;
+  d61_90: number;
+  d91_plus: number;
+  total: number;
+}
+interface AgingPDFProps {
+  company: CompanyInfo;
+  type: 'Customer' | 'Supplier';
+  rows: AgingRow[];
+  totals: AgingRow;
+}
+export const AgingPDF: React.FC<AgingPDFProps> = ({ company, type, rows, totals }) => {
+  const title = type === 'Customer' ? 'AGING PIUTANG' : 'AGING HUTANG';
+  const cols = ['Belum JT', '1-30', '31-60', '61-90', '>90', 'Total'];
+  const w = 68;
+  return (
+    <Document>
+      <Page size="A4" orientation="landscape" style={S.page}>
+        <ReportHeader company={company} title={title} period={`Per ${today()}`} />
+        <View style={S.sectionHeader}>
+          <View style={{ flexDirection: 'row' }}>
+            <Text style={[S.sectionHeaderText, { flex: 1 }]}>Nama Mitra</Text>
+            {cols.map((c) => (
+              <Text key={c} style={[S.sectionHeaderText, { width: w, textAlign: 'right' }]}>{c}</Text>
+            ))}
+          </View>
+        </View>
+        {rows.map((r, i) => (
+          <View key={i} style={[S.row, i % 2 === 1 ? S.rowAlt : {}]}>
+            <Text style={[S.colLabel, { flex: 1 }]}>{r.name}</Text>
+            <Text style={[S.colBalance, { width: w }]}>{idr(r.current)}</Text>
+            <Text style={[S.colBalance, { width: w }]}>{idr(r.d1_30)}</Text>
+            <Text style={[S.colBalance, { width: w, color: r.d31_60 > 0 ? '#d97706' : C.muted }]}>{idr(r.d31_60)}</Text>
+            <Text style={[S.colBalance, { width: w, color: r.d61_90 > 0 ? '#ea580c' : C.muted }]}>{idr(r.d61_90)}</Text>
+            <Text style={[S.colBalance, { width: w, color: r.d91_plus > 0 ? C.red : C.muted }]}>{idr(r.d91_plus)}</Text>
+            <Text style={[S.colTotalBold, { width: w }]}>{idr(r.total)}</Text>
+          </View>
+        ))}
+        <View style={S.rowGrandTotal}>
+          <Text style={[S.colGTLabel, { flex: 1 }]}>TOTAL</Text>
+          <Text style={[S.colTotalWhite, { width: w }]}>{idr(totals.current)}</Text>
+          <Text style={[S.colTotalWhite, { width: w }]}>{idr(totals.d1_30)}</Text>
+          <Text style={[S.colTotalWhite, { width: w }]}>{idr(totals.d31_60)}</Text>
+          <Text style={[S.colTotalWhite, { width: w }]}>{idr(totals.d61_90)}</Text>
+          <Text style={[S.colTotalWhite, { width: w }]}>{idr(totals.d91_plus)}</Text>
+          <Text style={[S.colTotalWhite, { width: w }]}>{idr(totals.total)}</Text>
+        </View>
+        <ReportFooter company={company} title={type === 'Customer' ? 'Aging Piutang' : 'Aging Hutang'} />
+      </Page>
+    </Document>
+  );
+};
+
 // ── Shared sub-components ─────────────────────────────────────────────────────
 function ReportHeader({ company, title, period }: { company: CompanyInfo; title: string; period: string }) {
   return (
