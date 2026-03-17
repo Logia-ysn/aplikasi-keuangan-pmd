@@ -1,8 +1,9 @@
 import { Prisma } from '@prisma/client';
+import { BusinessError } from './errors';
 
 /**
  * Find the open fiscal year that contains the given date.
- * Throws if not found or already closed.
+ * Throws BusinessError if not found or already closed.
  */
 export async function getOpenFiscalYear(
   tx: Prisma.TransactionClient,
@@ -17,7 +18,7 @@ export async function getOpenFiscalYear(
   });
 
   if (!fiscalYear) {
-    throw new Error('Tahun fiskal tidak ditemukan atau sudah ditutup untuk tanggal ini.');
+    throw new BusinessError('Tahun fiskal tidak ditemukan atau sudah ditutup untuk tanggal ini.');
   }
 
   return fiscalYear;

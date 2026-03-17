@@ -132,8 +132,11 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
     if (error instanceof BusinessError) {
       return res.status(400).json({ error: error.message });
     }
-    logger.error({ error }, 'POST /journals error');
-    return res.status(500).json({ error: 'Gagal menyimpan jurnal.' });
+    if (error?.code === 'P2025') {
+      return res.status(400).json({ error: 'Data terkait tidak ditemukan (akun/tahun fiskal).' });
+    }
+    logger.error({ error, stack: error?.stack }, 'POST /journals error');
+    return res.status(500).json({ error: error?.message || 'Gagal menyimpan jurnal.' });
   }
 });
 

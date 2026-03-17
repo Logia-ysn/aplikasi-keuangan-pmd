@@ -163,8 +163,15 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
     if (error instanceof BusinessError) {
       return res.status(400).json({ error: error.message });
     }
-    logger.error({ error }, 'POST /payments error');
-    return res.status(500).json({ error: 'Gagal menyimpan pembayaran.' });
+    // Surface Prisma known errors
+    if (error?.code === 'P2025') {
+      return res.status(400).json({ error: 'Data terkait tidak ditemukan (akun/pihak/tahun fiskal).' });
+    }
+    if (error?.code === 'P2002') {
+      return res.status(400).json({ error: 'Nomor pembayaran duplikat. Coba lagi.' });
+    }
+    logger.error({ error, stack: error?.stack }, 'POST /payments error');
+    return res.status(500).json({ error: error?.message || 'Gagal menyimpan pembayaran.' });
   }
 });
 

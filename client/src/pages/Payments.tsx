@@ -1,15 +1,17 @@
 import { useState } from 'react';
-import { Search, MoreHorizontal, CreditCard, Loader2, TrendingDown, TrendingUp } from 'lucide-react';
+import { Search, MoreHorizontal, CreditCard, Loader2, TrendingDown, TrendingUp, ArrowRightLeft } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useQuery } from '@tanstack/react-query';
 import api from '../lib/api';
 import { formatRupiah, formatDate } from '../lib/formatters';
 import PaymentModal from '../components/PaymentModal';
+import TransferModal from '../components/TransferModal';
 
 export const Payments = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [modalType, setModalType] = useState<'Receive' | 'Pay'>('Receive');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isTransferOpen, setIsTransferOpen] = useState(false);
 
   const openModal = (type: 'Receive' | 'Pay') => {
     setModalType(type);
@@ -33,6 +35,12 @@ export const Payments = () => {
           <p className="text-sm text-gray-500 mt-0.5">Pantau mutasi kas, pembayaran vendor, dan pelunasan piutang.</p>
         </div>
         <div className="flex gap-2">
+          <button
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-medium bg-blue-100 hover:bg-blue-200 text-blue-700 transition-colors"
+            onClick={() => setIsTransferOpen(true)}
+          >
+            <ArrowRightLeft size={15} /> Pinbuk
+          </button>
           <button className="btn-primary" onClick={() => openModal('Receive')}>
             <TrendingDown size={15} /> Terima Pembayaran
           </button>
@@ -136,6 +144,10 @@ export const Payments = () => {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         defaultType={modalType}
+      />
+      <TransferModal
+        isOpen={isTransferOpen}
+        onClose={() => setIsTransferOpen(false)}
       />
     </div>
   );
