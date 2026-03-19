@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../lib/api';
 import { Lock, User, AlertCircle, Eye, EyeOff, BarChart3, ShieldCheck, TrendingUp } from 'lucide-react';
+import { APP_VERSION, APP_BUILD_DATE } from '../lib/version';
 
 // Fallback brand logo (SVG matching PMD color palette: gray + amber/gold)
 const PmdLogoFallback = () => (
@@ -111,10 +112,13 @@ const LoginPage: React.FC = () => {
         </div>
 
         {/* Bottom: Footer */}
-        <div className="relative z-10 px-12 py-8 border-t border-white/5">
+        <div className="relative z-10 px-12 py-8 border-t border-white/5 flex items-center justify-between">
           <p className="text-gray-600 text-xs">
             © {new Date().getFullYear()} PT Pangan Masa Depan. All rights reserved.
           </p>
+          <span className="text-gray-600 text-[10px] font-mono bg-white/5 border border-white/10 rounded px-2 py-0.5">
+            v{APP_VERSION}
+          </span>
         </div>
       </div>
 
@@ -206,6 +210,14 @@ const LoginPage: React.FC = () => {
             Lupa password?{' '}
             <span className="text-gray-600 font-medium">Hubungi Administrator</span>
           </p>
+
+          {/* Version badge */}
+          <div className="mt-10 flex items-center justify-center gap-2">
+            <span className="text-[10px] font-mono text-gray-400 bg-gray-100 border border-gray-200 rounded px-2 py-0.5">
+              v{APP_VERSION}
+            </span>
+            <span className="text-[10px] text-gray-300">build {APP_BUILD_DATE}</span>
+          </div>
         </div>
       </div>
     </div>

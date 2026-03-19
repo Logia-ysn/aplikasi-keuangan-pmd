@@ -4,12 +4,14 @@ import { toast } from 'sonner';
 import api from '../lib/api';
 import {
   Calendar, Lock, Unlock, Plus, CheckCircle2, ChevronRight,
-  Building2, Save, Settings, Loader2, Upload, X, ImageIcon
+  Building2, Save, Settings, Loader2, Upload, X, ImageIcon,
+  Info, Tag, Clock, Sparkles, ExternalLink, RefreshCw, CheckCircle, ArrowUpCircle,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
 import { cn } from '../lib/utils';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { APP_VERSION, APP_BUILD_DATE, APP_NAME, CHANGELOG } from '../lib/version';
 
 interface FiscalYear {
   id: string;
@@ -347,12 +349,183 @@ const CompanySettingsTab: React.FC = () => {
   );
 };
 
+// ─── About & Changelog Tab ───────────────────────────────
+const AboutTab: React.FC = () => {
+  const [checking, setChecking] = useState(false);
+  const [updateResult, setUpdateResult] = useState<'latest' | 'available' | null>(null);
+
+  const handleCheckUpdate = async () => {
+    setChecking(true);
+    setUpdateResult(null);
+    try {
+      // Fetch latest release from GitHub API
+      const res = await fetch('https://api.github.com/repos/Logia-ysn/aplikasi-keuangan-pmd/releases/latest');
+      if (res.ok) {
+        const data = await res.json();
+        const latestTag = (data.tag_name || '').replace(/^v/, '');
+        if (latestTag && latestTag !== APP_VERSION) {
+          setUpdateResult('available');
+        } else {
+          setUpdateResult('latest');
+        }
+      } else {
+        // No releases or error — compare with latest commit
+        const commitRes = await fetch('https://api.github.com/repos/Logia-ysn/aplikasi-keuangan-pmd/commits/main');
+        if (commitRes.ok) {
+          setUpdateResult('latest'); // Can't compare semver from commits
+        }
+      }
+    } catch {
+      setUpdateResult('latest');
+    } finally {
+      setChecking(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* App Info Card */}
+      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+        <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
+                <Sparkles size={22} className="text-white" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-white">{APP_NAME}</h3>
+                <p className="text-blue-100 text-xs">Sistem ERP Keuangan — PT Pangan Masa Depan</p>
+              </div>
+            </div>
+            <span className="bg-white/20 text-white text-sm font-mono font-bold px-3 py-1.5 rounded-lg">
+              v{APP_VERSION}
+            </span>
+          </div>
+        </div>
+
+        <div className="p-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="bg-gray-50 rounded-lg p-3">
+              <div className="flex items-center gap-1.5 mb-1">
+                <Tag size={12} className="text-gray-400" />
+                <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Versi</span>
+              </div>
+              <p className="text-sm font-bold text-gray-900 font-mono">{APP_VERSION}</p>
+            </div>
+            <div className="bg-gray-50 rounded-lg p-3">
+              <div className="flex items-center gap-1.5 mb-1">
+                <Clock size={12} className="text-gray-400" />
+                <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Build Date</span>
+              </div>
+              <p className="text-sm font-bold text-gray-900">{APP_BUILD_DATE}</p>
+            </div>
+            <div className="bg-gray-50 rounded-lg p-3">
+              <div className="flex items-center gap-1.5 mb-1">
+                <Info size={12} className="text-gray-400" />
+                <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Platform</span>
+              </div>
+              <p className="text-sm font-bold text-gray-900">Raspberry Pi 5</p>
+            </div>
+            <div className="bg-gray-50 rounded-lg p-3">
+              <div className="flex items-center gap-1.5 mb-1">
+                <ExternalLink size={12} className="text-gray-400" />
+                <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Domain</span>
+              </div>
+              <p className="text-sm font-bold text-gray-900 truncate">keuangan.pmd</p>
+            </div>
+          </div>
+
+          {/* Check for updates */}
+          <div className="mt-5 flex items-center gap-3">
+            <button
+              onClick={handleCheckUpdate}
+              disabled={checking}
+              className="btn-secondary text-xs py-2"
+            >
+              {checking ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
+              {checking ? 'Memeriksa...' : 'Periksa Pembaruan'}
+            </button>
+
+            {updateResult === 'latest' && (
+              <div className="flex items-center gap-1.5 text-xs text-green-600">
+                <CheckCircle size={14} />
+                <span className="font-medium">Aplikasi sudah versi terbaru.</span>
+              </div>
+            )}
+            {updateResult === 'available' && (
+              <div className="flex items-center gap-1.5 text-xs text-blue-600">
+                <ArrowUpCircle size={14} />
+                <span className="font-medium">Pembaruan tersedia! Hubungi admin untuk update server.</span>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Changelog */}
+      <div>
+        <div className="flex items-center gap-2 mb-4">
+          <h2 className="text-base font-semibold text-gray-900">Changelog</h2>
+          <span className="badge badge-blue text-[10px]">{CHANGELOG.length} rilis</span>
+        </div>
+
+        <div className="relative">
+          {/* Timeline line */}
+          <div className="absolute left-[17px] top-8 bottom-4 w-px bg-gray-200" />
+
+          <div className="space-y-1">
+            {CHANGELOG.map((entry, idx) => (
+              <div key={entry.version} className="relative flex gap-4">
+                {/* Timeline dot */}
+                <div className="relative z-10 mt-1 flex-shrink-0">
+                  <div className={cn(
+                    'w-[9px] h-[9px] rounded-full ring-4 ring-white',
+                    idx === 0 ? 'bg-blue-500' : 'bg-gray-300'
+                  )} />
+                </div>
+
+                {/* Content */}
+                <div className={cn(
+                  'flex-1 bg-white border rounded-xl p-4 mb-3 transition-all',
+                  idx === 0 ? 'border-blue-200 shadow-sm' : 'border-gray-200'
+                )}>
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <span className={cn(
+                        'font-mono text-xs font-bold px-2 py-0.5 rounded',
+                        idx === 0 ? 'bg-blue-50 text-blue-700' : 'bg-gray-100 text-gray-600'
+                      )}>
+                        v{entry.version}
+                      </span>
+                      <h4 className="text-sm font-semibold text-gray-900">{entry.title}</h4>
+                    </div>
+                    <span className="text-[10px] text-gray-400 font-mono">{entry.date}</span>
+                  </div>
+                  <ul className="space-y-1">
+                    {entry.changes.map((change, ci) => (
+                      <li key={ci} className="flex items-start gap-2 text-xs text-gray-600">
+                        <span className="text-gray-300 mt-0.5 flex-shrink-0">•</span>
+                        <span>{change}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ─── Main Settings Page ───────────────────────────────────
 export const SettingsPage: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'fiscal' | 'company'>('fiscal');
+  const [activeTab, setActiveTab] = useState<'fiscal' | 'company' | 'about'>('fiscal');
   const tabs = [
     { id: 'fiscal', label: 'Tahun Buku', icon: Calendar },
     { id: 'company', label: 'Profil Perusahaan', icon: Building2 },
+    { id: 'about', label: 'Tentang Aplikasi', icon: Info },
   ];
 
   return (
@@ -384,7 +557,9 @@ export const SettingsPage: React.FC = () => {
         ))}
       </div>
 
-      {activeTab === 'fiscal' ? <FiscalYearsTab /> : <CompanySettingsTab />}
+      {activeTab === 'fiscal' && <FiscalYearsTab />}
+      {activeTab === 'company' && <CompanySettingsTab />}
+      {activeTab === 'about' && <AboutTab />}
     </div>
   );
 };
