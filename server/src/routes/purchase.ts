@@ -42,6 +42,32 @@ router.get('/', async (req, res) => {
   }
 });
 
+// GET /api/purchase/invoices/:id — detail single invoice
+router.get('/:id', async (req, res) => {
+  try {
+    const invoice = await prisma.purchaseInvoice.findUnique({
+      where: { id: req.params.id },
+      include: {
+        supplier: true,
+        items: true,
+        user: { select: { id: true, fullName: true } },
+      },
+    });
+    if (!invoice) return res.status(404).json({ error: 'Invoice tidak ditemukan.' });
+
+    const allocations = await prisma.paymentAllocation.findMany({
+      where: { invoiceType: 'PurchaseInvoice', invoiceId: invoice.id },
+      include: { payment: { select: { id: true, paymentNumber: true, date: true, amount: true, referenceNo: true } } },
+      orderBy: { payment: { date: 'desc' } },
+    });
+
+    return res.json({ ...invoice, paymentAllocations: allocations });
+  } catch (error) {
+    logger.error({ error }, 'GET /purchase/invoices/:id error');
+    return res.status(500).json({ error: 'Gagal mengambil detail invoice.' });
+  }
+});
+
 // POST /api/purchase/invoices — create purchase invoice
 router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthRequest, res) => {
   const body = validateBody(CreatePurchaseInvoiceSchema, req.body, res);

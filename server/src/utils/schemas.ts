@@ -102,6 +102,11 @@ export const UpdatePartySchema = CreatePartySchema.partial().extend({
   isActive: z.boolean().optional(),
 });
 
+// ─── Opening Balance ─────────────────────────────────────────────────────────
+export const SetBalanceSchema = z.object({
+  balance: z.number({ error: 'Saldo harus berupa angka.' }),
+});
+
 // ─── Company Settings ─────────────────────────────────────────────────────────
 export const UpdateCompanySettingsSchema = z.object({
   companyName: z.string().min(1, 'Nama perusahaan wajib diisi.').optional(),

@@ -72,6 +72,15 @@ body {
 }
 .data-table tbody td { @apply px-4 py-3 text-gray-700; }
 
+/* ─── Drawer animation ──────────────── */
+@keyframes slide-in-right {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(0); }
+}
+.animate-slide-in-right {
+  animation: slide-in-right 0.25s ease-out;
+}
+
 /* legacy aliases — remapped to clean white cards */
 .glass { @apply bg-white border border-gray-200 rounded-xl shadow-sm; }
 .premium-gradient { @apply bg-white; }

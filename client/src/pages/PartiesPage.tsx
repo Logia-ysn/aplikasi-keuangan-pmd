@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Plus, Search, MoreHorizontal, Users, Loader2, Mail, Phone, MapPin, Pencil, Trash2, AlertCircle } from 'lucide-react';
+import { toast } from 'sonner';
 import { cn } from '../lib/utils';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../lib/api';
@@ -38,13 +39,19 @@ export const PartiesPage = () => {
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.delete(`/parties/${id}`),
-    onSuccess: () => {
+    onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ['parties'] });
       queryClient.invalidateQueries({ queryKey: ['parties-all'] });
+      const data = res.data;
+      if (data.deactivated) {
+        toast.info(data.message || 'Mitra dinonaktifkan karena memiliki transaksi terkait.');
+      } else {
+        toast.success(data.message || 'Mitra berhasil dihapus.');
+      }
       setDeleteConfirm(null);
     },
     onError: (err: any) => {
-      alert(err.response?.data?.error || 'Gagal menghapus mitra.');
+      toast.error(err.response?.data?.error || 'Gagal menghapus mitra.');
       setDeleteConfirm(null);
     },
   });

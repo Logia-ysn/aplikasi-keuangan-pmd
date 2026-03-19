@@ -9,7 +9,7 @@ import { Prisma } from '@prisma/client';
  */
 export async function generateDocumentNumber(
   tx: Prisma.TransactionClient,
-  prefix: 'JV' | 'SI' | 'PI' | 'PAY' | 'SM' | 'PR',
+  prefix: 'JV' | 'SI' | 'PI' | 'PAY' | 'SM' | 'PR' | 'OB',
   date: Date,
   fiscalYearId: string
 ): Promise<string> {

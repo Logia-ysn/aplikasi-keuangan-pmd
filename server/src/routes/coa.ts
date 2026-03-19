@@ -1,8 +1,14 @@
 import { Router } from 'express';
+import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
-import { roleMiddleware } from '../middleware/auth';
+import { AuthRequest, roleMiddleware } from '../middleware/auth';
+import { updateAccountBalance } from '../utils/accountBalance';
+import { generateDocumentNumber } from '../utils/documentNumber';
+import { getOpenFiscalYear } from '../utils/fiscalYear';
 import { validateBody } from '../utils/validate';
-import { CreateAccountSchema, UpdateAccountSchema } from '../utils/schemas';
+import { CreateAccountSchema, UpdateAccountSchema, SetBalanceSchema } from '../utils/schemas';
+import { BusinessError, handleRouteError } from '../utils/errors';
+import { ACCOUNT_NUMBERS } from '../constants/accountNumbers';
 import { logger } from '../lib/logger';
 
 const router = Router();
@@ -111,6 +117,83 @@ router.put('/:id', roleMiddleware(['Admin']), async (req, res) => {
     if (error.code === 'P2025') return res.status(404).json({ error: 'Akun tidak ditemukan.' });
     if (error.code === 'P2002') return res.status(409).json({ error: 'Nomor akun sudah digunakan.' });
     return res.status(500).json({ error: 'Gagal mengupdate akun.' });
+  }
+});
+
+// PATCH /api/coa/:id/balance — set opening balance (Admin only)
+router.patch('/:id/balance', roleMiddleware(['Admin']), async (req: AuthRequest, res) => {
+  const id = req.params.id as string;
+  const body = validateBody(SetBalanceSchema, req.body, res);
+  if (!body) return;
+
+  try {
+    const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      const account = await tx.account.findUnique({ where: { id } });
+      if (!account) throw new BusinessError('Akun tidak ditemukan.');
+      if (account.isGroup) throw new BusinessError('Tidak bisa set saldo untuk akun grup.');
+
+      const currentBalance = Number(account.balance);
+      const newBalance = body.balance;
+      const delta = newBalance - currentBalance;
+
+      if (Math.abs(delta) < 0.01) return account; // No change
+
+      // Counter-entry to Retained Earnings
+      const equityAccount = await tx.account.findFirst({
+        where: { accountNumber: ACCOUNT_NUMBERS.RETAINED_EARNINGS },
+      });
+      if (!equityAccount) throw new BusinessError('Akun Saldo Laba Ditahan (3.2.1) tidak ditemukan.');
+
+      const now = new Date();
+      const fiscalYear = await getOpenFiscalYear(tx, now);
+      const entryNumber = await generateDocumentNumber(tx, 'OB', now, fiscalYear.id);
+
+      // Determine debit/credit based on account type and delta direction
+      let accountDebit = 0, accountCredit = 0;
+      let equityDebit = 0, equityCredit = 0;
+
+      if (account.rootType === 'ASSET' || account.rootType === 'EXPENSE') {
+        if (delta > 0) { accountDebit = delta; equityCredit = delta; }
+        else { accountCredit = Math.abs(delta); equityDebit = Math.abs(delta); }
+      } else {
+        if (delta > 0) { accountCredit = delta; equityDebit = delta; }
+        else { accountDebit = Math.abs(delta); equityCredit = Math.abs(delta); }
+      }
+
+      const journalEntry = await tx.journalEntry.create({
+        data: {
+          entryNumber,
+          date: now,
+          narration: `Saldo Awal: ${account.accountNumber} - ${account.name}`,
+          status: 'Submitted',
+          fiscalYearId: fiscalYear.id,
+          createdBy: req.user!.userId,
+          submittedAt: now,
+          items: {
+            create: [
+              { accountId: id, debit: accountDebit, credit: accountCredit, description: `Saldo Awal: ${account.name}` },
+              { accountId: equityAccount.id, debit: equityDebit, credit: equityCredit, description: `Saldo Awal: ${account.name}` },
+            ],
+          },
+        },
+      });
+
+      await tx.accountingLedgerEntry.createMany({
+        data: [
+          { date: now, accountId: id, debit: accountDebit, credit: accountCredit, referenceType: 'JournalEntry', referenceId: journalEntry.id, description: `Saldo Awal: ${account.name}`, fiscalYearId: fiscalYear.id },
+          { date: now, accountId: equityAccount.id, debit: equityDebit, credit: equityCredit, referenceType: 'JournalEntry', referenceId: journalEntry.id, description: `Saldo Awal: ${account.name}`, fiscalYearId: fiscalYear.id },
+        ],
+      });
+
+      await updateAccountBalance(tx, id, accountDebit, accountCredit);
+      await updateAccountBalance(tx, equityAccount.id, equityDebit, equityCredit);
+
+      return tx.account.findUnique({ where: { id } });
+    }, { timeout: 15000 });
+
+    return res.json(result);
+  } catch (error: any) {
+    return handleRouteError(res, error, 'PATCH /coa/:id/balance', 'Gagal mengatur saldo awal.');
   }
 });
 

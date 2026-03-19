@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../lib/api';
 import {
   ChevronRight, ChevronDown, Plus, Folder, FileText,
-  Search, PlusCircle, Pencil, X, Loader2, AlertCircle, Trash2
+  Search, PlusCircle, Pencil, X, Loader2, AlertCircle, Trash2, Wallet
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { formatRupiah } from '../lib/formatters';
@@ -273,6 +273,99 @@ const EditAccountModal: React.FC<{ isOpen: boolean; onClose: () => void; account
   );
 };
 
+// --- Set Balance Modal ---
+const SetBalanceModal: React.FC<{ isOpen: boolean; onClose: () => void; account: Account | null }> = ({ isOpen, onClose, account }) => {
+  const [balance, setBalance] = useState('');
+  const [error, setError] = useState('');
+  const queryClient = useQueryClient();
+
+  React.useEffect(() => {
+    if (account) {
+      setBalance(String(Number(account.balance) || 0));
+      setError('');
+    }
+  }, [account]);
+
+  const mutation = useMutation({
+    mutationFn: (data: { balance: number }) => api.patch(`/coa/${account!.id}/balance`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['coa'] });
+      toast.success('Saldo awal berhasil diatur.');
+      onClose();
+    },
+    onError: (err: any) => setError(err.response?.data?.error || 'Gagal mengatur saldo awal.')
+  });
+
+  if (!isOpen || !account) return null;
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    const numBalance = parseFloat(balance.replace(/[^0-9.-]/g, ''));
+    if (isNaN(numBalance)) {
+      setError('Masukkan angka yang valid.');
+      return;
+    }
+    mutation.mutate({ balance: numBalance });
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/30">
+      <div className="bg-white border border-gray-200 rounded-xl w-full max-w-md shadow-xl">
+        <div className="p-5 border-b border-gray-100 flex justify-between items-center">
+          <div>
+            <h3 className="text-base font-semibold text-gray-900">Set Saldo Awal</h3>
+            <p className="text-xs text-gray-500 mt-0.5 font-mono">{account.accountNumber} - {account.name}</p>
+          </div>
+          <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400 transition-colors">
+            <X size={18} />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+          {error && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-red-700 text-sm">
+              <AlertCircle size={15} />
+              <span>{error}</span>
+            </div>
+          )}
+
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Saldo Saat Ini</label>
+            <div className="text-sm font-mono text-gray-500 bg-gray-50 border border-gray-200 rounded-lg py-2 px-3">
+              {formatRupiah(account.balance)}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Saldo Baru</label>
+            <input
+              type="text"
+              value={balance}
+              onChange={(e) => setBalance(e.target.value)}
+              className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
+              placeholder="0"
+              autoFocus
+            />
+            <p className="text-[11px] text-gray-400 mt-1">Jurnal saldo awal akan otomatis dibuat terhadap akun Saldo Laba Ditahan.</p>
+          </div>
+
+          <div className="flex gap-3 pt-1">
+            <button type="button" onClick={onClose} className="flex-1 btn-secondary justify-center">Batal</button>
+            <button
+              type="submit"
+              disabled={mutation.isPending}
+              className="flex-1 btn-primary justify-center"
+            >
+              {mutation.isPending ? <Loader2 size={15} className="animate-spin" /> : 'Simpan Saldo'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
 // --- Account Node Component ---
 const AccountNode: React.FC<{
   account: Account;
@@ -280,7 +373,8 @@ const AccountNode: React.FC<{
   onAddSub: (acc: Account) => void;
   onEdit: (acc: Account) => void;
   onDelete: (acc: Account) => void;
-}> = React.memo(function AccountNode({ account, level, onAddSub, onEdit, onDelete }) {
+  onSetBalance: (acc: Account) => void;
+}> = React.memo(function AccountNode({ account, level, onAddSub, onEdit, onDelete, onSetBalance }) {
   const [isOpen, setIsOpen] = useState(false);
   const hasChildren = account.children && account.children.length > 0;
 
@@ -335,6 +429,15 @@ const AccountNode: React.FC<{
                   <PlusCircle size={13} />
                 </button>
               )}
+              {!account.isGroup && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); onSetBalance(account); }}
+                  className="p-1 hover:bg-green-50 rounded text-gray-400 hover:text-green-600 transition-colors"
+                  title="Set Saldo Awal"
+                >
+                  <Wallet size={13} />
+                </button>
+              )}
               <button
                 onClick={(e) => { e.stopPropagation(); onEdit(account); }}
                 className="p-1 hover:bg-gray-100 rounded text-gray-400 hover:text-gray-600 transition-colors"
@@ -357,7 +460,7 @@ const AccountNode: React.FC<{
       {isOpen && hasChildren && (
         <div>
           {account.children?.map(child => (
-            <AccountNode key={child.id} account={child} level={level + 1} onAddSub={onAddSub} onEdit={onEdit} onDelete={onDelete} />
+            <AccountNode key={child.id} account={child} level={level + 1} onAddSub={onAddSub} onEdit={onEdit} onDelete={onDelete} onSetBalance={onSetBalance} />
           ))}
         </div>
       )}
@@ -371,6 +474,7 @@ export const COAPage: React.FC = () => {
   const [modalState, setModalState] = useState<{ isVisible: boolean; parent: Account | null }>({ isVisible: false, parent: null });
   const [editTarget, setEditTarget] = useState<Account | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Account | null>(null);
+  const [balanceTarget, setBalanceTarget] = useState<Account | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const queryClient = useQueryClient();
 
@@ -469,6 +573,7 @@ export const COAPage: React.FC = () => {
                     onAddSub={(parent) => setModalState({ isVisible: true, parent })}
                     onEdit={setEditTarget}
                     onDelete={setDeleteTarget}
+                    onSetBalance={setBalanceTarget}
                   />
                 ))
               )}
@@ -484,6 +589,7 @@ export const COAPage: React.FC = () => {
                   onAddSub={(parent) => setModalState({ isVisible: true, parent })}
                   onEdit={setEditTarget}
                   onDelete={setDeleteTarget}
+                  onSetBalance={setBalanceTarget}
                 />
               ))}
             </div>
@@ -502,6 +608,12 @@ export const COAPage: React.FC = () => {
         isOpen={editTarget !== null}
         onClose={() => setEditTarget(null)}
         account={editTarget}
+      />
+
+      <SetBalanceModal
+        isOpen={balanceTarget !== null}
+        onClose={() => setBalanceTarget(null)}
+        account={balanceTarget}
       />
 
       <ConfirmDialog
