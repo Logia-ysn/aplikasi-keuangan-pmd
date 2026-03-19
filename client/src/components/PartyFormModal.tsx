@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../lib/api';
 import { X, Loader2, AlertCircle, User, Building2, Phone, Mail, MapPin, CreditCard, Globe } from 'lucide-react';
@@ -22,20 +22,55 @@ const defaultForm = (): PartyFormData => ({
   address: '', npwp: '', website: '', contactPerson: ''
 });
 
-const PartyFormModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, onClose }) => {
+interface PartyFormModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  /** Pass party data to enable edit mode */
+  editParty?: any | null;
+}
+
+const PartyFormModal: React.FC<PartyFormModalProps> = ({ isOpen, onClose, editParty }) => {
   const [form, setForm] = useState<PartyFormData>(defaultForm());
   const [error, setError] = useState('');
   const queryClient = useQueryClient();
 
+  const isEdit = !!editParty;
+
+  // Pre-fill form when editing
+  useEffect(() => {
+    if (isOpen && editParty) {
+      setForm({
+        name: editParty.name || '',
+        partyType: editParty.partyType || 'Customer',
+        phone: editParty.phone || '',
+        email: editParty.email || '',
+        address: editParty.address || '',
+        npwp: editParty.taxId || '',
+        website: '',
+        contactPerson: '',
+      });
+      setError('');
+    } else if (isOpen) {
+      setForm(defaultForm());
+      setError('');
+    }
+  }, [isOpen, editParty]);
+
   const set = (field: keyof PartyFormData, val: string) =>
     setForm(prev => ({ ...prev, [field]: val }));
 
+  const invalidateAll = () => {
+    queryClient.invalidateQueries({ queryKey: ['parties'] });
+    queryClient.invalidateQueries({ queryKey: ['parties-customers'] });
+    queryClient.invalidateQueries({ queryKey: ['parties-suppliers'] });
+    queryClient.invalidateQueries({ queryKey: ['parties-all'] });
+  };
+
   const mutation = useMutation({
-    mutationFn: (data: any) => api.post('/parties', data),
+    mutationFn: (data: any) =>
+      isEdit ? api.put(`/parties/${editParty.id}`, data) : api.post('/parties', data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['parties'] });
-      queryClient.invalidateQueries({ queryKey: ['parties-customers'] });
-      queryClient.invalidateQueries({ queryKey: ['parties-suppliers'] });
+      invalidateAll();
       setForm(defaultForm());
       setError('');
       onClose();
@@ -45,7 +80,6 @@ const PartyFormModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ is
 
   const handleSubmit = () => {
     if (!form.name.trim()) { setError('Nama mitra wajib diisi.'); return; }
-    // Map form fields ke server schema: npwp → taxId; website & contactPerson tidak ada di skema DB
     const { npwp, website: _w, contactPerson: _cp, ...rest } = form;
     mutation.mutate({ ...rest, taxId: npwp || undefined });
   };
@@ -62,8 +96,12 @@ const PartyFormModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ is
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <div>
-            <h2 id="party-modal-title" className="text-base font-semibold text-gray-900">Tambah Mitra Baru</h2>
-            <p className="text-xs text-gray-400 mt-0.5">Pelanggan, vendor, atau keduanya</p>
+            <h2 id="party-modal-title" className="text-base font-semibold text-gray-900">
+              {isEdit ? 'Edit Mitra' : 'Tambah Mitra Baru'}
+            </h2>
+            <p className="text-xs text-gray-400 mt-0.5">
+              {isEdit ? `Mengubah data ${editParty.name}` : 'Pelanggan, vendor, atau keduanya'}
+            </p>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 transition-colors">
             <X size={18} />
@@ -88,7 +126,7 @@ const PartyFormModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ is
                       : 'bg-white text-gray-500 hover:bg-gray-50'
                   )}
                 >
-                  {type === 'Customer' ? '👤 Pelanggan' : type === 'Supplier' ? '🏭 Vendor / Supplier' : '🔄 Keduanya'}
+                  {type === 'Customer' ? 'Pelanggan' : type === 'Supplier' ? 'Vendor / Supplier' : 'Keduanya'}
                 </button>
               ))}
             </div>
@@ -110,21 +148,6 @@ const PartyFormModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ is
                     value={form.name}
                     onChange={e => set('name', e.target.value)}
                     placeholder="PT Maju Bersama / Budi Santoso"
-                    className={inputCls}
-                  />
-                </div>
-              </div>
-
-              {/* Contact Person */}
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Nama PIC / Contact Person</label>
-                <div className="relative">
-                  <User size={14} className={iconCls} />
-                  <input
-                    type="text"
-                    value={form.contactPerson}
-                    onChange={e => set('contactPerson', e.target.value)}
-                    placeholder="Bapak / Ibu..."
                     className={inputCls}
                   />
                 </div>
@@ -177,19 +200,6 @@ const PartyFormModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ is
                   />
                 </div>
               </div>
-              <div className="col-span-2">
-                <label className="block text-xs font-medium text-gray-600 mb-1">Website</label>
-                <div className="relative">
-                  <Globe size={14} className={iconCls} />
-                  <input
-                    type="url"
-                    value={form.website}
-                    onChange={e => set('website', e.target.value)}
-                    placeholder="https://www.perusahaan.com"
-                    className={inputCls}
-                  />
-                </div>
-              </div>
             </div>
           </div>
 
@@ -218,8 +228,8 @@ const PartyFormModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ is
         {/* Footer */}
         <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between">
           <p className="text-xs text-gray-400">
-            {form.partyType === 'Customer' ? '👤 Pelanggan' : form.partyType === 'Supplier' ? '🏭 Vendor' : '🔄 Pelanggan & Vendor'}
-            {form.name ? ` · ${form.name}` : ''}
+            {form.partyType === 'Customer' ? 'Pelanggan' : form.partyType === 'Supplier' ? 'Vendor' : 'Pelanggan & Vendor'}
+            {form.name ? ` — ${form.name}` : ''}
           </p>
           <div className="flex gap-3">
             <button onClick={onClose} className="btn-secondary">Batal</button>
@@ -228,7 +238,7 @@ const PartyFormModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ is
               disabled={!form.name.trim() || mutation.isPending}
               className="btn-primary disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              {mutation.isPending ? <Loader2 size={15} className="animate-spin" /> : 'Simpan Mitra'}
+              {mutation.isPending ? <Loader2 size={15} className="animate-spin" /> : isEdit ? 'Simpan Perubahan' : 'Simpan Mitra'}
             </button>
           </div>
         </div>

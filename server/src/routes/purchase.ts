@@ -7,7 +7,7 @@ import { generateDocumentNumber } from '../utils/documentNumber';
 import { getOpenFiscalYear } from '../utils/fiscalYear';
 import { validateBody } from '../utils/validate';
 import { CreatePurchaseInvoiceSchema } from '../utils/schemas';
-import { BusinessError } from '../utils/errors';
+import { BusinessError, handleRouteError } from '../utils/errors';
 import { ACCOUNT_NUMBERS } from '../constants/accountNumbers';
 import { logger } from '../lib/logger';
 
@@ -50,7 +50,11 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
   try {
     const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const parsedDate = new Date(body.date);
+      if (isNaN(parsedDate.getTime())) throw new BusinessError('Format tanggal tidak valid.');
       const fiscalYear = await getOpenFiscalYear(tx, parsedDate);
+
+      const party = await tx.party.findUnique({ where: { id: body.partyId } });
+      if (!party) throw new BusinessError('Data supplier tidak ditemukan.');
 
       const apAccount = await tx.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.AP } });
       const inventoryAccount = await tx.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.INVENTORY } });
@@ -129,15 +133,11 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
       await tx.party.update({ where: { id: body.partyId }, data: { outstandingAmount: { increment: grandTotal } } });
 
       return invoice;
-    });
+    }, { timeout: 15000 });
 
     return res.status(201).json(result);
   } catch (error: any) {
-    if (error instanceof BusinessError) {
-      return res.status(400).json({ error: error.message });
-    }
-    logger.error({ error }, 'POST /purchase/invoices error');
-    return res.status(500).json({ error: 'Gagal menyimpan invoice pembelian.' });
+    return handleRouteError(res, error, 'POST /purchase/invoices', 'Gagal menyimpan invoice pembelian.');
   }
 });
 

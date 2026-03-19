@@ -7,7 +7,7 @@ import { generateDocumentNumber } from '../utils/documentNumber';
 import { getOpenFiscalYear } from '../utils/fiscalYear';
 import { validateBody } from '../utils/validate';
 import { CreateJournalSchema } from '../utils/schemas';
-import { BusinessError } from '../utils/errors';
+import { BusinessError, handleRouteError } from '../utils/errors';
 import { logger } from '../lib/logger';
 
 const router = Router();
@@ -125,18 +125,11 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
       }
 
       return journalEntry;
-    });
+    }, { timeout: 15000 });
 
     return res.status(201).json(result);
   } catch (error: any) {
-    if (error instanceof BusinessError) {
-      return res.status(400).json({ error: error.message });
-    }
-    if (error?.code === 'P2025') {
-      return res.status(400).json({ error: 'Data terkait tidak ditemukan (akun/tahun fiskal).' });
-    }
-    logger.error({ error, stack: error?.stack }, 'POST /journals error');
-    return res.status(500).json({ error: error?.message || 'Gagal menyimpan jurnal.' });
+    return handleRouteError(res, error, 'POST /journals', 'Gagal menyimpan jurnal.');
   }
 });
 

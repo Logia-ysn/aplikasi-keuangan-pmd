@@ -3,7 +3,7 @@ import { prisma } from '../lib/prisma';
 import { AuthRequest, roleMiddleware } from '../middleware/auth';
 import { validateBody } from '../utils/validate';
 import { CreateInventoryItemSchema, UpdateInventoryItemSchema, CreateStockMovementSchema, CreateProductionRunSchema } from '../utils/schemas';
-import { BusinessError } from '../utils/errors';
+import { BusinessError, handleRouteError } from '../utils/errors';
 import { generateDocumentNumber } from '../utils/documentNumber';
 import { updateAccountBalance } from '../utils/accountBalance';
 import { logger } from '../lib/logger';
@@ -295,13 +295,11 @@ router.post('/movements', roleMiddleware(['Admin', 'Accountant']), async (req: A
       });
 
       return movement;
-    });
+    }, { timeout: 15000 });
 
     return res.status(201).json(result);
   } catch (error: any) {
-    if (error instanceof BusinessError) return res.status(400).json({ error: error.message });
-    logger.error({ error }, 'POST /inventory/movements error');
-    return res.status(500).json({ error: 'Gagal mencatat gerakan stok.' });
+    return handleRouteError(res, error, 'POST /inventory/movements', 'Gagal mencatat gerakan stok.');
   }
 });
 
@@ -360,13 +358,11 @@ router.put('/movements/:id/cancel', roleMiddleware(['Admin']), async (req: AuthR
         where: { id },
         data: { isCancelled: true },
       });
-    });
+    }, { timeout: 15000 });
 
     return res.json({ message: 'Gerakan stok berhasil dibatalkan.' });
   } catch (error: any) {
-    if (error instanceof BusinessError) return res.status(400).json({ error: error.message });
-    logger.error({ error }, 'PUT /inventory/movements/:id/cancel error');
-    return res.status(500).json({ error: 'Gagal membatalkan gerakan stok.' });
+    return handleRouteError(res, error, 'PUT /inventory/movements/:id/cancel', 'Gagal membatalkan gerakan stok.');
   }
 });
 
@@ -568,13 +564,11 @@ router.post('/production-runs', roleMiddleware(['Admin', 'Accountant']), async (
           },
         },
       });
-    });
+    }, { timeout: 30000 }); // heavy: multiple stock movements + GL entries
 
     return res.status(201).json(result);
   } catch (error: any) {
-    if (error instanceof BusinessError) return res.status(400).json({ error: error.message });
-    logger.error({ error }, 'POST /inventory/production-runs error');
-    return res.status(500).json({ error: 'Gagal mencatat proses produksi.' });
+    return handleRouteError(res, error, 'POST /inventory/production-runs', 'Gagal mencatat proses produksi.');
   }
 });
 
@@ -627,13 +621,11 @@ router.put('/production-runs/:id/cancel', roleMiddleware(['Admin']), async (req:
         where: { id },
         data: { isCancelled: true },
       });
-    });
+    }, { timeout: 15000 });
 
     return res.json({ message: 'Proses produksi berhasil dibatalkan.' });
   } catch (error: any) {
-    if (error instanceof BusinessError) return res.status(400).json({ error: error.message });
-    logger.error({ error }, 'PUT /inventory/production-runs/:id/cancel error');
-    return res.status(500).json({ error: 'Gagal membatalkan proses produksi.' });
+    return handleRouteError(res, error, 'PUT /inventory/production-runs/:id/cancel', 'Gagal membatalkan proses produksi.');
   }
 });
 

@@ -84,4 +84,40 @@ router.put('/:id', roleMiddleware(['Admin', 'Accountant']), async (req, res) => 
   }
 });
 
+// DELETE /api/parties/:id — soft-delete / hard-delete with safety check
+router.delete('/:id', roleMiddleware(['Admin']), async (req, res) => {
+  const id = req.params.id as string;
+
+  try {
+    // Check for linked transactions
+    const [salesCount, purchaseCount, paymentCount] = await Promise.all([
+      prisma.salesInvoice.count({ where: { partyId: id } }),
+      prisma.purchaseInvoice.count({ where: { partyId: id } }),
+      prisma.payment.count({ where: { partyId: id } }),
+    ]);
+
+    const totalLinked = salesCount + purchaseCount + paymentCount;
+
+    if (totalLinked > 0) {
+      // Soft-delete: deactivate instead of hard-delete
+      await prisma.party.update({
+        where: { id },
+        data: { isActive: false },
+      });
+      return res.json({
+        message: `Mitra dinonaktifkan karena memiliki ${totalLinked} transaksi terkait.`,
+        deactivated: true,
+      });
+    }
+
+    // No linked transactions — safe to hard-delete
+    await prisma.party.delete({ where: { id } });
+    return res.json({ message: 'Mitra berhasil dihapus.', deleted: true });
+  } catch (error: any) {
+    logger.error({ error }, 'DELETE /parties/:id error');
+    if (error.code === 'P2025') return res.status(404).json({ error: 'Data mitra tidak ditemukan.' });
+    return res.status(500).json({ error: 'Gagal menghapus data mitra.' });
+  }
+});
+
 export default router;

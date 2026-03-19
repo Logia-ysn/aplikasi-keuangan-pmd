@@ -1,7 +1,7 @@
-import { useState } from 'react';
-import { Plus, Search, MoreHorizontal, Users, Loader2, Mail, Phone, MapPin } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { Plus, Search, MoreHorizontal, Users, Loader2, Mail, Phone, MapPin, Pencil, Trash2, AlertCircle } from 'lucide-react';
 import { cn } from '../lib/utils';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../lib/api';
 import { formatRupiah } from '../lib/formatters';
 import PartyFormModal from '../components/PartyFormModal';
@@ -10,6 +10,11 @@ export const PartiesPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('All');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editParty, setEditParty] = useState<any | null>(null);
+  const [menuPartyId, setMenuPartyId] = useState<string | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<any | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const queryClient = useQueryClient();
 
   const { data: parties, isLoading } = useQuery({
     queryKey: ['parties', filterType],
@@ -20,6 +25,46 @@ export const PartiesPage = () => {
     }
   });
 
+  // Close menu on outside click
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuPartyId(null);
+      }
+    };
+    if (menuPartyId) document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [menuPartyId]);
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => api.delete(`/parties/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['parties'] });
+      queryClient.invalidateQueries({ queryKey: ['parties-all'] });
+      setDeleteConfirm(null);
+    },
+    onError: (err: any) => {
+      alert(err.response?.data?.error || 'Gagal menghapus mitra.');
+      setDeleteConfirm(null);
+    },
+  });
+
+  const handleEdit = (party: any) => {
+    setMenuPartyId(null);
+    setEditParty(party);
+    setIsModalOpen(true);
+  };
+
+  const handleDelete = (party: any) => {
+    setMenuPartyId(null);
+    setDeleteConfirm(party);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setEditParty(null);
+  };
+
   return (
     <div className="space-y-5 pb-8">
       {/* Header */}
@@ -28,7 +73,7 @@ export const PartiesPage = () => {
           <h1 className="text-xl font-semibold text-gray-900">Pelanggan & Vendor</h1>
           <p className="text-sm text-gray-500 mt-0.5">Kelola data mitra bisnis, saldo piutang, dan hutang usaha.</p>
         </div>
-        <button className="btn-primary" onClick={() => setIsModalOpen(true)}>
+        <button className="btn-primary" onClick={() => { setEditParty(null); setIsModalOpen(true); }}>
           <Plus size={15} /> Tambah Mitra Baru
         </button>
       </div>
@@ -80,28 +125,60 @@ export const PartiesPage = () => {
             p.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
             p.phone?.includes(searchTerm)
           ).map((party: any) => (
-            <div key={party.id} className="bg-white border border-gray-200 rounded-xl p-5 hover:border-gray-300 transition-all group">
+            <div key={party.id} className={cn(
+              'bg-white border border-gray-200 rounded-xl p-5 hover:border-gray-300 transition-all group relative',
+              !party.isActive && 'opacity-50'
+            )}>
               <div className="flex items-start justify-between mb-3">
                 <div className="flex items-center gap-3">
                   <div className={cn(
                     'w-9 h-9 rounded-lg flex items-center justify-center text-sm font-semibold',
-                    party.partyType === 'Customer' ? 'bg-blue-50 text-blue-600' : 'bg-gray-100 text-gray-600'
+                    party.partyType === 'Customer' ? 'bg-blue-50 text-blue-600' :
+                    party.partyType === 'Supplier' ? 'bg-orange-50 text-orange-600' : 'bg-purple-50 text-purple-600'
                   )}>
                     {party.name.charAt(0)}
                   </div>
                   <div>
-                    <h3 className="text-sm font-semibold text-gray-900">{party.name}</h3>
+                    <h3 className="text-sm font-semibold text-gray-900">
+                      {party.name}
+                      {!party.isActive && <span className="ml-1.5 text-[10px] text-red-400 font-normal">(Nonaktif)</span>}
+                    </h3>
                     <span className={cn(
                       'text-[10px] font-medium uppercase tracking-wider',
-                      party.partyType === 'Customer' ? 'text-blue-500' : 'text-gray-400'
+                      party.partyType === 'Customer' ? 'text-blue-500' :
+                      party.partyType === 'Supplier' ? 'text-orange-500' : 'text-purple-500'
                     )}>
-                      {party.partyType}
+                      {party.partyType === 'Customer' ? 'Pelanggan' : party.partyType === 'Supplier' ? 'Vendor' : 'Pelanggan & Vendor'}
                     </span>
                   </div>
                 </div>
-                <button className="p-1 hover:bg-gray-100 rounded text-gray-400 opacity-0 group-hover:opacity-100 transition-all">
-                  <MoreHorizontal size={14} />
-                </button>
+
+                {/* Action Menu */}
+                <div className="relative" ref={menuPartyId === party.id ? menuRef : undefined}>
+                  <button
+                    onClick={() => setMenuPartyId(menuPartyId === party.id ? null : party.id)}
+                    className="p-1 hover:bg-gray-100 rounded text-gray-400 opacity-0 group-hover:opacity-100 transition-all"
+                  >
+                    <MoreHorizontal size={14} />
+                  </button>
+
+                  {menuPartyId === party.id && (
+                    <div className="absolute right-0 top-8 z-50 w-40 bg-white border border-gray-200 rounded-lg shadow-lg py-1 animate-in fade-in slide-in-from-top-1">
+                      <button
+                        onClick={() => handleEdit(party)}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                      >
+                        <Pencil size={13} /> Edit
+                      </button>
+                      <button
+                        onClick={() => handleDelete(party)}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                      >
+                        <Trash2 size={13} /> Hapus
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="space-y-1.5 mb-4">
@@ -143,7 +220,62 @@ export const PartiesPage = () => {
         )}
       </div>
 
-      <PartyFormModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
+      {/* Form Modal (Create / Edit) */}
+      <PartyFormModal
+        isOpen={isModalOpen}
+        onClose={handleCloseModal}
+        editParty={editParty}
+      />
+
+      {/* Delete Confirmation Dialog */}
+      {deleteConfirm && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4"
+          onClick={() => !deleteMutation.isPending && setDeleteConfirm(null)}
+        >
+          <div
+            className="bg-white rounded-xl w-full max-w-sm shadow-2xl p-6"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center">
+                <Trash2 size={18} className="text-red-500" />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-gray-900">Hapus Mitra?</h3>
+                <p className="text-xs text-gray-500">
+                  {deleteConfirm.name}
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-5 flex items-start gap-2">
+              <AlertCircle size={14} className="text-yellow-600 mt-0.5 shrink-0" />
+              <p className="text-xs text-yellow-700">
+                Jika mitra memiliki transaksi terkait (invoice/pembayaran), data akan dinonaktifkan, bukan dihapus permanen.
+              </p>
+            </div>
+
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setDeleteConfirm(null)}
+                disabled={deleteMutation.isPending}
+                className="btn-secondary"
+              >
+                Batal
+              </button>
+              <button
+                onClick={() => deleteMutation.mutate(deleteConfirm.id)}
+                disabled={deleteMutation.isPending}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-medium bg-red-500 hover:bg-red-600 text-white transition-colors disabled:opacity-40"
+              >
+                {deleteMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                Hapus
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

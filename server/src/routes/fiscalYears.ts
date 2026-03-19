@@ -5,7 +5,7 @@ import { AuthRequest, roleMiddleware } from '../middleware/auth';
 import { updateAccountBalance } from '../utils/accountBalance';
 import { validateBody } from '../utils/validate';
 import { CreateFiscalYearSchema } from '../utils/schemas';
-import { BusinessError } from '../utils/errors';
+import { BusinessError, handleRouteError } from '../utils/errors';
 import { ACCOUNT_NUMBERS } from '../constants/accountNumbers';
 import { logger } from '../lib/logger';
 
@@ -155,15 +155,11 @@ router.post('/:id/close', roleMiddleware(['Admin']), async (req: AuthRequest, re
         where: { id },
         data: { isClosed: true, closedAt: new Date(), closedBy: req.user!.userId },
       });
-    });
+    }, { timeout: 30000 }); // heavy transaction: 30s timeout
 
     return res.json(result);
   } catch (error: any) {
-    if (error instanceof BusinessError) {
-      return res.status(400).json({ error: error.message });
-    }
-    logger.error({ error }, 'POST /fiscal-years/:id/close error');
-    return res.status(500).json({ error: 'Gagal menutup tahun buku.' });
+    return handleRouteError(res, error, 'POST /fiscal-years/:id/close', 'Gagal menutup tahun buku.');
   }
 });
 

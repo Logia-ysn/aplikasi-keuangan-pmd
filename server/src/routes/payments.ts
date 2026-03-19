@@ -7,7 +7,7 @@ import { generateDocumentNumber } from '../utils/documentNumber';
 import { getOpenFiscalYear } from '../utils/fiscalYear';
 import { validateBody } from '../utils/validate';
 import { CreatePaymentSchema } from '../utils/schemas';
-import { BusinessError } from '../utils/errors';
+import { BusinessError, handleRouteError } from '../utils/errors';
 import { ACCOUNT_NUMBERS } from '../constants/accountNumbers';
 import { logger } from '../lib/logger';
 
@@ -45,7 +45,19 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
   try {
     const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const parsedDate = new Date(body.date);
+      if (isNaN(parsedDate.getTime())) {
+        throw new BusinessError('Format tanggal tidak valid.');
+      }
+
       const fiscalYear = await getOpenFiscalYear(tx, parsedDate);
+
+      // Verify account exists
+      const bankAccount = await tx.account.findUnique({ where: { id: body.accountId } });
+      if (!bankAccount) throw new BusinessError('Akun kas/bank tidak ditemukan.');
+
+      // Verify party exists
+      const party = await tx.party.findUnique({ where: { id: body.partyId } });
+      if (!party) throw new BusinessError('Data mitra tidak ditemukan.');
 
       const arAccount = await tx.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.AR } });
       const apAccount = await tx.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.AP } });
@@ -69,7 +81,6 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
           createdBy: req.user!.userId,
           submittedAt: new Date(),
         },
-        include: { party: true },
       });
 
       // Determine GL posting sides
@@ -86,11 +97,18 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
         creditAccountId = body.accountId;      // Bank/Kas
       }
 
+      // Check journal entry number uniqueness before creating
+      const jvNumber = `JV-${paymentNumber}`;
+      const existingJV = await tx.journalEntry.findUnique({ where: { entryNumber: jvNumber } });
+      if (existingJV) {
+        throw new BusinessError(`Nomor jurnal ${jvNumber} sudah ada. Silakan coba lagi.`);
+      }
+
       const journalEntry = await tx.journalEntry.create({
         data: {
-          entryNumber: `JV-${payment.paymentNumber}`,
+          entryNumber: jvNumber,
           date: parsedDate,
-          narration: `Pembayaran ${body.paymentType}: ${payment.paymentNumber} - ${payment.party.name}`,
+          narration: `Pembayaran ${body.paymentType}: ${paymentNumber} - ${party.name}`,
           status: 'Submitted',
           fiscalYearId: fiscalYear.id,
           createdBy: req.user!.userId,
@@ -102,14 +120,14 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
                 partyId: body.paymentType === 'Pay' ? body.partyId : null,
                 debit: numAmount,
                 credit: 0,
-                description: `Pembayaran: ${payment.paymentNumber}`,
+                description: `Pembayaran: ${paymentNumber}`,
               },
               {
                 accountId: creditAccountId,
                 partyId: body.paymentType === 'Receive' ? body.partyId : null,
                 debit: 0,
                 credit: numAmount,
-                description: `Pembayaran: ${payment.paymentNumber}`,
+                description: `Pembayaran: ${paymentNumber}`,
               },
             ],
           },
@@ -126,7 +144,7 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
             credit: 0,
             referenceType: 'JournalEntry',
             referenceId: journalEntry.id,
-            description: `Pembayaran: ${payment.paymentNumber}`,
+            description: `Pembayaran: ${paymentNumber}`,
             fiscalYearId: fiscalYear.id,
           },
           {
@@ -137,7 +155,7 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
             credit: numAmount,
             referenceType: 'JournalEntry',
             referenceId: journalEntry.id,
-            description: `Pembayaran: ${payment.paymentNumber}`,
+            description: `Pembayaran: ${paymentNumber}`,
             fiscalYearId: fiscalYear.id,
           },
         ],
@@ -155,23 +173,12 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
       // Auto-allocate payment to oldest outstanding invoices
       await autoAllocatePayment(tx, payment.id, body.partyId, body.paymentType, numAmount);
 
-      return payment;
-    });
+      return { ...payment, party };
+    }, { timeout: 15000 }); // 15s timeout for advisory lock safety
 
     return res.status(201).json(result);
   } catch (error: any) {
-    if (error instanceof BusinessError) {
-      return res.status(400).json({ error: error.message });
-    }
-    // Surface Prisma known errors
-    if (error?.code === 'P2025') {
-      return res.status(400).json({ error: 'Data terkait tidak ditemukan (akun/pihak/tahun fiskal).' });
-    }
-    if (error?.code === 'P2002') {
-      return res.status(400).json({ error: 'Nomor pembayaran duplikat. Coba lagi.' });
-    }
-    logger.error({ error, stack: error?.stack }, 'POST /payments error');
-    return res.status(500).json({ error: error?.message || 'Gagal menyimpan pembayaran.' });
+    return handleRouteError(res, error, 'POST /payments', 'Gagal menyimpan pembayaran.');
   }
 });
 
