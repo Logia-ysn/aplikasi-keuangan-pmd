@@ -3,7 +3,7 @@
  * Update file ini setiap kali release baru.
  */
 
-export const APP_VERSION = '1.4.0';
+export const APP_VERSION = '1.5.0';
 export const APP_BUILD_DATE = '2026-03-20';
 export const APP_NAME = 'PMD Finance';
 
@@ -15,6 +15,19 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.5.0',
+    date: '2026-03-20',
+    title: 'Cetak Laporan, Favicon Dinamis & Update Check',
+    changes: [
+      'Fix cetak laporan: print CSS untuk output bersih tanpa sidebar/navbar',
+      'Tambah print header otomatis: nama perusahaan, judul laporan, periode',
+      'Favicon tab browser otomatis menggunakan logo perusahaan dari pengaturan',
+      'Title tab browser dinamis sesuai nama perusahaan',
+      'Fitur cek pembaruan sekarang berfungsi — bandingkan versi dari GitHub',
+      'Tampilkan changelog perubahan baru saat pembaruan tersedia',
+    ],
+  },
   {
     version: '1.4.0',
     date: '2026-03-20',

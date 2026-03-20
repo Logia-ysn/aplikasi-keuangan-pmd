@@ -350,33 +350,70 @@ const CompanySettingsTab: React.FC = () => {
 };
 
 // ─── About & Changelog Tab ───────────────────────────────
+interface UpdateInfo {
+  status: 'latest' | 'available' | 'error';
+  remoteVersion?: string;
+  remoteChangelog?: Array<{ version: string; date: string; title: string; changes: string[] }>;
+  errorMsg?: string;
+}
+
+const GITHUB_RAW_URL =
+  'https://raw.githubusercontent.com/Logia-ysn/aplikasi-keuangan-pmd/main/client/src/lib/version.ts';
+
+/** Parse APP_VERSION and CHANGELOG from the raw version.ts file content */
+function parseRemoteVersion(source: string): { version: string; changelog: UpdateInfo['remoteChangelog'] } {
+  // Extract APP_VERSION
+  const versionMatch = source.match(/APP_VERSION\s*=\s*['"]([^'"]+)['"]/);
+  const version = versionMatch?.[1] || '';
+
+  // Extract CHANGELOG entries — simple regex approach
+  const changelog: UpdateInfo['remoteChangelog'] = [];
+  const entryRegex = /\{\s*version:\s*'([^']+)',\s*date:\s*'([^']+)',\s*title:\s*'([^']+)',\s*changes:\s*\[([\s\S]*?)\],?\s*\}/g;
+  let match;
+  while ((match = entryRegex.exec(source)) !== null) {
+    const changes = [...match[4].matchAll(/'([^']+)'/g)].map((m) => m[1]);
+    changelog.push({ version: match[1], date: match[2], title: match[3], changes });
+  }
+
+  return { version, changelog };
+}
+
+/** Compare semver strings: returns 1 if a > b, -1 if a < b, 0 if equal */
+function compareSemver(a: string, b: string): number {
+  const pa = a.split('.').map(Number);
+  const pb = b.split('.').map(Number);
+  for (let i = 0; i < 3; i++) {
+    if ((pa[i] || 0) > (pb[i] || 0)) return 1;
+    if ((pa[i] || 0) < (pb[i] || 0)) return -1;
+  }
+  return 0;
+}
+
 const AboutTab: React.FC = () => {
   const [checking, setChecking] = useState(false);
-  const [updateResult, setUpdateResult] = useState<'latest' | 'available' | null>(null);
+  const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
 
   const handleCheckUpdate = async () => {
     setChecking(true);
-    setUpdateResult(null);
+    setUpdateInfo(null);
     try {
-      // Fetch latest release from GitHub API
-      const res = await fetch('https://api.github.com/repos/Logia-ysn/aplikasi-keuangan-pmd/releases/latest');
-      if (res.ok) {
-        const data = await res.json();
-        const latestTag = (data.tag_name || '').replace(/^v/, '');
-        if (latestTag && latestTag !== APP_VERSION) {
-          setUpdateResult('available');
-        } else {
-          setUpdateResult('latest');
-        }
+      const res = await fetch(GITHUB_RAW_URL, { cache: 'no-store' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      const source = await res.text();
+      const { version, changelog } = parseRemoteVersion(source);
+
+      if (!version) throw new Error('Gagal membaca versi dari repository.');
+
+      if (compareSemver(version, APP_VERSION) > 0) {
+        // Newer version available — find new entries
+        const newEntries = changelog?.filter((e) => compareSemver(e.version, APP_VERSION) > 0) || [];
+        setUpdateInfo({ status: 'available', remoteVersion: version, remoteChangelog: newEntries });
       } else {
-        // No releases or error — compare with latest commit
-        const commitRes = await fetch('https://api.github.com/repos/Logia-ysn/aplikasi-keuangan-pmd/commits/main');
-        if (commitRes.ok) {
-          setUpdateResult('latest'); // Can't compare semver from commits
-        }
+        setUpdateInfo({ status: 'latest', remoteVersion: version });
       }
-    } catch {
-      setUpdateResult('latest');
+    } catch (err: any) {
+      setUpdateInfo({ status: 'error', errorMsg: err?.message || 'Gagal memeriksa pembaruan.' });
     } finally {
       setChecking(false);
     }
@@ -436,26 +473,79 @@ const AboutTab: React.FC = () => {
           </div>
 
           {/* Check for updates */}
-          <div className="mt-5 flex items-center gap-3">
-            <button
-              onClick={handleCheckUpdate}
-              disabled={checking}
-              className="btn-secondary text-xs py-2"
-            >
-              {checking ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
-              {checking ? 'Memeriksa...' : 'Periksa Pembaruan'}
-            </button>
+          <div className="mt-5 space-y-3">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleCheckUpdate}
+                disabled={checking}
+                className="btn-secondary text-xs py-2"
+              >
+                {checking ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
+                {checking ? 'Memeriksa...' : 'Periksa Pembaruan'}
+              </button>
 
-            {updateResult === 'latest' && (
-              <div className="flex items-center gap-1.5 text-xs text-green-600">
-                <CheckCircle size={14} />
-                <span className="font-medium">Aplikasi sudah versi terbaru.</span>
-              </div>
-            )}
-            {updateResult === 'available' && (
-              <div className="flex items-center gap-1.5 text-xs text-blue-600">
-                <ArrowUpCircle size={14} />
-                <span className="font-medium">Pembaruan tersedia! Hubungi admin untuk update server.</span>
+              {updateInfo?.status === 'latest' && (
+                <div className="flex items-center gap-1.5 text-xs text-green-600">
+                  <CheckCircle size={14} />
+                  <span className="font-medium">Aplikasi sudah versi terbaru (v{updateInfo.remoteVersion}).</span>
+                </div>
+              )}
+              {updateInfo?.status === 'error' && (
+                <div className="flex items-center gap-1.5 text-xs text-red-500">
+                  <Info size={14} />
+                  <span className="font-medium">{updateInfo.errorMsg}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Update available card */}
+            {updateInfo?.status === 'available' && (
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <ArrowUpCircle size={16} className="text-blue-600" />
+                    <span className="text-sm font-semibold text-blue-800">
+                      Pembaruan tersedia: v{updateInfo.remoteVersion}
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-mono text-blue-500 bg-blue-100 px-2 py-0.5 rounded">
+                    v{APP_VERSION} → v{updateInfo.remoteVersion}
+                  </span>
+                </div>
+
+                {/* New changes */}
+                {updateInfo.remoteChangelog && updateInfo.remoteChangelog.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-xs font-semibold text-blue-700">Perubahan baru:</p>
+                    {updateInfo.remoteChangelog.map((entry) => (
+                      <div key={entry.version} className="bg-white/60 rounded-lg p-3">
+                        <div className="flex items-center gap-2 mb-1.5">
+                          <span className="font-mono text-[10px] font-bold text-blue-600 bg-blue-100 px-1.5 py-0.5 rounded">
+                            v{entry.version}
+                          </span>
+                          <span className="text-xs font-medium text-gray-800">{entry.title}</span>
+                          <span className="text-[10px] text-gray-400 font-mono ml-auto">{entry.date}</span>
+                        </div>
+                        <ul className="space-y-0.5">
+                          {entry.changes.map((c, i) => (
+                            <li key={i} className="text-[11px] text-gray-600 flex items-start gap-1.5">
+                              <span className="text-blue-400 mt-0.5">•</span> {c}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="bg-white/60 rounded-lg p-3 text-xs text-gray-600 space-y-1">
+                  <p className="font-semibold text-gray-700">Cara update di server:</p>
+                  <pre className="bg-gray-900 text-green-300 rounded-lg p-2.5 text-[11px] font-mono overflow-x-auto">
+{`cd ~/aplikasi-keuangan-pmd
+git pull origin main
+cd client && npm run build
+pm2 restart pmd-server`}</pre>
+                </div>
               </div>
             )}
           </div>
