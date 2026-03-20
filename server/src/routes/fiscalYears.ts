@@ -144,11 +144,33 @@ router.post('/:id/close', roleMiddleware(['Admin']), async (req: AuthRequest, re
         await updateAccountBalance(tx, retainedEarningsAcc.id, profit < 0 ? Math.abs(profit) : 0, profit > 0 ? profit : 0);
       }
 
-      // 3. Zero out all Revenue and Expense account balances for next year
-      await tx.account.updateMany({
-        where: { OR: [{ rootType: 'REVENUE' as any }, { rootType: 'EXPENSE' as any }] },
-        data: { balance: 0 },
+      // 3. Decrement Revenue/Expense balances by only this FY's contribution
+      const fyAccountSums = await tx.accountingLedgerEntry.groupBy({
+        by: ['accountId'],
+        where: {
+          fiscalYearId: id,
+          isCancelled: false,
+          account: { OR: [{ rootType: 'REVENUE' as any }, { rootType: 'EXPENSE' as any }] },
+        },
+        _sum: { debit: true, credit: true },
       });
+
+      for (const entry of fyAccountSums) {
+        const acct = await tx.account.findUnique({ where: { id: entry.accountId }, select: { rootType: true } });
+        if (!acct) continue;
+        const debit = Number(entry._sum.debit || 0);
+        const credit = Number(entry._sum.credit || 0);
+        // Reverse the impact this FY contributed to the running balance
+        const impact = acct.rootType === 'ASSET' || acct.rootType === 'EXPENSE'
+          ? debit - credit
+          : credit - debit;
+        if (impact !== 0) {
+          await tx.account.update({
+            where: { id: entry.accountId },
+            data: { balance: { decrement: impact } },
+          });
+        }
+      }
 
       // 4. Mark fiscal year as closed
       return tx.fiscalYear.update({

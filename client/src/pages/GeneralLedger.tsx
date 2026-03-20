@@ -12,11 +12,30 @@ import { formatRupiah, formatDate } from '../lib/formatters';
 export const GeneralLedger = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+
+  const setThisMonth = () => {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    setStartDate(`${y}-${m}-01`);
+    const lastDay = new Date(y, now.getMonth() + 1, 0).getDate();
+    setEndDate(`${y}-${m}-${String(lastDay).padStart(2, '0')}`);
+  };
+
+  const clearDateFilter = () => {
+    setStartDate('');
+    setEndDate('');
+  };
 
   const { data: journals, isLoading } = useQuery({
-    queryKey: ['journals'],
+    queryKey: ['journals', startDate, endDate],
     queryFn: async () => {
-      const response = await api.get('/journals');
+      const params = new URLSearchParams();
+      if (startDate) params.set('startDate', startDate);
+      if (endDate) params.set('endDate', endDate);
+      const response = await api.get(`/journals?${params.toString()}`);
       return response.data.data ?? response.data;
     }
   });
@@ -46,9 +65,14 @@ export const GeneralLedger = () => {
             className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
-        <button className="btn-secondary text-xs py-2 px-3">
+        <button onClick={setThisMonth} className={cn('btn-secondary text-xs py-2 px-3', startDate && 'ring-2 ring-blue-300')}>
           <CalendarIcon size={14} /> Bulan Ini
         </button>
+        {startDate && (
+          <button onClick={clearDateFilter} className="btn-secondary text-xs py-2 px-3 text-red-600">
+            Hapus Filter
+          </button>
+        )}
       </div>
 
       {/* Table */}

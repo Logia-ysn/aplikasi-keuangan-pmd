@@ -82,6 +82,7 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
 
       const party = await tx.party.findUnique({ where: { id: body.partyId } });
       if (!party) throw new BusinessError('Data pelanggan tidak ditemukan.');
+      if (!party.isActive) throw new BusinessError('Pelanggan sudah tidak aktif.');
 
       const arAccount = await tx.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.AR } });
       const salesAccount = await tx.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.SALES } });

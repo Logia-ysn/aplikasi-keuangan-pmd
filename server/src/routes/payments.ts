@@ -51,13 +51,20 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
 
       const fiscalYear = await getOpenFiscalYear(tx, parsedDate);
 
-      // Verify account exists
+      // Verify account exists and is a cash/bank account
       const bankAccount = await tx.account.findUnique({ where: { id: body.accountId } });
       if (!bankAccount) throw new BusinessError('Akun kas/bank tidak ditemukan.');
+      const isCashAccount = ACCOUNT_NUMBERS.CASH.some(
+        (prefix) => bankAccount.accountNumber.startsWith(prefix)
+      );
+      if (!isCashAccount) {
+        throw new BusinessError('Akun yang dipilih bukan akun kas/bank.');
+      }
 
-      // Verify party exists
+      // Verify party exists and is active
       const party = await tx.party.findUnique({ where: { id: body.partyId } });
       if (!party) throw new BusinessError('Data mitra tidak ditemukan.');
+      if (!party.isActive) throw new BusinessError('Mitra sudah tidak aktif.');
 
       const arAccount = await tx.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.AR } });
       const apAccount = await tx.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.AP } });
@@ -171,9 +178,13 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
       });
 
       // Auto-allocate payment to oldest outstanding invoices
-      await autoAllocatePayment(tx, payment.id, body.partyId, body.paymentType, numAmount);
+      const unallocatedAmount = await autoAllocatePayment(tx, payment.id, body.partyId, body.paymentType, numAmount);
 
-      return { ...payment, party };
+      if (unallocatedAmount > 0.01) {
+        logger.warn({ paymentId: payment.id, unallocatedAmount }, 'Overpayment: sisa pembayaran tidak teralokasi');
+      }
+
+      return { ...payment, party, unallocatedAmount };
     }, { timeout: 15000 }); // 15s timeout for advisory lock safety
 
     return res.status(201).json(result);
@@ -191,7 +202,7 @@ async function autoAllocatePayment(
   partyId: string,
   paymentType: string,
   amount: number
-): Promise<void> {
+): Promise<number> {
   let remaining = amount;
 
   if (paymentType === 'Receive') {
@@ -251,6 +262,8 @@ async function autoAllocatePayment(
       });
     }
   }
+
+  return remaining > 0 ? remaining : 0;
 }
 
 export default router;

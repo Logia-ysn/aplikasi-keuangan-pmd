@@ -2,6 +2,8 @@ import { Router } from 'express';
 import * as XLSX from 'xlsx';
 import { prisma } from '../lib/prisma';
 import { Prisma } from '@prisma/client';
+import { computeImpact } from '../utils/accountBalance';
+import { ACCOUNT_NUMBERS } from '../constants/accountNumbers';
 import { logger } from '../lib/logger';
 
 const router = Router();
@@ -37,7 +39,7 @@ router.get('/trial-balance', async (req, res) => {
         const entry = entryMap.get(account.id);
         const debit = Number(entry?._sum.debit || 0);
         const credit = Number(entry?._sum.credit || 0);
-        return { ...account, debit, credit, balance: debit - credit };
+        return { ...account, debit, credit, balance: computeImpact(account.rootType as string, debit, credit) };
       })
       .filter((a) => a.debit !== 0 || a.credit !== 0);
 
@@ -207,10 +209,20 @@ router.get('/balance-sheet', async (req, res) => {
       (Number(revAgg._sum?.credit || 0) - Number(revAgg._sum?.debit || 0)) -
       (Number(expAgg._sum?.debit || 0) - Number(expAgg._sum?.credit || 0));
 
-    equity.push({
+    // Remove real 3.3.1 account from hierarchy to avoid double-counting with synthetic entry
+    const filterOutCurrentProfit = (items: any[]): any[] =>
+      items
+        .map((item) => ({
+          ...item,
+          children: item.children ? filterOutCurrentProfit(item.children) : [],
+        }))
+        .filter((item) => item.accountNumber !== ACCOUNT_NUMBERS.CURRENT_PROFIT);
+    const filteredEquity = filterOutCurrentProfit(equity);
+
+    filteredEquity.push({
       id: 'current-profit',
       name: 'Laba Tahun Berjalan',
-      accountNumber: '3.3.1',
+      accountNumber: ACCOUNT_NUMBERS.CURRENT_PROFIT,
       isGroup: false,
       balance: currentProfit,
       children: [],
@@ -219,10 +231,10 @@ router.get('/balance-sheet', async (req, res) => {
     return res.json({
       assets,
       liabilities,
-      equity,
+      equity: filteredEquity,
       totalAssets: assets.reduce((s: number, a: any) => s + a.balance, 0),
       totalLiabilities: liabilities.reduce((s: number, a: any) => s + a.balance, 0),
-      totalEquity: equity.reduce((s: number, a: any) => s + a.balance, 0),
+      totalEquity: filteredEquity.reduce((s: number, a: any) => s + a.balance, 0),
     });
   } catch (error) {
     logger.error({ error }, 'GET /reports/balance-sheet error');
@@ -239,7 +251,7 @@ router.get('/cash-flow', async (req, res) => {
   try {
     const cashAccounts = await prisma.account.findMany({
       where: {
-        OR: [{ accountNumber: { startsWith: '1.1.1' } }, { accountNumber: { startsWith: '1.1.2' } }],
+        OR: ACCOUNT_NUMBERS.CASH.map((prefix) => ({ accountNumber: { startsWith: prefix } })),
         isGroup: false,
         isActive: true,
       },
@@ -269,7 +281,7 @@ router.get('/cash-flow', async (req, res) => {
       const rootType = ent.account.rootType as string;
       const accNum = ent.account.accountNumber;
 
-      if (rootType === 'REVENUE' || rootType === 'EXPENSE' || accNum.startsWith('1.1.3') || accNum.startsWith('2.1.1')) {
+      if (rootType === 'REVENUE' || rootType === 'EXPENSE' || accNum.startsWith(ACCOUNT_NUMBERS.AR) || accNum.startsWith(ACCOUNT_NUMBERS.AP)) {
         operating += amount;
         operatingDetails.push({ name: ent.account.name, amount });
       } else if (accNum.startsWith('1.2')) {

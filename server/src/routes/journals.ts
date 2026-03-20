@@ -52,6 +52,15 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
   const body = validateBody(CreateJournalSchema, req.body, res);
   if (!body) return;
 
+  // Validate: each line must have either debit OR credit, not both
+  for (const item of body.items) {
+    if ((item.debit || 0) > 0 && (item.credit || 0) > 0) {
+      return res.status(400).json({
+        error: 'Satu baris jurnal tidak boleh memiliki debit dan kredit sekaligus.',
+      });
+    }
+  }
+
   const totalDebit = body.items.reduce((s, i) => s + (i.debit || 0), 0);
   const totalCredit = body.items.reduce((s, i) => s + (i.credit || 0), 0);
   if (Math.abs(totalDebit - totalCredit) > 0.01) {
@@ -113,14 +122,24 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
         }))
       );
 
-      // Update party outstanding amounts
+      // Update party outstanding amounts (account-aware direction)
       for (const item of journalEntry.items) {
         if (item.partyId) {
-          const impact = Number(item.debit) - Number(item.credit);
-          await tx.party.update({
-            where: { id: item.partyId },
-            data: { outstandingAmount: { increment: impact } },
+          const account = await tx.account.findUnique({
+            where: { id: item.accountId },
+            select: { rootType: true },
           });
+          // ASSET/EXPENSE (debit-normal): debit increases outstanding
+          // LIABILITY/EQUITY/REVENUE (credit-normal): credit increases outstanding
+          const impact = account?.rootType === 'ASSET' || account?.rootType === 'EXPENSE'
+            ? Number(item.debit) - Number(item.credit)
+            : Number(item.credit) - Number(item.debit);
+          if (impact !== 0) {
+            await tx.party.update({
+              where: { id: item.partyId },
+              data: { outstandingAmount: { increment: impact } },
+            });
+          }
         }
       }
 
