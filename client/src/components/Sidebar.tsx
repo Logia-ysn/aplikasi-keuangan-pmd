@@ -45,6 +45,7 @@ export const Sidebar = () => {
 
   return (
     <aside
+      data-no-print
       className={cn(
         'h-screen bg-white border-r border-gray-200 text-gray-700 transition-all duration-300 flex flex-col z-50 flex-shrink-0',
         isCollapsed ? 'w-[60px]' : 'w-[220px]'

@@ -44,9 +44,9 @@ export const MainLayout = () => {
       </a>
 
       <Sidebar />
-      <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <main className="flex-1 flex flex-col min-w-0 overflow-hidden main-content">
         {/* Header */}
-        <header className="h-14 border-b border-gray-200 bg-white flex items-center px-6 justify-between shrink-0">
+        <header className="h-14 border-b border-gray-200 bg-white flex items-center px-6 justify-between shrink-0" data-no-print>
           <div className="flex items-center gap-1.5 text-sm text-gray-500">
             <span>Finance</span>
             <span className="text-gray-300">/</span>

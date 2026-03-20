@@ -84,3 +84,110 @@ body {
 /* legacy aliases — remapped to clean white cards */
 .glass { @apply bg-white border border-gray-200 rounded-xl shadow-sm; }
 .premium-gradient { @apply bg-white; }
+
+/* ─── Print Styles ─────────────────── */
+@media print {
+  /* Hide non-report UI */
+  nav, aside,
+  header,
+  .sidebar,
+  .no-print,
+  [data-no-print] {
+    display: none !important;
+  }
+
+  /* Reset layout — full-width content only */
+  body {
+    background: white !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    font-size: 11pt !important;
+    color: #111 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  main, .main-content {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* Show print-only elements */
+  .print-only {
+    display: block !important;
+  }
+
+  /* Clean card borders for print */
+  .card, .glass,
+  .bg-white.border {
+    border: 1px solid #e5e7eb !important;
+    box-shadow: none !important;
+    break-inside: avoid;
+  }
+
+  /* Table print styles */
+  .data-table {
+    font-size: 10pt !important;
+  }
+  .data-table thead th {
+    background: #f3f4f6 !important;
+    border-bottom: 2px solid #374151 !important;
+    font-size: 9pt !important;
+    padding: 6px 12px !important;
+  }
+  .data-table tbody td {
+    padding: 5px 12px !important;
+    border-bottom: 1px solid #e5e7eb !important;
+  }
+  .data-table tbody tr:hover {
+    background: transparent !important;
+  }
+  .data-table tfoot td {
+    padding: 6px 12px !important;
+  }
+
+  /* Report section headers */
+  .section-header {
+    background: #f3f4f6 !important;
+    border-bottom: 1px solid #d1d5db !important;
+    padding: 6px 12px !important;
+  }
+
+  /* Summary cards layout */
+  .report-summary-cards {
+    break-inside: avoid;
+  }
+
+  /* Report footer totals — force background */
+  .bg-blue-600 {
+    background-color: #2563eb !important;
+    color: white !important;
+  }
+  .bg-green-50\/60, .bg-red-50\/60, .bg-gray-50\/60 {
+    background-color: #f9fafb !important;
+  }
+
+  /* Ensure page breaks are clean */
+  h1, h2, h3 {
+    break-after: avoid;
+  }
+  table {
+    break-inside: auto;
+  }
+  tr {
+    break-inside: avoid;
+  }
+
+  /* Remove rounded corners for cleaner print */
+  .rounded-xl, .rounded-lg {
+    border-radius: 4px !important;
+  }
+
+  /* Page margins */
+  @page {
+    margin: 1.5cm 1cm;
+    size: A4;
+  }
+}

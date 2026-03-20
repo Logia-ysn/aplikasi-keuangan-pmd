@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../lib/api';
-import { X, Loader2, AlertCircle, User, Building2, Phone, Mail, MapPin, CreditCard, Globe } from 'lucide-react';
+import { X, Loader2, AlertCircle, Building2, Phone, Mail, MapPin, CreditCard } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 type PartyType = 'Customer' | 'Supplier' | 'Both';
