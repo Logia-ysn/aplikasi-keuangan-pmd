@@ -1,16 +1,48 @@
+# ============================================================================
+# PMD Finance — Docker Compose (Full Stack)
+#
+# Usage:
+#   cp .env.docker.example .env        # lalu edit JWT_SECRET
+#   docker compose up -d --build       # build & start semua
+#   docker compose logs -f app         # lihat log
+#   docker compose exec app npx prisma db seed  # seed data awal (pertama kali)
+#   docker compose down                # stop semua (data tetap tersimpan)
+# ============================================================================
+
 services:
+  # ── PostgreSQL Database ───────────────────────────────────────────────────
   db:
-    image: postgres:16
-    restart: always
-    env_file: .env
+    image: postgres:16-alpine
+    restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-user}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      POSTGRES_USER: ${POSTGRES_USER:-pmd}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pmd_secret_2026}
       POSTGRES_DB: ${POSTGRES_DB:-pmd_finance}
-    ports:
-      - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-pmd}"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ── Application (API + Frontend) ──────────────────────────────────────────
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${PORT:-3001}:3001"
+    environment:
+      DATABASE_URL: "postgresql://${POSTGRES_USER:-pmd}:${POSTGRES_PASSWORD:-pmd_secret_2026}@db:5432/${POSTGRES_DB:-pmd_finance}?schema=public"
+      PORT: "3001"
+      JWT_SECRET: "${JWT_SECRET:-ganti-dengan-secret-yang-aman}"
+      ALLOWED_ORIGINS: "${ALLOWED_ORIGINS:-http://localhost:3001,https://keuangan.panganmasadepan.com}"
+      NODE_ENV: "production"
+    depends_on:
+      db:
+        condition: service_healthy
 
 volumes:
   pgdata:
