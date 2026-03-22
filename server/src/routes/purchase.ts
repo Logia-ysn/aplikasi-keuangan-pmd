@@ -168,4 +168,61 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
   }
 });
 
+// POST /api/purchase/invoices/:id/cancel — cancel purchase invoice
+router.post('/:id/cancel', roleMiddleware(['Admin']), async (req: AuthRequest, res) => {
+  try {
+    const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      const invoice = await tx.purchaseInvoice.findUnique({
+        where: { id: req.params.id },
+        include: { supplier: true },
+      });
+      if (!invoice) throw new BusinessError('Invoice tidak ditemukan.');
+      if (invoice.status === 'Cancelled') throw new BusinessError('Invoice sudah dibatalkan.');
+      if (invoice.status === 'Paid') throw new BusinessError('Invoice sudah lunas, tidak bisa dibatalkan.');
+
+      const allocations = await tx.paymentAllocation.findMany({
+        where: { invoiceType: 'PurchaseInvoice', invoiceId: invoice.id },
+      });
+      if (allocations.length > 0) {
+        throw new BusinessError('Invoice memiliki pembayaran teralokasi. Batalkan pembayaran terlebih dahulu.');
+      }
+
+      await tx.purchaseInvoice.update({
+        where: { id: invoice.id },
+        data: { status: 'Cancelled', outstanding: 0 },
+      });
+
+      await tx.accountingLedgerEntry.updateMany({
+        where: { referenceId: invoice.id },
+        data: { isCancelled: true },
+      });
+
+      const jvNumber = `JV-${invoice.invoiceNumber}`;
+      const journal = await tx.journalEntry.findUnique({ where: { entryNumber: jvNumber } });
+      if (journal) {
+        await tx.accountingLedgerEntry.updateMany({
+          where: { referenceId: journal.id },
+          data: { isCancelled: true },
+        });
+      }
+
+      const apAccount = await tx.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.AP } });
+      const inventoryAccount = await tx.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.INVENTORY } });
+      if (inventoryAccount) await updateAccountBalance(tx, inventoryAccount.id, 0, Number(invoice.grandTotal));
+      if (apAccount) await updateAccountBalance(tx, apAccount.id, Number(invoice.grandTotal), 0);
+
+      await tx.party.update({
+        where: { id: invoice.partyId },
+        data: { outstandingAmount: { decrement: Number(invoice.outstanding) } },
+      });
+
+      return { id: invoice.id, status: 'Cancelled' };
+    }, { timeout: 15000 });
+
+    return res.json(result);
+  } catch (error: any) {
+    return handleRouteError(res, error, 'POST /purchase/invoices/:id/cancel', 'Gagal membatalkan invoice.');
+  }
+});
+
 export default router;

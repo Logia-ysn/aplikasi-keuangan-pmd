@@ -193,6 +193,95 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
   }
 });
 
+// POST /api/payments/:id/cancel — cancel payment and reverse allocations
+router.post('/:id/cancel', roleMiddleware(['Admin']), async (req: AuthRequest, res) => {
+  try {
+    const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      const payment = await tx.payment.findUnique({
+        where: { id: req.params.id },
+        include: { party: true },
+      });
+      if (!payment) throw new BusinessError('Pembayaran tidak ditemukan.');
+      if (payment.status === 'Cancelled') throw new BusinessError('Pembayaran sudah dibatalkan.');
+
+      const numAmount = Number(payment.amount);
+
+      // Reverse payment allocations
+      const allocations = await tx.paymentAllocation.findMany({
+        where: { paymentId: payment.id },
+      });
+
+      for (const alloc of allocations) {
+        const allocAmt = Number(alloc.allocatedAmount);
+        if (alloc.invoiceType === 'SalesInvoice') {
+          const inv = await tx.salesInvoice.findUnique({ where: { id: alloc.invoiceId } });
+          if (inv) {
+            const newOutstanding = Number(inv.outstanding) + allocAmt;
+            await tx.salesInvoice.update({
+              where: { id: inv.id },
+              data: { outstanding: newOutstanding, status: newOutstanding >= Number(inv.grandTotal) ? 'Submitted' : 'PartiallyPaid' },
+            });
+          }
+        } else if (alloc.invoiceType === 'PurchaseInvoice') {
+          const inv = await tx.purchaseInvoice.findUnique({ where: { id: alloc.invoiceId } });
+          if (inv) {
+            const newOutstanding = Number(inv.outstanding) + allocAmt;
+            await tx.purchaseInvoice.update({
+              where: { id: inv.id },
+              data: { outstanding: newOutstanding, status: newOutstanding >= Number(inv.grandTotal) ? 'Submitted' : 'PartiallyPaid' },
+            });
+          }
+        }
+      }
+
+      // Delete allocations
+      await tx.paymentAllocation.deleteMany({ where: { paymentId: payment.id } });
+
+      // Cancel related ledger entries
+      const jvNumber = `JV-PAY-${payment.paymentNumber.replace('PAY-', '')}`;
+      const journal = await tx.journalEntry.findFirst({
+        where: { entryNumber: { contains: payment.paymentNumber } },
+      });
+      if (journal) {
+        await tx.accountingLedgerEntry.updateMany({
+          where: { referenceId: journal.id },
+          data: { isCancelled: true },
+        });
+      }
+
+      // Reverse account balances
+      const arAccount = await tx.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.AR } });
+      const apAccount = await tx.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.AP } });
+
+      if (payment.paymentType === 'Receive') {
+        await updateAccountBalance(tx, payment.accountId, 0, numAmount); // reverse bank debit
+        if (arAccount) await updateAccountBalance(tx, arAccount.id, numAmount, 0); // reverse AR credit
+      } else {
+        if (apAccount) await updateAccountBalance(tx, apAccount.id, 0, numAmount); // reverse AP debit
+        await updateAccountBalance(tx, payment.accountId, numAmount, 0); // reverse bank credit
+      }
+
+      // Reverse party outstanding
+      await tx.party.update({
+        where: { id: payment.partyId },
+        data: { outstandingAmount: { increment: numAmount } },
+      });
+
+      // Mark payment as cancelled
+      await tx.payment.update({
+        where: { id: payment.id },
+        data: { status: 'Cancelled' },
+      });
+
+      return { id: payment.id, status: 'Cancelled' };
+    }, { timeout: 15000 });
+
+    return res.json(result);
+  } catch (error: any) {
+    return handleRouteError(res, error, 'POST /payments/:id/cancel', 'Gagal membatalkan pembayaran.');
+  }
+});
+
 /**
  * Auto-allocate the payment amount to outstanding invoices (oldest-first).
  */

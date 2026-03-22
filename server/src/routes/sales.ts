@@ -172,4 +172,67 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
   }
 });
 
+// POST /api/sales/invoices/:id/cancel — cancel sales invoice
+router.post('/:id/cancel', roleMiddleware(['Admin']), async (req: AuthRequest, res) => {
+  try {
+    const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      const invoice = await tx.salesInvoice.findUnique({
+        where: { id: req.params.id },
+        include: { customer: true },
+      });
+      if (!invoice) throw new BusinessError('Invoice tidak ditemukan.');
+      if (invoice.status === 'Cancelled') throw new BusinessError('Invoice sudah dibatalkan.');
+      if (invoice.status === 'Paid') throw new BusinessError('Invoice sudah lunas, tidak bisa dibatalkan.');
+
+      // Check if there are payment allocations
+      const allocations = await tx.paymentAllocation.findMany({
+        where: { invoiceType: 'SalesInvoice', invoiceId: invoice.id },
+      });
+      if (allocations.length > 0) {
+        throw new BusinessError('Invoice memiliki pembayaran teralokasi. Batalkan pembayaran terlebih dahulu.');
+      }
+
+      // Cancel the invoice
+      await tx.salesInvoice.update({
+        where: { id: invoice.id },
+        data: { status: 'Cancelled', outstanding: 0 },
+      });
+
+      // Cancel related ledger entries
+      await tx.accountingLedgerEntry.updateMany({
+        where: { referenceId: invoice.id },
+        data: { isCancelled: true },
+      });
+
+      // Also cancel ledger entries from the auto-posted journal
+      const jvNumber = `JV-${invoice.invoiceNumber}`;
+      const journal = await tx.journalEntry.findUnique({ where: { entryNumber: jvNumber } });
+      if (journal) {
+        await tx.accountingLedgerEntry.updateMany({
+          where: { referenceId: journal.id },
+          data: { isCancelled: true },
+        });
+      }
+
+      // Reverse account balances
+      const arAccount = await tx.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.AR } });
+      const salesAccount = await tx.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.SALES } });
+      if (arAccount) await updateAccountBalance(tx, arAccount.id, 0, Number(invoice.grandTotal));
+      if (salesAccount) await updateAccountBalance(tx, salesAccount.id, Number(invoice.grandTotal), 0);
+
+      // Reverse party outstanding
+      await tx.party.update({
+        where: { id: invoice.partyId },
+        data: { outstandingAmount: { decrement: Number(invoice.outstanding) } },
+      });
+
+      return { id: invoice.id, status: 'Cancelled' };
+    }, { timeout: 15000 });
+
+    return res.json(result);
+  } catch (error: any) {
+    return handleRouteError(res, error, 'POST /sales/invoices/:id/cancel', 'Gagal membatalkan invoice.');
+  }
+});
+
 export default router;
