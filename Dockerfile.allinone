@@ -5,18 +5,17 @@
 # Build:
 #   docker build -f Dockerfile.allinone -t pmd-finance .
 #
-# Run:
+# Run (langsung pakai, seed otomatis saat pertama kali):
 #   docker run -d --name pmd-finance \
 #     -p 3001:3001 \
 #     -e JWT_SECRET="$(openssl rand -hex 48)" \
 #     -v pmd-pgdata:/var/lib/postgresql/data \
 #     pmd-finance
 #
-# Seed (pertama kali):
-#   docker exec pmd-finance sh -c "cd /app/server && npx prisma db seed"
-#
 # Logs:
 #   docker logs -f pmd-finance
+#
+# Login default: keuangan@panganmasadepan.com / P4nganterdepan!
 # ============================================================================
 
 # ── Stage 1: Install dependencies ───────────────────────────────────────────
