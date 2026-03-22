@@ -123,7 +123,7 @@ export function ProductionRunModal({ isOpen, onClose, items }: Props) {
         role="dialog"
         aria-modal="true"
         aria-labelledby="production-modal-title"
-        className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col"
+        className="bg-white rounded-2xl shadow-xl w-full max-w-[calc(100vw-1rem)] sm:max-w-md lg:max-w-2xl max-h-[90vh] flex flex-col"
       >
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">

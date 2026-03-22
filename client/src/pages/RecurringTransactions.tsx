@@ -92,7 +92,7 @@ export const RecurringTransactions = () => {
   return (
     <div className="space-y-5 pb-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold" style={{ color: 'var(--color-text-primary)' }}>
             Transaksi Berulang
@@ -102,7 +102,7 @@ export const RecurringTransactions = () => {
           </p>
         </div>
         <button
-          className="btn-primary"
+          className="btn-primary self-start"
           onClick={() => { setEditTemplate(null); setIsModalOpen(true); }}
         >
           <Plus size={15} /> Buat Template
@@ -130,7 +130,7 @@ export const RecurringTransactions = () => {
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="table-responsive">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b" style={{ borderColor: 'var(--color-border)', backgroundColor: 'var(--color-bg-secondary)' }}>

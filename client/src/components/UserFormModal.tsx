@@ -98,7 +98,7 @@ const UserFormModal: React.FC<UserFormModalProps> = ({ isOpen, onClose, editUser
       onKeyDown={(e: React.KeyboardEvent) => e.key === 'Escape' && onClose()}
     >
       <div
-        className="rounded-xl w-full max-w-lg shadow-2xl flex flex-col max-h-[95vh] overflow-hidden"
+        className="rounded-xl w-full max-w-[calc(100vw-1rem)] sm:max-w-lg shadow-2xl flex flex-col max-h-[95vh] overflow-hidden"
         style={{ backgroundColor: 'var(--color-bg-primary)' }}
       >
         {/* Header */}

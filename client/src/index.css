@@ -177,6 +177,44 @@ body {
 .dark .ring-gray-200 { --tw-ring-color: var(--color-border); }
 .dark .shadow-sm, .dark .shadow { box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
 
+/* ── Mobile Responsive ── */
+@media (max-width: 767px) {
+  /* Make all data-tables horizontally scrollable */
+  .data-table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    min-width: 600px;
+  }
+
+  /* Modal responsive — constrain width on mobile */
+  .modal-overlay > div {
+    max-width: 100% !important;
+    margin: 0.5rem;
+    max-height: 95vh;
+  }
+}
+
+@media (max-width: 639px) {
+  /* Stack filter bars vertically */
+  .filter-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .filter-bar > * {
+    width: 100%;
+  }
+}
+
+/* Utility: scrollable table wrapper */
+.table-responsive {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.table-responsive table {
+  min-width: 700px;
+}
+
 /* ─── Print Styles ─────────────────── */
 @media print {
   /* Hide non-report UI */

@@ -125,7 +125,7 @@ const ReconciliationModal: React.FC<Props> = ({ isOpen, onClose }) => {
       onKeyDown={(e) => e.key === 'Escape' && onClose()}
     >
       <div
-        className="rounded-xl border shadow-xl p-6 w-full max-w-2xl max-h-[85vh] overflow-y-auto"
+        className="rounded-xl border shadow-xl p-4 sm:p-6 w-full max-w-[calc(100vw-1rem)] sm:max-w-md lg:max-w-2xl max-h-[85vh] overflow-y-auto"
         style={{ backgroundColor: 'var(--color-bg-primary)', borderColor: 'var(--color-border)' }}
       >
         <div className="flex items-center justify-between mb-5">

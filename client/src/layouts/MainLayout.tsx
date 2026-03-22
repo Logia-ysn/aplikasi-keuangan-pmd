@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Sidebar } from '../components/Sidebar';
-import { LogOut, Search, Keyboard, KeyRound } from 'lucide-react';
+import { LogOut, Search, Keyboard, KeyRound, Menu } from 'lucide-react';
 import { NotificationBell } from '../components/NotificationBell';
 import { useHotkey } from '../hooks/useHotkeys';
 import { CommandPalette } from '../components/CommandPalette';
@@ -35,6 +35,7 @@ export const MainLayout = () => {
   const [isShortcutHelpOpen, setIsShortcutHelpOpen] = useState(false);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const companySettings = useCompanySettings();
 
   useEffect(() => {
@@ -45,6 +46,11 @@ export const MainLayout = () => {
       setShowOnboarding(true);
     }
   }, [companySettings]);
+
+  // Close mobile menu on route change
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [location.pathname]);
 
   useHotkey('mod+k', () => setIsSearchOpen(true));
   useHotkey('?', () => setIsShortcutHelpOpen(true), !isSearchOpen && !isShortcutHelpOpen);
@@ -73,20 +79,48 @@ export const MainLayout = () => {
         Langsung ke konten utama
       </a>
 
-      <Sidebar />
+      {/* Desktop Sidebar (hidden on mobile) */}
+      <div className="hidden lg:block">
+        <Sidebar />
+      </div>
+
+      {/* Mobile Sidebar Drawer */}
+      {mobileMenuOpen && (
+        <div className="fixed inset-0 z-50 lg:hidden">
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 bg-black/50 transition-opacity"
+            onClick={() => setMobileMenuOpen(false)}
+          />
+          {/* Drawer */}
+          <div className="fixed inset-y-0 left-0 z-50 transform transition-transform duration-300 ease-in-out">
+            <Sidebar mobileOpen={true} onMobileClose={() => setMobileMenuOpen(false)} />
+          </div>
+        </div>
+      )}
+
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden main-content">
         {/* Header */}
         <header
-          className="h-14 border-b flex items-center px-6 justify-between shrink-0"
+          className="h-14 border-b flex items-center px-3 lg:px-6 justify-between shrink-0"
           style={{ backgroundColor: 'var(--color-bg-primary)', borderColor: 'var(--color-border)' }}
           data-no-print
         >
           <div className="flex items-center gap-1.5 text-sm" style={{ color: 'var(--color-text-secondary)' }}>
-            <span>Finance</span>
-            <span style={{ color: 'var(--color-text-muted)' }}>/</span>
+            {/* Hamburger menu button - only on mobile */}
+            <button
+              onClick={() => setMobileMenuOpen(true)}
+              className="p-1.5 -ml-1 mr-1 rounded-lg transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 lg:hidden"
+              style={{ color: 'var(--color-text-muted)' }}
+              aria-label="Buka menu"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+            <span className="hidden sm:inline">Finance</span>
+            <span className="hidden sm:inline" style={{ color: 'var(--color-text-muted)' }}>/</span>
             <span className="font-medium" style={{ color: 'var(--color-text-primary)' }}>{pageName}</span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2">
             {/* Search button */}
             <button
               onClick={() => setIsSearchOpen(true)}
@@ -99,7 +133,7 @@ export const MainLayout = () => {
             {/* Shortcuts help button */}
             <button
               onClick={() => setIsShortcutHelpOpen(true)}
-              className="p-1.5 rounded-lg transition-colors hover:bg-gray-100 dark:hover:bg-gray-700"
+              className="hidden sm:block p-1.5 rounded-lg transition-colors hover:bg-gray-100 dark:hover:bg-gray-700"
               style={{ color: 'var(--color-text-muted)' }}
               title="Pintasan Keyboard (?)"
             >
@@ -107,7 +141,7 @@ export const MainLayout = () => {
             </button>
             {/* Notification bell */}
             <NotificationBell />
-            <div className="flex items-center gap-2.5 pl-2 ml-1 border-l" style={{ borderColor: 'var(--color-border)' }}>
+            <div className="flex items-center gap-2 sm:gap-2.5 pl-1.5 sm:pl-2 ml-0.5 sm:ml-1 border-l" style={{ borderColor: 'var(--color-border)' }}>
               <div className="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-semibold text-xs">
                 {user?.fullName?.charAt(0) || 'U'}
               </div>
@@ -119,7 +153,7 @@ export const MainLayout = () => {
             <button
               onClick={() => setIsPasswordModalOpen(true)}
               aria-label="Ganti Password"
-              className="p-1.5 rounded-lg transition-colors hover:bg-gray-100 dark:hover:bg-gray-700"
+              className="hidden sm:block p-1.5 rounded-lg transition-colors hover:bg-gray-100 dark:hover:bg-gray-700"
               style={{ color: 'var(--color-text-muted)' }}
               title="Ganti Password"
             >
@@ -137,8 +171,8 @@ export const MainLayout = () => {
         </header>
 
         {/* Content */}
-        <div id="main-content" className="flex-1 overflow-y-auto p-6" style={{ backgroundColor: 'var(--color-bg-secondary)' }}>
-          <div className="max-w-7xl mx-auto space-y-6">
+        <div id="main-content" className="flex-1 overflow-y-auto p-3 sm:p-4 lg:p-6" style={{ backgroundColor: 'var(--color-bg-secondary)' }}>
+          <div className="max-w-7xl mx-auto space-y-4 sm:space-y-6">
             <Outlet />
           </div>
         </div>

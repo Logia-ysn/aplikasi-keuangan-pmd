@@ -91,7 +91,7 @@ const PartyFormModal: React.FC<PartyFormModalProps> = ({ isOpen, onClose, editPa
 
   return (
     <div role="dialog" aria-modal="true" aria-labelledby="party-modal-title" className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4" onKeyDown={(e: React.KeyboardEvent) => e.key === "Escape" && onClose()}>
-      <div className="bg-white rounded-xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[95vh] overflow-hidden">
+      <div className="bg-white rounded-xl w-full max-w-[calc(100vw-1rem)] sm:max-w-md lg:max-w-2xl shadow-2xl flex flex-col max-h-[95vh] overflow-hidden">
 
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">

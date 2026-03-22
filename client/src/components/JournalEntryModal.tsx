@@ -73,7 +73,7 @@ const JournalEntryModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
 
   return (
     <div role="dialog" aria-modal="true" aria-labelledby="journal-modal-title" className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/30" onKeyDown={(e: React.KeyboardEvent) => e.key === "Escape" && onClose()}>
-      <div className="bg-white border border-gray-200 rounded-xl w-full max-w-5xl shadow-xl flex flex-col max-h-[90vh]">
+      <div className="bg-white border border-gray-200 rounded-xl w-full max-w-[calc(100vw-1rem)] lg:max-w-5xl shadow-xl flex flex-col max-h-[90vh]">
         {/* Header */}
         <div className="px-5 py-4 border-b border-gray-100 flex justify-between items-center">
           <div>

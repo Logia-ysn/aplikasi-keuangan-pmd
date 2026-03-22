@@ -106,7 +106,7 @@ export const Notifications = () => {
   return (
     <div className="space-y-5 pb-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold" style={{ color: 'var(--color-text-primary)' }}>
             Notifikasi
@@ -117,7 +117,7 @@ export const Notifications = () => {
         </div>
         {unreadCount > 0 && (
           <button
-            className="btn-secondary flex items-center gap-1.5"
+            className="btn-secondary flex items-center gap-1.5 self-start"
             onClick={() => markAllReadMutation.mutate()}
             disabled={markAllReadMutation.isPending}
           >

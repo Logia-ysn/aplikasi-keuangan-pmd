@@ -19,6 +19,7 @@ import {
   ScrollText,
   Repeat,
   Scale,
+  X,
 } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '../lib/utils';
@@ -45,7 +46,12 @@ const adminNavItems = [
   { icon: ScrollText, label: 'Jejak Audit', href: '/audit' },
 ];
 
-export const Sidebar = () => {
+interface SidebarProps {
+  mobileOpen?: boolean;
+  onMobileClose?: () => void;
+}
+
+export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen = false, onMobileClose }) => {
   const [isCollapsed, setIsCollapsed] = React.useState(false);
   const location = useLocation();
   const settings = useCompanySettings();
@@ -75,12 +81,20 @@ export const Sidebar = () => {
     return items;
   }, [user?.role]);
 
-  return (
+  const handleNavClick = () => {
+    // Auto-close sidebar on mobile when a nav item is clicked
+    if (onMobileClose) {
+      onMobileClose();
+    }
+  };
+
+  const sidebarContent = (
     <aside
       data-no-print
       className={cn(
         'h-screen border-r transition-all duration-300 flex flex-col z-50 flex-shrink-0',
-        isCollapsed ? 'w-[60px]' : 'w-[220px]'
+        // On mobile (inside drawer), always show full width
+        mobileOpen ? 'w-[260px]' : (isCollapsed ? 'w-[60px]' : 'w-[220px]')
       )}
       style={{
         backgroundColor: 'var(--color-bg-primary)',
@@ -90,7 +104,7 @@ export const Sidebar = () => {
     >
       {/* Logo */}
       <div className="h-14 flex items-center justify-between px-3 border-b" style={{ borderColor: 'var(--color-border-light)' }}>
-        {!isCollapsed && (
+        {(!isCollapsed || mobileOpen) && (
           <div className="flex items-center gap-2 overflow-hidden">
             {settings?.logoUrl ? (
               <img
@@ -110,25 +124,37 @@ export const Sidebar = () => {
             )}
           </div>
         )}
-        {isCollapsed && settings?.logoUrl && (
+        {isCollapsed && !mobileOpen && settings?.logoUrl && (
           <img
             src={settings.logoUrl}
             alt="Logo"
             className="h-7 w-7 object-contain mx-auto"
           />
         )}
-        {isCollapsed && !settings?.logoUrl && (
+        {isCollapsed && !mobileOpen && !settings?.logoUrl && (
           <div className="w-7 h-7 bg-blue-600 rounded-md flex items-center justify-center mx-auto">
             <span className="text-white font-black text-[9px] leading-none">Rp</span>
           </div>
         )}
-        <button
-          onClick={() => setIsCollapsed(!isCollapsed)}
-          aria-label={isCollapsed ? 'Buka sidebar' : 'Tutup sidebar'}
-          className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors ml-auto flex-shrink-0"
-        >
-          {isCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
-        </button>
+
+        {/* On mobile: show close button. On desktop: show collapse toggle */}
+        {mobileOpen ? (
+          <button
+            onClick={onMobileClose}
+            aria-label="Tutup menu"
+            className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors ml-auto flex-shrink-0"
+          >
+            <X size={18} />
+          </button>
+        ) : (
+          <button
+            onClick={() => setIsCollapsed(!isCollapsed)}
+            aria-label={isCollapsed ? 'Buka sidebar' : 'Tutup sidebar'}
+            className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors ml-auto flex-shrink-0 hidden lg:block"
+          >
+            {isCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+          </button>
+        )}
       </div>
 
       {/* Nav */}
@@ -137,11 +163,13 @@ export const Sidebar = () => {
           const isActive =
             location.pathname === item.href ||
             (item.href !== '/' && location.pathname.startsWith(item.href));
+          const showLabel = mobileOpen || !isCollapsed;
           return (
             <Link
               key={item.label}
               to={item.href}
-              title={isCollapsed ? item.label : undefined}
+              title={!showLabel ? item.label : undefined}
+              onClick={handleNavClick}
               className={cn(
                 'flex items-center gap-3 px-3 py-2 my-0.5 rounded-lg text-sm transition-colors duration-150',
                 isActive
@@ -153,7 +181,7 @@ export const Sidebar = () => {
                 size={18}
                 className={cn('flex-shrink-0', isActive ? 'text-blue-600' : 'text-gray-400')}
               />
-              {!isCollapsed && <span className="truncate">{item.label}</span>}
+              {showLabel && <span className="truncate">{item.label}</span>}
             </Link>
           );
         })}
@@ -171,17 +199,17 @@ export const Sidebar = () => {
           style={{ color: 'var(--color-text-muted)' }}
         >
           <ThemeIcon size={16} className="flex-shrink-0" />
-          {!isCollapsed && <span className="truncate text-xs font-medium">{themeLabel}</span>}
+          {(mobileOpen || !isCollapsed) && <span className="truncate text-xs font-medium">{themeLabel}</span>}
         </button>
       </div>
 
       {/* User */}
       <div className="border-t p-3" style={{ borderColor: 'var(--color-border-light)' }}>
-        <div className={cn('flex items-center gap-2 p-2 rounded-lg', isCollapsed && 'justify-center')}>
+        <div className={cn('flex items-center gap-2 p-2 rounded-lg', !mobileOpen && isCollapsed && 'justify-center')}>
           <div className="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center font-semibold text-xs text-blue-700 flex-shrink-0">
             {user?.fullName?.charAt(0) || 'U'}
           </div>
-          {!isCollapsed && (
+          {(mobileOpen || !isCollapsed) && (
             <div className="overflow-hidden">
               <p className="text-xs font-semibold truncate" style={{ color: 'var(--color-text-primary)' }}>{user?.fullName || 'User'}</p>
               <p className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>{user?.role || 'Admin'}</p>
@@ -191,4 +219,6 @@ export const Sidebar = () => {
       </div>
     </aside>
   );
+
+  return sidebarContent;
 };

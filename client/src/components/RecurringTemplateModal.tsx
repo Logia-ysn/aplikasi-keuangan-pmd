@@ -138,7 +138,7 @@ const RecurringTemplateModal = ({ isOpen, onClose, editTemplate }: Props) => {
   return (
     <div className="fixed inset-0 z-[100] flex items-start justify-center bg-black/40 p-4 pt-12 overflow-y-auto" onClick={onClose}>
       <div
-        className="w-full max-w-2xl rounded-xl shadow-2xl"
+        className="w-full max-w-[calc(100vw-1rem)] sm:max-w-md lg:max-w-2xl rounded-xl shadow-2xl"
         onClick={(e) => e.stopPropagation()}
         style={{ backgroundColor: 'var(--color-bg-primary)' }}
       >

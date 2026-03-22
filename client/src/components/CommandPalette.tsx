@@ -123,7 +123,7 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
       onClick={(e) => { if (e.target === overlayRef.current) onClose(); }}
     >
       <div
-        className="w-full max-w-lg rounded-xl shadow-2xl border overflow-hidden"
+        className="w-full max-w-[calc(100vw-1rem)] sm:max-w-lg rounded-xl shadow-2xl border overflow-hidden"
         style={{
           backgroundColor: 'var(--color-card-bg)',
           borderColor: 'var(--color-border)',

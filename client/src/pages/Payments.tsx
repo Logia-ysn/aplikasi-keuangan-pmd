@@ -25,12 +25,12 @@ export const Payments = () => {
   return (
     <div className="space-y-5 pb-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold text-gray-900">Bank & Kas</h1>
           <p className="text-sm text-gray-500 mt-0.5">Pantau mutasi kas, pembayaran vendor, dan pelunasan piutang.</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button
             className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-medium bg-blue-100 hover:bg-blue-200 text-blue-700 transition-colors"
             onClick={() => setIsTransferOpen(true)}
@@ -63,6 +63,7 @@ export const Payments = () => {
 
       {/* Table */}
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+       <div className="table-responsive">
         <table className="data-table">
           <thead>
             <tr>
@@ -135,6 +136,7 @@ export const Payments = () => {
             )}
           </tbody>
         </table>
+       </div>
       </div>
       <PaymentModal
         isOpen={isReceiveOpen}

@@ -518,7 +518,7 @@ export const COAPage: React.FC = () => {
   return (
     <div className="space-y-5 pb-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold text-gray-900">Bagan Akun</h1>
           <p className="text-sm text-gray-500 mt-0.5">Kelola struktur Chart of Accounts secara hierarkis.</p>
@@ -538,7 +538,7 @@ export const COAPage: React.FC = () => {
 
       {/* Search & Table */}
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-        <div className="p-4 border-b border-gray-100 flex items-center justify-between gap-3">
+        <div className="p-3 sm:p-4 border-b border-gray-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
           <div className="relative flex-1 max-w-xs">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input

@@ -193,7 +193,7 @@ export const AuditTrail = () => {
         className="rounded-xl border overflow-hidden"
         style={{ backgroundColor: 'var(--color-bg-primary)', borderColor: 'var(--color-border)' }}
       >
-        <div className="overflow-x-auto">
+        <div className="table-responsive">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b" style={{ borderColor: 'var(--color-border)', backgroundColor: 'var(--color-bg-secondary)' }}>

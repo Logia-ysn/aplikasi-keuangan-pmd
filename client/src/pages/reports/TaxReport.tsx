@@ -125,6 +125,7 @@ const TaxReport: React.FC = () => {
         className="rounded-xl border overflow-hidden"
         style={{ backgroundColor: 'var(--color-bg-primary)', borderColor: 'var(--color-border)' }}
       >
+       <div className="table-responsive">
         <table className="data-table">
           <thead>
             <tr>
@@ -176,6 +177,7 @@ const TaxReport: React.FC = () => {
             </tfoot>
           )}
         </table>
+       </div>
       </div>
     </ReportLayout>
   );

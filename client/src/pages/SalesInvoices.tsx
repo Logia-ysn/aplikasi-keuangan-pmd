@@ -75,18 +75,18 @@ export const SalesInvoices = () => {
   return (
     <div className="space-y-5 pb-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold text-gray-900">Invoice Penjualan</h1>
           <p className="text-sm text-gray-500 mt-0.5">Kelola faktur penjualan dan piutang pelanggan.</p>
         </div>
-        <button className="btn-primary" onClick={() => setIsModalOpen(true)}>
+        <button className="btn-primary self-start" onClick={() => setIsModalOpen(true)}>
           <Plus size={15} /> Buat Invoice Baru
         </button>
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <div className="card px-4 py-3">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-blue-50 rounded-lg">
@@ -134,8 +134,8 @@ export const SalesInvoices = () => {
       </div>
 
       {/* Filter Bar */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <div className="relative flex-1 max-w-sm">
+      <div className="flex items-center gap-3 flex-wrap filter-bar">
+        <div className="relative flex-1 min-w-0 sm:max-w-sm">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
             type="text"
@@ -182,6 +182,7 @@ export const SalesInvoices = () => {
 
       {/* Table */}
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+       <div className="table-responsive">
         <table className="data-table">
           <thead>
             <tr>
@@ -269,10 +270,11 @@ export const SalesInvoices = () => {
             )}
           </tbody>
         </table>
+       </div>
 
         {/* Pagination */}
         {filtered.length > PAGE_SIZE && (
-          <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 bg-gray-50/50">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-2 px-4 py-3 border-t border-gray-100 bg-gray-50/50">
             <p className="text-xs text-gray-400">
               Menampilkan {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtered.length)} dari {filtered.length} invoice
             </p>

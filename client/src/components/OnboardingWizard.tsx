@@ -153,7 +153,7 @@ const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onComplete }) => {
       {/* Background subtle pattern */}
       <div className="absolute inset-0 opacity-5" style={{ backgroundImage: 'radial-gradient(circle at 1px 1px, currentColor 1px, transparent 0)', backgroundSize: '40px 40px' }} />
 
-      <div className="relative w-full max-w-xl mx-4">
+      <div className="relative w-full max-w-[calc(100vw-2rem)] sm:max-w-xl mx-4">
         {/* Progress bar */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-3">

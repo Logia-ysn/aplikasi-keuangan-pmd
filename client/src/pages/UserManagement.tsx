@@ -96,12 +96,12 @@ export const UserManagement = () => {
   return (
     <div className="space-y-5 pb-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold" style={{ color: 'var(--color-text-primary)' }}>Manajemen User</h1>
           <p className="text-sm mt-0.5" style={{ color: 'var(--color-text-muted)' }}>Kelola akun pengguna aplikasi.</p>
         </div>
-        <button className="btn-primary" onClick={() => { setEditUser(null); setIsModalOpen(true); }}>
+        <button className="btn-primary self-start" onClick={() => { setEditUser(null); setIsModalOpen(true); }}>
           <Plus size={15} /> Tambah User
         </button>
       </div>
@@ -148,7 +148,7 @@ export const UserManagement = () => {
         className="rounded-xl border overflow-hidden"
         style={{ backgroundColor: 'var(--color-bg-primary)', borderColor: 'var(--color-border)' }}
       >
-        <div className="overflow-x-auto">
+        <div className="table-responsive">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b" style={{ borderColor: 'var(--color-border)', backgroundColor: 'var(--color-bg-secondary)' }}>

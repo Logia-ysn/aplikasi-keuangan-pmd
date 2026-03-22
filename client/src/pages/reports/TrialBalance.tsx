@@ -102,6 +102,7 @@ const TrialBalance: React.FC = () => {
         }
       >
         <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+         <div className="table-responsive">
           <table className="data-table">
             <thead>
               <tr>
@@ -144,6 +145,7 @@ const TrialBalance: React.FC = () => {
               </tr>
             </tfoot>
           </table>
+         </div>
         </div>
       </ReportLayout>
 

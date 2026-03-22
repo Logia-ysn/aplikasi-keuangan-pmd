@@ -45,7 +45,7 @@ export const GeneralLedger = () => {
   return (
     <div className="space-y-5 pb-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold text-gray-900">Buku Besar</h1>
           <p className="text-sm text-gray-500 mt-0.5">Kelola dan tinjau semua transaksi jurnal harian.</p>
@@ -61,7 +61,7 @@ export const GeneralLedger = () => {
       </div>
 
       {/* Search */}
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <div className="relative flex-1 max-w-sm">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
@@ -84,6 +84,7 @@ export const GeneralLedger = () => {
 
       {/* Table */}
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+       <div className="table-responsive">
         <table className="data-table">
           <thead>
             <tr>
@@ -164,6 +165,7 @@ export const GeneralLedger = () => {
             )}
           </tbody>
         </table>
+       </div>
       </div>
 
       <JournalEntryModal

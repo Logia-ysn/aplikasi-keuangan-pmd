@@ -36,7 +36,7 @@ export function ShortcutHelp({ isOpen, onClose }: ShortcutHelpProps) {
       className="fixed inset-0 z-[100] flex items-center justify-center bg-black/30"
       onClick={(e) => { if (e.target === overlayRef.current) onClose(); }}
     >
-      <div className="w-full max-w-md rounded-xl shadow-xl border"
+      <div className="w-full max-w-[calc(100vw-1rem)] sm:max-w-md rounded-xl shadow-xl border"
         style={{
           backgroundColor: 'var(--color-card-bg)',
           borderColor: 'var(--color-border)',

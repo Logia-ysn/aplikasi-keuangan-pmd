@@ -104,7 +104,7 @@ export function InventoryItemModal({ isOpen, onClose, editItem }: InventoryItemM
       aria-labelledby="item-modal-title"
       className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4"
     >
-      <div className="bg-white rounded-xl w-full max-w-lg shadow-2xl flex flex-col max-h-[95vh] overflow-hidden">
+      <div className="bg-white rounded-xl w-full max-w-[calc(100vw-1rem)] sm:max-w-lg shadow-2xl flex flex-col max-h-[95vh] overflow-hidden">
 
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">

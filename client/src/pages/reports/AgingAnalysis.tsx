@@ -113,6 +113,7 @@ const AgingAnalysis: React.FC<AgingProps> = ({ type }) => {
       }
     >
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+       <div className="table-responsive">
         <table className="data-table">
           <thead>
             <tr>
@@ -169,6 +170,7 @@ const AgingAnalysis: React.FC<AgingProps> = ({ type }) => {
             </tr>
           </tfoot>
         </table>
+       </div>
       </div>
     </ReportLayout>
   );

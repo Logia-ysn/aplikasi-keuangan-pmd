@@ -156,7 +156,7 @@ const ReconciliationDetail: React.FC<{ id: string; onBack: () => void }> = ({ id
   return (
     <div className="space-y-5">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <button
             onClick={onBack}
@@ -165,7 +165,7 @@ const ReconciliationDetail: React.FC<{ id: string; onBack: () => void }> = ({ id
             <ArrowLeft size={18} style={{ color: 'var(--color-text-muted)' }} />
           </button>
           <div>
-            <h2 className="text-lg font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+            <h2 className="text-base sm:text-lg font-semibold" style={{ color: 'var(--color-text-primary)' }}>
               {detail.account.accountNumber} - {detail.account.name}
             </h2>
             <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
@@ -315,7 +315,7 @@ const ReconciliationDetail: React.FC<{ id: string; onBack: () => void }> = ({ id
           {addingItems && (
             <div className="px-4 py-3 border-b space-y-2" style={{ borderColor: 'var(--color-border)', backgroundColor: 'var(--color-bg-secondary)' }}>
               {newItems.map((item, idx) => (
-                <div key={idx} className="flex items-center gap-2">
+                <div key={idx} className="flex flex-wrap sm:flex-nowrap items-center gap-2">
                   <input
                     type="date"
                     value={item.date}
@@ -494,7 +494,7 @@ export const BankReconciliation: React.FC = () => {
 
   return (
     <div className="space-y-5 pb-8">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <Scale size={18} style={{ color: 'var(--color-text-muted)' }} />
           <div>
@@ -504,7 +504,7 @@ export const BankReconciliation: React.FC = () => {
             </p>
           </div>
         </div>
-        <button onClick={() => setIsModalOpen(true)} className="btn-primary">
+        <button onClick={() => setIsModalOpen(true)} className="btn-primary self-start">
           <Plus size={15} /> Rekonsiliasi Baru
         </button>
       </div>
@@ -516,6 +516,7 @@ export const BankReconciliation: React.FC = () => {
             <Loader2 className="animate-spin" size={18} /> Memuat...
           </div>
         ) : (
+         <div className="table-responsive">
           <table className="data-table">
             <thead>
               <tr>
@@ -587,6 +588,7 @@ export const BankReconciliation: React.FC = () => {
               )}
             </tbody>
           </table>
+         </div>
         )}
       </div>
 

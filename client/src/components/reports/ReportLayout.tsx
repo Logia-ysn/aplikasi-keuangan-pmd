@@ -163,7 +163,7 @@ const ReportLayout: React.FC<ReportLayoutProps> = ({
 
       {/* Date Filter — hidden when printing */}
       {dateFilter && dateFilter.mode === 'range' && (
-        <div className="flex items-center gap-3 no-print" data-no-print>
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3 no-print" data-no-print>
           <span className="text-xs text-gray-500 font-medium">Periode:</span>
           <input
             type="date"

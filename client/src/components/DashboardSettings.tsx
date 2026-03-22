@@ -35,7 +35,7 @@ const DashboardSettings: React.FC<DashboardSettingsProps> = ({ isOpen, onClose, 
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <div
-        className="rounded-xl border shadow-xl w-full max-w-md"
+        className="rounded-xl border shadow-xl w-full max-w-[calc(100vw-1rem)] sm:max-w-md"
         style={{ backgroundColor: 'var(--color-bg-primary)', borderColor: 'var(--color-border)' }}
       >
         <div className="flex items-center justify-between p-5 border-b" style={{ borderColor: 'var(--color-border)' }}>

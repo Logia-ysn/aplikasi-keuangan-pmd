@@ -66,7 +66,7 @@ const LedgerDetailDrawer: React.FC<LedgerDetailDrawerProps> = ({
 
       {/* Drawer */}
       <div
-        className="fixed right-0 top-0 bottom-0 z-50 w-full max-w-2xl border-l shadow-2xl flex flex-col overflow-hidden transition-transform"
+        className="fixed right-0 top-0 bottom-0 z-50 w-full max-w-[100vw] sm:max-w-2xl border-l shadow-2xl flex flex-col overflow-hidden transition-transform"
         style={{
           backgroundColor: 'var(--color-bg-primary)',
           borderColor: 'var(--color-border)',

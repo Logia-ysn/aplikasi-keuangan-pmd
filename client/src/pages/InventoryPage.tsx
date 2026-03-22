@@ -141,7 +141,7 @@ export function InventoryPage() {
   return (
     <div className="space-y-5 pb-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold text-gray-900">Stok &amp; Gudang</h1>
           <p className="text-sm text-gray-500 mt-0.5">Kelola master item, pantau stok, dan catat gerakan persediaan.</p>
@@ -162,7 +162,7 @@ export function InventoryPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 border-b border-gray-200">
+      <div className="flex gap-1 border-b border-gray-200 overflow-x-auto">
         <button
           onClick={() => setActiveTab('items')}
           className={cn(
@@ -201,6 +201,7 @@ export function InventoryPage() {
       {/* ─── Tab 1: Master Item ─── */}
       {activeTab === 'items' && (
         <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+         <div className="table-responsive">
           <table className="data-table">
             <thead>
               <tr>
@@ -289,6 +290,7 @@ export function InventoryPage() {
               )}
             </tbody>
           </table>
+         </div>
         </div>
       )}
 
@@ -448,6 +450,7 @@ export function InventoryPage() {
                 )}
               </tbody>
             </table>
+           </div>
           </div>
         </div>
       )}
@@ -572,6 +575,7 @@ export function InventoryPage() {
                 )}
               </tbody>
             </table>
+           </div>
           </div>
         </div>
       )}
