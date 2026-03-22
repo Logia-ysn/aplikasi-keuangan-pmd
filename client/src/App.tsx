@@ -22,6 +22,8 @@ import { UserManagement } from './pages/UserManagement';
 import { AuditTrail } from './pages/AuditTrail';
 import { Notifications } from './pages/Notifications';
 import { RecurringTransactions } from './pages/RecurringTransactions';
+import { BankReconciliation } from './pages/BankReconciliation';
+import TaxReport from './pages/reports/TaxReport';
 
 const ProtectedRoute = () => {
   const token = localStorage.getItem('token');
@@ -56,7 +58,9 @@ function App() {
             <Route path="/reports/cash-flow" element={<CashFlow />} />
             <Route path="/reports/aging-ar" element={<AgingAnalysis type="Customer" />} />
             <Route path="/reports/aging-ap" element={<AgingAnalysis type="Supplier" />} />
+            <Route path="/reports/tax" element={<TaxReport />} />
 
+            <Route path="/reconciliation" element={<BankReconciliation />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/users" element={<UserManagement />} />
             <Route path="/audit" element={<AuditTrail />} />

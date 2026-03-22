@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { BarChart3, Scale, Clock, ClipboardList, Banknote, ChevronRight } from 'lucide-react';
+import { BarChart3, Scale, Clock, ClipboardList, Banknote, ChevronRight, Receipt } from 'lucide-react';
 
 const reports = [
   {
@@ -38,6 +38,12 @@ const reports = [
     description: 'Pergerakan kas dari aktivitas operasi, investasi, dan pendanaan.',
     icon: Banknote,
     path: '/reports/cash-flow',
+  },
+  {
+    title: 'Laporan Pajak',
+    description: 'Ringkasan PPN Keluaran, PPN Masukan, dan PPh berdasarkan periode.',
+    icon: Receipt,
+    path: '/reports/tax',
   },
 ];
 

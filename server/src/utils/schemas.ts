@@ -219,3 +219,42 @@ export const CreateProductionRunSchema = z.object({
   inputs: z.array(ProductionLineSchema).min(1, 'Minimal satu item input.'),
   outputs: z.array(ProductionLineSchema).min(1, 'Minimal satu item output.'),
 });
+
+// ─── Bank Reconciliation ────────────────────────────────────────────────────
+export const CreateReconciliationSchema = z.object({
+  accountId: z.string().min(1, 'Akun bank wajib dipilih.'),
+  statementDate: z.string().min(1, 'Tanggal statement wajib diisi.'),
+  statementBalance: z.number({ message: 'Saldo statement harus berupa angka.' }),
+  notes: z.string().nullable().optional(),
+});
+
+const StatementItemSchema = z.object({
+  statementAmount: z.number({ message: 'Jumlah harus berupa angka.' }),
+  statementDesc: z.string().nullable().optional(),
+  statementDate: z.string().nullable().optional(),
+});
+
+export const AddStatementItemsSchema = z.object({
+  items: z.array(StatementItemSchema).min(1, 'Minimal satu item statement.'),
+});
+
+export const MatchItemSchema = z.object({
+  itemId: z.string().min(1, 'ID item wajib diisi.'),
+  ledgerEntryId: z.string().min(1, 'ID ledger entry wajib diisi.'),
+});
+
+export const UnmatchItemSchema = z.object({
+  itemId: z.string().min(1, 'ID item wajib diisi.'),
+});
+
+// ─── Tax Config ──────────────────────────────────────────────────────────────
+export const CreateTaxConfigSchema = z.object({
+  name: z.string().min(1, 'Nama pajak wajib diisi.'),
+  rate: z.number().min(0, 'Tarif tidak boleh negatif.').max(100, 'Tarif maksimal 100%.'),
+  type: z.enum(['sales', 'purchase', 'withholding'], { message: 'Tipe harus: sales, purchase, atau withholding.' }),
+  accountId: z.string().nullable().optional(),
+});
+
+export const UpdateTaxConfigSchema = CreateTaxConfigSchema.partial().extend({
+  isActive: z.boolean().optional(),
+});

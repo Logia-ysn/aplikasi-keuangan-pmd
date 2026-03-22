@@ -43,6 +43,7 @@ model Account {
   payments            Payment[]                @relation("PaymentAccount")
   inventoryItems      InventoryItem[]          @relation("ItemAccount")
   movementsAsOffset   StockMovement[]          @relation("MovementOffset")
+  reconciliations     BankReconciliation[]     @relation("ReconciliationAccount")
   createdAt           DateTime                 @default(now())
   updatedAt           DateTime                 @updatedAt
 
@@ -515,4 +516,50 @@ model RecurringTemplate {
 
   @@index([isActive, nextRunDate])
   @@map("recurring_templates")
+}
+
+model BankReconciliation {
+  id               String                    @id @default(uuid())
+  accountId        String                    @map("account_id")
+  account          Account                   @relation("ReconciliationAccount", fields: [accountId], references: [id])
+  statementDate    DateTime                  @map("statement_date")
+  statementBalance Decimal                   @db.Decimal(15, 2) @map("statement_balance")
+  bookBalance      Decimal                   @default(0) @db.Decimal(15, 2) @map("book_balance")
+  status           String                    @default("Draft") // Draft, Completed
+  notes            String?
+  items            BankReconciliationItem[]
+  createdBy        String                    @map("created_by")
+  createdAt        DateTime                  @default(now()) @map("created_at")
+  updatedAt        DateTime                  @updatedAt @map("updated_at")
+
+  @@index([accountId, statementDate])
+  @@map("bank_reconciliations")
+}
+
+model BankReconciliationItem {
+  id               String              @id @default(uuid())
+  reconciliationId String              @map("reconciliation_id")
+  reconciliation   BankReconciliation  @relation(fields: [reconciliationId], references: [id], onDelete: Cascade)
+  ledgerEntryId    String?             @map("ledger_entry_id")
+  isMatched        Boolean             @default(false) @map("is_matched")
+  statementAmount  Decimal?            @db.Decimal(15, 2) @map("statement_amount")
+  statementDesc    String?             @map("statement_desc")
+  statementDate    DateTime?           @map("statement_date")
+  createdAt        DateTime            @default(now()) @map("created_at")
+
+  @@index([reconciliationId])
+  @@map("bank_reconciliation_items")
+}
+
+model TaxConfig {
+  id        String   @id @default(uuid())
+  name      String
+  rate      Decimal  @db.Decimal(5, 2)
+  type      String   // sales, purchase, withholding
+  accountId String?  @map("account_id")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("tax_configs")
 }

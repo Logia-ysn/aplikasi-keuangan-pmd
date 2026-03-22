@@ -26,6 +26,8 @@ import auditRoutes from './routes/audit';
 import notificationRoutes from './routes/notifications';
 import recurringRoutes from './routes/recurring';
 import importRoutes from './routes/import';
+import reconciliationRoutes from './routes/reconciliation';
+import taxRoutes from './routes/tax';
 
 const app = express();
 const port = process.env.PORT || 3001;
@@ -103,6 +105,8 @@ app.use('/api/audit-logs', auditRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/recurring', recurringRoutes);
 app.use('/api/import', importRoutes);
+app.use('/api/reconciliation', reconciliationRoutes);
+app.use('/api/tax', taxRoutes);
 
 // ─── Serve Frontend (Production) ──────────────────────────────────────────────
 // In production, serve the built React client from ../client/dist
