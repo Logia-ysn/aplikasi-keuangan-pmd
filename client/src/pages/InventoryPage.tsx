@@ -350,6 +350,7 @@ export function InventoryPage() {
 
           {/* Table */}
           <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+           <div className="table-responsive">
             <table className="data-table">
               <thead>
                 <tr>
@@ -482,6 +483,7 @@ export function InventoryPage() {
 
           {/* Table */}
           <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+           <div className="table-responsive">
             <table className="data-table">
               <thead>
                 <tr>
