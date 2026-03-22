@@ -1,21 +1,21 @@
 # ============================================================================
-# PMD Finance — All-in-One Dockerfile
+# Keuangan ERP — All-in-One Dockerfile
 # PostgreSQL 16 + Node.js 20 + Express API + React SPA dalam 1 container.
 #
 # Build:
-#   docker build -f Dockerfile.allinone -t pmd-finance .
+#   docker build -f Dockerfile.allinone -t keuangan-erp .
 #
 # Run (langsung pakai, seed otomatis saat pertama kali):
-#   docker run -d --name pmd-finance \
+#   docker run -d --name keuangan-erp \
 #     -p 3001:3001 \
 #     -e JWT_SECRET="$(openssl rand -hex 48)" \
-#     -v pmd-pgdata:/var/lib/postgresql/data \
-#     pmd-finance
+#     -v keuangan-pgdata:/var/lib/postgresql/data \
+#     keuangan-erp
 #
 # Logs:
-#   docker logs -f pmd-finance
+#   docker logs -f keuangan-erp
 #
-# Login default: keuangan@panganmasadepan.com / P4nganterdepan!
+# Login default: admin@keuangan.local / Admin123!
 # ============================================================================
 
 # ── Stage 1: Install dependencies ───────────────────────────────────────────
@@ -69,9 +69,9 @@ RUN chmod +x /docker-entrypoint.sh
 # Environment defaults
 ENV NODE_ENV=production \
     PORT=3001 \
-    POSTGRES_USER=pmd \
-    POSTGRES_PASSWORD=pmd_secret_2026 \
-    POSTGRES_DB=pmd_finance \
+    POSTGRES_USER=keuangan \
+    POSTGRES_PASSWORD=keuangan_secret_2026 \
+    POSTGRES_DB=keuangan_db \
     PGDATA=/var/lib/postgresql/data \
     JWT_SECRET=ganti-dengan-secret-yang-aman \
     ALLOWED_ORIGINS=http://localhost:3001

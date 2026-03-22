@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate PDF Manual for PMD Finance ERP Application."""
+"""Generate PDF Manual for Keuangan ERP Application."""
 
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm, cm
@@ -47,7 +47,7 @@ def header_footer(canvas_obj, doc):
         canvas_obj.line(2*cm, H - 1.5*cm, W - 2*cm, H - 1.5*cm)
         canvas_obj.setFont('Helvetica', 7)
         canvas_obj.setFillColor(C_LIGHT)
-        canvas_obj.drawString(2*cm, H - 1.3*cm, 'PMD Finance v1.5.0 — Panduan Pengguna')
+        canvas_obj.drawString(2*cm, H - 1.3*cm, 'Keuangan v1.5.0 — Panduan Pengguna')
         canvas_obj.drawRightString(W - 2*cm, H - 1.3*cm, f'Halaman {page_num}')
 
         # Footer
@@ -55,7 +55,7 @@ def header_footer(canvas_obj, doc):
         canvas_obj.line(2*cm, 1.5*cm, W - 2*cm, 1.5*cm)
         canvas_obj.setFont('Helvetica', 6.5)
         canvas_obj.setFillColor(C_LIGHT)
-        canvas_obj.drawString(2*cm, 1.1*cm, 'PT Pangan Masa Depan — Dokumen Internal')
+        canvas_obj.drawString(2*cm, 1.1*cm, 'Perusahaan Anda — Dokumen Internal')
         canvas_obj.drawRightString(W - 2*cm, 1.1*cm, 'Dibuat: Maret 2026')
 
     canvas_obj.restoreState()
@@ -75,7 +75,7 @@ def build_cover(story, styles):
     cover_ver = ParagraphStyle('CoverVer', parent=styles['Normal'],
         fontSize=11, leading=16, textColor=C_ACCENT, alignment=TA_CENTER)
 
-    story.append(Paragraph('PMD Finance', cover_title))
+    story.append(Paragraph('Keuangan', cover_title))
     story.append(Paragraph('Panduan Pengguna Aplikasi', cover_sub))
     story.append(Spacer(1, 0.5*cm))
 
@@ -84,7 +84,7 @@ def build_cover(story, styles):
                             spaceAfter=12, spaceBefore=4, hAlign='CENTER'))
 
     story.append(Paragraph('Sistem ERP Keuangan', cover_ver))
-    story.append(Paragraph('PT Pangan Masa Depan', cover_ver))
+    story.append(Paragraph('Perusahaan Anda', cover_ver))
     story.append(Spacer(1, 1.5*cm))
 
     info_style = ParagraphStyle('CoverInfo', parent=styles['Normal'],
@@ -95,7 +95,7 @@ def build_cover(story, styles):
 
     # Bottom info box
     box_data = [
-        ['Disiapkan oleh', 'Tim IT — PT Pangan Masa Depan'],
+        ['Disiapkan oleh', 'Tim IT'],
         ['Klasifikasi', 'Dokumen Internal'],
         ['Tanggal', datetime.now().strftime('%d %B %Y')],
     ]
@@ -243,9 +243,9 @@ def divider():
 def ch1_pendahuluan(story):
     story.append(heading1('1. Pendahuluan'))
     story.append(body(
-        '<b>PMD Finance</b> adalah aplikasi ERP (Enterprise Resource Planning) berbasis web '
-        'yang dirancang khusus untuk mengelola keuangan PT Pangan Masa Depan, sebuah perusahaan '
-        'penggilingan padi. Aplikasi ini mencakup seluruh siklus akuntansi mulai dari pencatatan '
+        '<b>Keuangan</b> adalah aplikasi ERP (Enterprise Resource Planning) berbasis web '
+        'yang dirancang untuk mengelola keuangan perusahaan. '
+        'Aplikasi ini mencakup seluruh siklus akuntansi mulai dari pencatatan '
         'transaksi hingga pelaporan keuangan.'
     ))
     story.append(heading2('1.1 Fitur Utama'))
@@ -711,7 +711,7 @@ def ch10_inventory(story):
 def ch11_laporan(story):
     story.append(heading1('11. Laporan Keuangan'))
     story.append(body(
-        'PMD Finance menyediakan 6 jenis laporan keuangan standar. '
+        'Keuangan menyediakan 6 jenis laporan keuangan standar. '
         'Setiap laporan dapat dicetak, diekspor ke PDF, atau diekspor ke Excel.'
     ))
     story.append(heading2('11.1 Neraca Saldo (Trial Balance)'))
@@ -850,10 +850,10 @@ def ch12_pengaturan(story):
         leading=12, textColor=C_DARK, backColor=HexColor('#f1f5f9'),
         borderWidth=0.5, borderColor=C_BORDER, borderPadding=8)
     story.append(Paragraph(
-        'cd ~/aplikasi-keuangan-pmd<br/>'
+        'cd ~/aplikasi-keuangan<br/>'
         'git pull origin main<br/>'
         'cd client &amp;&amp; npm run build<br/>'
-        'pm2 restart pmd-server',
+        'pm2 restart keuangan-erp',
         cmd_style
     ))
     story.append(PageBreak())
@@ -951,7 +951,7 @@ def appendix_coa(story):
 
 # ── Main Build ──────────────────────────────────────────────
 def main():
-    output_path = '/Users/yay/Project/finance-pmd/docs/PMD-Finance-Panduan-Pengguna-v1.5.0.pdf'
+    output_path = '/Users/yay/Project/finance-pmd/docs/Keuangan-Panduan-Pengguna-v1.5.0.pdf'
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
     doc = SimpleDocTemplate(
@@ -961,8 +961,8 @@ def main():
         bottomMargin=2*cm,
         leftMargin=2*cm,
         rightMargin=2*cm,
-        title='PMD Finance — Panduan Pengguna',
-        author='PT Pangan Masa Depan',
+        title='Keuangan — Panduan Pengguna',
+        author='Perusahaan Anda',
         subject='Panduan Penggunaan Aplikasi ERP Keuangan',
     )
 

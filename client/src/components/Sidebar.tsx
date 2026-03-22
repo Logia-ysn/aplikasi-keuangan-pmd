@@ -64,10 +64,10 @@ export const Sidebar = () => {
             ) : (
               <>
                 <div className="w-7 h-7 bg-blue-600 rounded-md flex items-center justify-center flex-shrink-0">
-                  <span className="text-white font-black text-xs leading-none">PMD</span>
+                  <span className="text-white font-black text-[10px] leading-none">Rp</span>
                 </div>
                 <span className="text-sm font-bold text-gray-900 tracking-tight truncate">
-                  {settings?.companyName || 'PMD Finance'}
+                  {settings?.companyName || 'Keuangan'}
                 </span>
               </>
             )}
@@ -82,7 +82,7 @@ export const Sidebar = () => {
         )}
         {isCollapsed && !settings?.logoUrl && (
           <div className="w-7 h-7 bg-blue-600 rounded-md flex items-center justify-center mx-auto">
-            <span className="text-white font-black text-[9px] leading-none">PMD</span>
+            <span className="text-white font-black text-[9px] leading-none">Rp</span>
           </div>
         )}
         <button

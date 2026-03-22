@@ -5,7 +5,7 @@
 
 export const APP_VERSION = '1.5.0';
 export const APP_BUILD_DATE = '2026-03-20';
-export const APP_NAME = 'PMD Finance';
+export const APP_NAME = 'Keuangan';
 
 export interface ChangelogEntry {
   version: string;
@@ -66,7 +66,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     changes: [
       'Add auto backup system: daily pg_dump ke GitHub',
       'Fix Express 5 wildcard route untuk path-to-regexp compatibility',
-      'Fix CORS: auto-allow panganmasadepan.com dan localhost',
+      'Fix CORS: auto-allow localhost',
       'Fix 502 Bad Gateway: dotenv ke production dependencies',
       'Fix production deploy: API URL, static serving, env config',
     ],

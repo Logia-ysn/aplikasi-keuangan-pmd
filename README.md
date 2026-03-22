@@ -1,6 +1,6 @@
-# PMD Finance — ERP Keuangan Pangan Masa Depan
+# Keuangan ERP — Sistem ERP Keuangan
 
-Aplikasi ERP keuangan berbasis web untuk perusahaan penggilingan padi (rice milling). Dibangun dengan arsitektur monorepo fullstack TypeScript, dirancang untuk deployment di Raspberry Pi 5 via LAN + Cloudflare Tunnel.
+Aplikasi ERP keuangan berbasis web untuk pengelolaan keuangan perusahaan. Dibangun dengan arsitektur monorepo fullstack TypeScript, dirancang untuk deployment di Raspberry Pi 5 via LAN + Cloudflare Tunnel.
 
 ## Fitur Utama
 
@@ -11,7 +11,7 @@ Aplikasi ERP keuangan berbasis web untuk perusahaan penggilingan padi (rice mill
 | **Buku Besar** | Jurnal umum double-entry, pencarian, filter tanggal |
 | **Penjualan** | Invoice pelanggan, auto-posting GL, PPN, diskon per item, potongan & biaya lain |
 | **Pembelian** | Invoice pemasok, auto-posting GL, kalkulasi grandTotal lengkap |
-| **Stok & Gudang** | Item inventori, mutasi stok, proses produksi (konversi gabah → beras) dengan rendemen % |
+| **Stok & Gudang** | Item inventori, mutasi stok, proses produksi dengan rendemen % |
 | **Bank & Kas** | Penerimaan & pengeluaran, auto-alokasi ke invoice, lacak status pembayaran |
 | **Pelanggan & Vendor** | Manajemen mitra bisnis, saldo terutang |
 | **Laporan Keuangan** | Trial Balance, Laba Rugi, Neraca, Arus Kas, Aging AR/AP |
@@ -82,10 +82,10 @@ cd server && npm install && cd ..
 
 ```env
 # Database
-DATABASE_URL="postgresql://user:password@localhost:5432/pmd_finance"
-POSTGRES_USER=user
+DATABASE_URL="postgresql://keuangan:password@localhost:5432/keuangan_db"
+POSTGRES_USER=keuangan
 POSTGRES_PASSWORD=password
-POSTGRES_DB=pmd_finance
+POSTGRES_DB=keuangan_db
 
 # Server
 PORT=3001
@@ -97,8 +97,8 @@ JWT_SECRET=ganti-dengan-string-panjang-acak-minimal-32-karakter
 # CORS
 ALLOWED_ORIGINS="http://localhost:5173"
 
-# Seed (optional — default: admin123)
-SEED_ADMIN_PASSWORD=admin123
+# Seed (optional — default: Admin123!)
+SEED_ADMIN_PASSWORD=Admin123!
 ```
 
 ### 3. Jalankan database
@@ -128,7 +128,7 @@ cd client && npm run dev
 ```
 
 Buka: [http://localhost:5173](http://localhost:5173)
-Login: `admin` / `admin123`
+Login: `admin@keuangan.local` / `Admin123!`
 
 **Production build:**
 
@@ -140,9 +140,11 @@ cd server && npm start       # serve API + static files
 
 ## Akun Default
 
-| Username | Password | Role |
+| Email | Password | Role |
 |---|---|---|
-| `admin` | `admin123` | Admin (full access) |
+| `admin@keuangan.local` | `Admin123!` | Admin (full access) |
+| `staff@keuangan.local` | `Admin123!` | Accountant |
+| `viewer@keuangan.local` | `Admin123!` | Viewer |
 
 > **Ganti password default sebelum go live!**
 
@@ -177,4 +179,4 @@ cd server && npm run test:watch  # watch mode
 
 ## Lisensi
 
-Internal use — PT Pangan Masa Depan.
+MIT

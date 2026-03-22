@@ -1,13 +1,13 @@
 #!/bin/bash
 # ============================================================
-# deploy.sh — PMD Finance Deployment Script
+# deploy.sh — Keuangan ERP Deployment Script
 # Run on the Raspberry Pi / production server
 # Usage: bash deploy.sh
 # ============================================================
 
 set -e
 
-echo "🚀 PMD Finance — Deploy"
+echo "🚀 Keuangan ERP — Deploy"
 echo "========================"
 
 # 1. Pull latest code
@@ -51,17 +51,17 @@ cd ..
 
 # Try PM2 first, then systemd, then just show instructions
 if command -v pm2 &> /dev/null; then
-  pm2 restart pmd-finance 2>/dev/null || pm2 start server/dist/index.js --name pmd-finance
+  pm2 restart keuangan-erp 2>/dev/null || pm2 start server/dist/index.js --name keuangan-erp
   pm2 save
   echo "✅ Server restarted via PM2"
-elif systemctl is-active --quiet pmd-finance 2>/dev/null; then
-  sudo systemctl restart pmd-finance
+elif systemctl is-active --quiet keuangan-erp 2>/dev/null; then
+  sudo systemctl restart keuangan-erp
   echo "✅ Server restarted via systemd"
 else
   echo "⚠️  No process manager detected."
   echo "   Start manually:  cd server && node dist/index.js"
   echo "   Or install PM2:  npm install -g pm2"
-  echo "                    pm2 start server/dist/index.js --name pmd-finance"
+  echo "                    pm2 start server/dist/index.js --name keuangan-erp"
   echo "                    pm2 save && pm2 startup"
 fi
 

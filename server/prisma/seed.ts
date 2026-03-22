@@ -9,7 +9,7 @@ const adapter = new PrismaPg(pool as any);
 const prisma = new PrismaClient({ adapter });
 
 async function main() {
-  console.log('Seeding PMD Finance...');
+  console.log('Seeding Keuangan...');
 
   // 1. Seed Fiscal Year
   const fiscalYear = await prisma.fiscalYear.upsert({
@@ -24,12 +24,12 @@ async function main() {
   console.log('- Created Fiscal Year: 2026');
 
   // 2. Seed Users
-  const hashedPassword = await bcrypt.hash('P4nganterdepan!', 12);
+  const hashedPassword = await bcrypt.hash('Admin123!', 12);
 
   const users = [
-    { username: 'keuangan', fullName: 'Keuangan PMD', email: 'keuangan@panganmasadepan.com', role: UserRole.Admin },
-    { username: 'info',     fullName: 'Info PMD',     email: 'info@panganmasadepan.com',     role: UserRole.Accountant },
-    { username: 'ysn',      fullName: 'YSN',          email: 'ysn@panganmasadepan.com',      role: UserRole.Viewer },
+    { username: 'admin',    fullName: 'Administrator',   email: 'admin@keuangan.local',  role: UserRole.Admin },
+    { username: 'staff',    fullName: 'Staff Keuangan',  email: 'staff@keuangan.local',  role: UserRole.Accountant },
+    { username: 'viewer',   fullName: 'Viewer',          email: 'viewer@keuangan.local', role: UserRole.Viewer },
   ];
 
   for (const u of users) {
@@ -109,6 +109,22 @@ async function main() {
     numberToId[item.accountNumber] = account.id;
     console.log(`- Created account: ${account.accountNumber} ${account.name}`);
   }
+
+  // 4. Seed Company Settings
+  await prisma.companySettings.upsert({
+    where: { slug: 'default' },
+    update: {},
+    create: {
+      slug: 'default',
+      companyName: 'Perusahaan Anda',
+      address: '',
+      phone: '',
+      email: '',
+      taxId: '',
+      defaultCurrency: 'IDR',
+    },
+  });
+  console.log('- Created default Company Settings');
 
   console.log('Seeding completed.');
 }

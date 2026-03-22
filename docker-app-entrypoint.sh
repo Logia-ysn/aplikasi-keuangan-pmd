@@ -2,7 +2,7 @@
 set -e
 
 echo "╔══════════════════════════════════════════╗"
-echo "║       PMD Finance — App Container        ║"
+echo "║      Keuangan ERP — App Container       ║"
 echo "╚══════════════════════════════════════════╝"
 
 cd /app/server
@@ -35,12 +35,12 @@ USER_COUNT=$(node -e "
 if [ "$USER_COUNT" = "0" ]; then
   echo "[APP] Database kosong, menjalankan seed data awal..."
   npx tsx prisma/seed.ts
-  echo "[APP] Seed selesai — login: keuangan@panganmasadepan.com / P4nganterdepan!"
+  echo "[APP] Seed selesai — login: admin@keuangan.local / Admin123!"
 else
   echo "[APP] Database sudah berisi data ($USER_COUNT user), skip seed."
 fi
 
 # ── 4. Start server ────────────────────────────────────────────────────────
-echo "[APP] Starting PMD Finance on port ${PORT:-3001}..."
+echo "[APP] Starting Keuangan ERP on port ${PORT:-3001}..."
 echo "═══════════════════════════════════════════"
 exec node dist/index.js

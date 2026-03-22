@@ -186,8 +186,8 @@ const CompanySettingsTab: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDirty, setIsDirty] = useState(false);
   const [formData, setFormData] = useState({
-    companyName: 'PT Pangan Masa Depan',
-    address: 'Cirebon, Jawa Barat',
+    companyName: '',
+    address: '',
     phone: '',
     email: '',
     taxId: '',
@@ -255,8 +255,8 @@ const CompanySettingsTab: React.FC = () => {
   };
 
   const fields = [
-    { key: 'companyName', label: 'Nama Perusahaan', placeholder: 'PT Pangan Masa Depan', type: 'text' },
-    { key: 'address', label: 'Alamat', placeholder: 'Cirebon, Jawa Barat', type: 'text' },
+    { key: 'companyName', label: 'Nama Perusahaan', placeholder: 'Nama Perusahaan Anda', type: 'text' },
+    { key: 'address', label: 'Alamat', placeholder: 'Alamat perusahaan', type: 'text' },
     { key: 'phone', label: 'Nomor Telepon', placeholder: '+62 xxx', type: 'text' },
     { key: 'email', label: 'Email', placeholder: 'finance@company.com', type: 'email' },
     { key: 'taxId', label: 'NPWP', placeholder: '00.000.000.0-000.000', type: 'text' },
@@ -431,7 +431,7 @@ const AboutTab: React.FC = () => {
               </div>
               <div>
                 <h3 className="text-lg font-bold text-white">{APP_NAME}</h3>
-                <p className="text-blue-100 text-xs">Sistem ERP Keuangan — PT Pangan Masa Depan</p>
+                <p className="text-blue-100 text-xs">Sistem ERP Keuangan</p>
               </div>
             </div>
             <span className="bg-white/20 text-white text-sm font-mono font-bold px-3 py-1.5 rounded-lg">
@@ -468,7 +468,7 @@ const AboutTab: React.FC = () => {
                 <ExternalLink size={12} className="text-gray-400" />
                 <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Domain</span>
               </div>
-              <p className="text-sm font-bold text-gray-900 truncate">keuangan.pmd</p>
+              <p className="text-sm font-bold text-gray-900 truncate">localhost</p>
             </div>
           </div>
 
@@ -541,10 +541,10 @@ const AboutTab: React.FC = () => {
                 <div className="bg-white/60 rounded-lg p-3 text-xs text-gray-600 space-y-1">
                   <p className="font-semibold text-gray-700">Cara update di server:</p>
                   <pre className="bg-gray-900 text-green-300 rounded-lg p-2.5 text-[11px] font-mono overflow-x-auto">
-{`cd ~/aplikasi-keuangan-pmd
+{`cd ~/aplikasi-keuangan
 git pull origin main
 cd client && npm run build
-pm2 restart pmd-server`}</pre>
+pm2 restart keuangan-erp`}</pre>
                 </div>
               </div>
             )}
@@ -624,7 +624,7 @@ export const SettingsPage: React.FC = () => {
         <Settings size={18} className="text-gray-400" />
         <div>
           <h1 className="text-xl font-semibold text-gray-900">Pengaturan</h1>
-          <p className="text-sm text-gray-500">Konfigurasi sistem PMD Finance.</p>
+          <p className="text-sm text-gray-500">Konfigurasi sistem Keuangan.</p>
         </div>
       </div>
 

@@ -12,6 +12,7 @@ import {
 import { cn } from '../lib/utils';
 import { useQuery } from '@tanstack/react-query';
 import api from '../lib/api';
+import { useCompanySettings } from '../contexts/CompanySettingsContext';
 import {
   AreaChart,
   Area,
@@ -44,6 +45,7 @@ const MetricCard = React.memo(function MetricCard({ title, value, icon: Icon, lo
 });
 
 export const Dashboard = () => {
+  const company = useCompanySettings();
   const { data: metrics, isLoading: isMetricsLoading } = useQuery({
     queryKey: ['dashboard-metrics'],
     queryFn: async () => { const r = await api.get('/dashboard/metrics'); return r.data; }
@@ -69,7 +71,7 @@ export const Dashboard = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-semibold text-gray-900">Dashboard</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Ringkasan keuangan PT Pangan Masa Depan</p>
+          <p className="text-sm text-gray-500 mt-0.5">Ringkasan keuangan {company?.companyName || 'perusahaan Anda'}</p>
         </div>
         <span className="text-xs text-gray-400">
           {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}

@@ -4,22 +4,22 @@ import api from '../lib/api';
 import { Lock, User, AlertCircle, Eye, EyeOff, BarChart3, ShieldCheck, TrendingUp } from 'lucide-react';
 import { APP_VERSION, APP_BUILD_DATE } from '../lib/version';
 
-// Fallback brand logo (SVG matching PMD color palette: gray + amber/gold)
-const PmdLogoFallback = () => (
-  <svg viewBox="0 0 120 40" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-10 w-auto">
+// Fallback brand logo (SVG generic finance branding)
+const AppLogoFallback = () => (
+  <svg viewBox="0 0 160 40" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-10 w-auto">
     {/* Bar 1 */}
     <rect x="0" y="10" width="14" height="30" fill="#6B7280" />
     {/* Bar 2 */}
     <rect x="18" y="4" width="14" height="36" fill="#6B7280" />
     {/* Bar 3 */}
     <rect x="36" y="18" width="14" height="22" fill="#6B7280" />
-    {/* Gold diagonal stripe */}
+    {/* Blue diagonal stripe */}
     <path d="M0 34 L50 6" stroke="#2563EB" strokeWidth="5" strokeLinecap="round" />
-    {/* Wheat dot */}
+    {/* Accent dot */}
     <circle cx="47" cy="8" r="4" fill="#2563EB" />
-    {/* PMD text */}
-    <text x="58" y="26" fontFamily="Arial, sans-serif" fontWeight="900" fontSize="18" fill="#111827" letterSpacing="2">PMD</text>
-    <text x="58" y="36" fontFamily="Arial, sans-serif" fontWeight="500" fontSize="6" fill="#6B7280" letterSpacing="1.5">PANGAN MASA DEPAN</text>
+    {/* App name */}
+    <text x="58" y="26" fontFamily="Arial, sans-serif" fontWeight="900" fontSize="16" fill="#111827" letterSpacing="1">Keuangan</text>
+    <text x="58" y="36" fontFamily="Arial, sans-serif" fontWeight="500" fontSize="6" fill="#6B7280" letterSpacing="1.5">FINANCE SYSTEM</text>
   </svg>
 );
 
@@ -77,7 +77,7 @@ const LoginPage: React.FC = () => {
           {logoUrl ? (
             <img src={logoUrl} alt="Logo" className="h-12 w-auto object-contain" />
           ) : (
-            <PmdLogoFallback />
+            <AppLogoFallback />
           )}
         </div>
 
@@ -114,7 +114,7 @@ const LoginPage: React.FC = () => {
         {/* Bottom: Footer */}
         <div className="relative z-10 px-12 py-8 border-t border-white/5 flex items-center justify-between">
           <p className="text-gray-600 text-xs">
-            © {new Date().getFullYear()} PT Pangan Masa Depan. All rights reserved.
+            © {new Date().getFullYear()} Keuangan ERP. All rights reserved.
           </p>
           <span className="text-gray-600 text-[10px] font-mono bg-white/5 border border-white/10 rounded px-2 py-0.5">
             v{APP_VERSION}
@@ -127,7 +127,7 @@ const LoginPage: React.FC = () => {
         <div className="w-full max-w-sm">
           {/* Mobile logo */}
           <div className="flex lg:hidden justify-center mb-10">
-            <PmdLogoFallback />
+            <AppLogoFallback />
           </div>
 
           <div className="mb-8">
@@ -155,7 +155,7 @@ const LoginPage: React.FC = () => {
                   autoComplete="email"
                   autoFocus
                   className="w-full bg-white border border-gray-200 rounded-xl py-3 pl-10 pr-4 text-gray-900 placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all shadow-sm"
-                  placeholder="email@panganmasadepan.com"
+                  placeholder="admin@perusahaan.com"
                   required
                 />
               </div>

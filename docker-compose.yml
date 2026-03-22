@@ -1,5 +1,5 @@
 # ============================================================================
-# PMD Finance — Docker Compose Project
+# Keuangan ERP — Docker Compose Project
 #
 # Setup:
 #   cp .env.docker.example .env
@@ -12,7 +12,7 @@
 #   docker compose up -d --build       # rebuild app saja, data tetap aman
 #
 # Backup database:
-#   docker compose exec db pg_dump -U pmd pmd_finance > backup.sql
+#   docker compose exec db pg_dump -U keuangan keuangan_db > backup.sql
 # ============================================================================
 
 services:
@@ -21,13 +21,13 @@ services:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-pmd}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pmd_secret_2026}
-      POSTGRES_DB: ${POSTGRES_DB:-pmd_finance}
+      POSTGRES_USER: ${POSTGRES_USER:-keuangan}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-keuangan_secret_2026}
+      POSTGRES_DB: ${POSTGRES_DB:-keuangan_db}
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-pmd}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-keuangan}"]
       interval: 5s
       timeout: 3s
       retries: 5
@@ -39,10 +39,10 @@ services:
     ports:
       - "${PORT:-3001}:3001"
     environment:
-      DATABASE_URL: "postgresql://${POSTGRES_USER:-pmd}:${POSTGRES_PASSWORD:-pmd_secret_2026}@db:5432/${POSTGRES_DB:-pmd_finance}?schema=public"
+      DATABASE_URL: "postgresql://${POSTGRES_USER:-keuangan}:${POSTGRES_PASSWORD:-keuangan_secret_2026}@db:5432/${POSTGRES_DB:-keuangan_db}?schema=public"
       PORT: "3001"
       JWT_SECRET: "${JWT_SECRET:-ganti-dengan-secret-yang-aman}"
-      ALLOWED_ORIGINS: "${ALLOWED_ORIGINS:-http://localhost:3001,https://keuangan.panganmasadepan.com}"
+      ALLOWED_ORIGINS: "${ALLOWED_ORIGINS:-http://localhost:3001}"
       NODE_ENV: "production"
     depends_on:
       db:

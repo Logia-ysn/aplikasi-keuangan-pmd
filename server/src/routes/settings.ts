@@ -36,7 +36,7 @@ router.put('/company', roleMiddleware(['Admin']), async (req, res) => {
 
   try {
     const data = {
-      companyName: body.companyName ?? rawBody.name ?? 'PMD Finance',
+      companyName: body.companyName ?? rawBody.name ?? 'Perusahaan Anda',
       address: body.address || null,
       phone: body.phone || null,
       email: body.email || null,

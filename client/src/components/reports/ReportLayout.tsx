@@ -71,7 +71,7 @@ interface ReportLayoutProps {
 
 const PrintHeader: React.FC<{ title: string; periodLabel: string }> = ({ title, periodLabel }) => {
   const company = useCompanySettings();
-  const companyName = company?.companyName || 'PT Pangan Masa Depan';
+  const companyName = company?.companyName || 'Perusahaan';
   const address = company?.address;
   const taxId = company?.taxId;
   const printDate = new Date().toLocaleDateString('id-ID', {

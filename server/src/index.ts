@@ -27,7 +27,7 @@ const port = process.env.PORT || 3001;
 // ─── CORS ──────────────────────────────────────────────────────────────────────
 const allowedOrigins = (
   process.env.ALLOWED_ORIGINS ||
-  'http://localhost:5173,http://localhost:3000,https://keuangan.panganmasadepan.com'
+  'http://localhost:5173,http://localhost:3000'
 )
   .split(',')
   .map((o) => o.trim());
@@ -45,9 +45,7 @@ app.use(
         const originHost = new URL(origin).hostname;
         if (
           originHost === 'localhost' ||
-          originHost === '127.0.0.1' ||
-          originHost.endsWith('.panganmasadepan.com') ||
-          originHost === 'panganmasadepan.com'
+          originHost === '127.0.0.1'
         ) {
           return callback(null, true);
         }

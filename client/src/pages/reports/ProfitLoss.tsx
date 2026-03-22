@@ -8,6 +8,7 @@ import { useState } from 'react';
 import { formatRupiah } from '../../lib/formatters';
 import { ProfitLossPDF } from '../../lib/pdf/ReportPDF';
 import { useCompanyPDF } from '../../lib/pdf/useCompanyPDF';
+import { useCompanySettings } from '../../contexts/CompanySettingsContext';
 import { ReportLayout, AccountTreeTable, ReportSummaryCards } from '../../components/reports';
 import type { SummaryCard } from '../../components/reports';
 
@@ -15,6 +16,7 @@ const ProfitLoss: React.FC = () => {
   const [startDate, setStartDate] = useState(format(new Date(), 'yyyy-MM-01'));
   const [endDate, setEndDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const company = useCompanyPDF();
+  const companySettings = useCompanySettings();
 
   const { data: report, isLoading, isError, refetch } = useQuery({
     queryKey: ['profit-loss', startDate, endDate],
@@ -48,7 +50,7 @@ const ProfitLoss: React.FC = () => {
   return (
     <ReportLayout
       title="Laporan Laba Rugi"
-      subtitle="Performa finansial PT Pangan Masa Depan"
+      subtitle={`Performa finansial ${companySettings?.companyName || 'perusahaan'}`}
       dateFilter={{ mode: 'range', startDate, endDate, onStartDateChange: setStartDate, onEndDateChange: setEndDate }}
       pdfDocument={
         <ProfitLossPDF

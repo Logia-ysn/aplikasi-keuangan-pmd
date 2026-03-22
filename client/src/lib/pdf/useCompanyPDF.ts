@@ -10,7 +10,7 @@ export interface CompanyPDF {
 }
 
 const FALLBACK: CompanyPDF = {
-  name: 'PT Pangan Masa Depan',
+  name: 'Perusahaan',
   address: null,
   phone: null,
   email: null,
