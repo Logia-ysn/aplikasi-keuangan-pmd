@@ -155,6 +155,35 @@ export const CreateStockMovementSchema = z.object({
   notes: z.string().nullable().optional(),
 });
 
+// ─── User Management ─────────────────────────────────────────────────────────
+const UserRoleEnum = z.enum(['Admin', 'Accountant', 'Viewer'], {
+  message: "Role harus salah satu dari: Admin, Accountant, Viewer",
+});
+
+export const CreateUserSchema = z.object({
+  username: z.string().min(3, 'Username minimal 3 karakter.'),
+  email: z.string().email('Format email tidak valid.'),
+  fullName: z.string().min(2, 'Nama lengkap minimal 2 karakter.'),
+  password: z.string().min(8, 'Password minimal 8 karakter.'),
+  role: UserRoleEnum,
+});
+
+export const UpdateUserSchema = z.object({
+  username: z.string().min(3, 'Username minimal 3 karakter.').optional(),
+  email: z.string().email('Format email tidak valid.').optional(),
+  fullName: z.string().min(2, 'Nama lengkap minimal 2 karakter.').optional(),
+  password: z.string().min(8, 'Password minimal 8 karakter.').optional(),
+  role: UserRoleEnum.optional(),
+  isActive: z.boolean().optional(),
+}).refine(data => Object.values(data).some(v => v !== undefined), {
+  message: 'Minimal satu field harus diisi.',
+});
+
+export const ChangePasswordSchema = z.object({
+  currentPassword: z.string().min(1, 'Password saat ini wajib diisi.'),
+  newPassword: z.string().min(8, 'Password baru minimal 8 karakter.'),
+});
+
 // ─── Production Run ───────────────────────────────────────────────────────────
 const ProductionLineSchema = z.object({
   itemId: z.string().min(1, 'Item wajib dipilih.'),

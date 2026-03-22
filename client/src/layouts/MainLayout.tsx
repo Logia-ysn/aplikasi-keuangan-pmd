@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Sidebar } from '../components/Sidebar';
-import { LogOut, Search, Keyboard } from 'lucide-react';
+import { LogOut, Search, Keyboard, KeyRound } from 'lucide-react';
 import { useHotkey } from '../hooks/useHotkeys';
 import { CommandPalette } from '../components/CommandPalette';
 import { ShortcutHelp } from '../components/ShortcutHelp';
+import ChangePasswordModal from '../components/ChangePasswordModal';
 
 const routeNames: Record<string, string> = {
   '': 'Dashboard',
@@ -17,6 +18,8 @@ const routeNames: Record<string, string> = {
   'reports': 'Laporan Keuangan',
   'inventory': 'Stok & Gudang',
   'settings': 'Pengaturan',
+  'users': 'Manajemen User',
+  'audit': 'Jejak Audit',
 };
 
 export const MainLayout = () => {
@@ -24,6 +27,7 @@ export const MainLayout = () => {
   const navigate = useNavigate();
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isShortcutHelpOpen, setIsShortcutHelpOpen] = useState(false);
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
 
   useHotkey('mod+k', () => setIsSearchOpen(true));
   useHotkey('?', () => setIsShortcutHelpOpen(true), !isSearchOpen && !isShortcutHelpOpen);
@@ -94,6 +98,15 @@ export const MainLayout = () => {
               </div>
             </div>
             <button
+              onClick={() => setIsPasswordModalOpen(true)}
+              aria-label="Ganti Password"
+              className="p-1.5 rounded-lg transition-colors hover:bg-gray-100 dark:hover:bg-gray-700"
+              style={{ color: 'var(--color-text-muted)' }}
+              title="Ganti Password"
+            >
+              <KeyRound className="w-4 h-4" />
+            </button>
+            <button
               onClick={handleLogout}
               aria-label="Logout"
               className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
@@ -117,6 +130,9 @@ export const MainLayout = () => {
 
       {/* Shortcut Help */}
       <ShortcutHelp isOpen={isShortcutHelpOpen} onClose={() => setIsShortcutHelpOpen(false)} />
+
+      {/* Change Password Modal */}
+      <ChangePasswordModal isOpen={isPasswordModalOpen} onClose={() => setIsPasswordModalOpen(false)} />
     </div>
   );
 };

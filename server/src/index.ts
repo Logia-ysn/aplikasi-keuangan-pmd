@@ -21,6 +21,8 @@ import settingsRoutes from './routes/settings';
 import fiscalYearRoutes from './routes/fiscalYears';
 import inventoryRoutes from './routes/inventory';
 import searchRoutes from './routes/search';
+import usersRoutes from './routes/users';
+import auditRoutes from './routes/audit';
 
 const app = express();
 const port = process.env.PORT || 3001;
@@ -93,6 +95,8 @@ app.use('/api/settings', settingsRoutes);
 app.use('/api/fiscal-years', fiscalYearRoutes);
 app.use('/api/inventory', inventoryRoutes);
 app.use('/api/search', searchRoutes);
+app.use('/api/users', usersRoutes);
+app.use('/api/audit-logs', auditRoutes);
 
 // ─── Serve Frontend (Production) ──────────────────────────────────────────────
 // In production, serve the built React client from ../client/dist

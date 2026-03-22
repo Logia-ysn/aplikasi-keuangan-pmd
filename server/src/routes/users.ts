@@ -1,0 +1,223 @@
+import { Router } from 'express';
+import bcrypt from 'bcrypt';
+import { prisma } from '../lib/prisma';
+import { roleMiddleware, AuthRequest } from '../middleware/auth';
+import { validateBody } from '../utils/validate';
+import { CreateUserSchema, UpdateUserSchema, ChangePasswordSchema } from '../utils/schemas';
+import { handleRouteError } from '../utils/errors';
+import { logger } from '../lib/logger';
+
+const router = Router();
+
+// GET /api/users — list all users (Admin only)
+router.get('/', roleMiddleware(['Admin']), async (req, res) => {
+  try {
+    const { page = '1', limit = '50', search } = req.query;
+    const take = Math.min(Number(limit) || 50, 200);
+    const skip = (Number(page) - 1) * take;
+
+    const where: any = {};
+    if (typeof search === 'string' && search.trim()) {
+      where.OR = [
+        { fullName: { contains: search, mode: 'insensitive' } },
+        { email: { contains: search, mode: 'insensitive' } },
+        { username: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    const [users, total] = await Promise.all([
+      prisma.user.findMany({
+        where,
+        select: {
+          id: true,
+          username: true,
+          fullName: true,
+          email: true,
+          role: true,
+          isActive: true,
+          lastLoginAt: true,
+          createdAt: true,
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take,
+      }),
+      prisma.user.count({ where }),
+    ]);
+
+    return res.json({ data: users, total, page: Number(page), limit: take });
+  } catch (error) {
+    return handleRouteError(res, error, 'GET /users', 'Gagal mengambil data user.');
+  }
+});
+
+// POST /api/users — create new user (Admin only)
+router.post('/', roleMiddleware(['Admin']), async (req, res) => {
+  const body = validateBody(CreateUserSchema, req.body, res);
+  if (!body) return;
+
+  try {
+    // Check unique username
+    const existingUsername = await prisma.user.findUnique({ where: { username: body.username } });
+    if (existingUsername) {
+      return res.status(400).json({ error: 'Username sudah digunakan.' });
+    }
+
+    // Check unique email
+    const existingEmail = await prisma.user.findUnique({ where: { email: body.email } });
+    if (existingEmail) {
+      return res.status(400).json({ error: 'Email sudah digunakan.' });
+    }
+
+    const passwordHash = await bcrypt.hash(body.password, 10);
+
+    const user = await prisma.user.create({
+      data: {
+        username: body.username,
+        email: body.email,
+        fullName: body.fullName,
+        passwordHash,
+        role: body.role as any,
+      },
+      select: {
+        id: true,
+        username: true,
+        fullName: true,
+        email: true,
+        role: true,
+        isActive: true,
+        createdAt: true,
+      },
+    });
+
+    return res.status(201).json(user);
+  } catch (error) {
+    return handleRouteError(res, error, 'POST /users', 'Gagal membuat user.');
+  }
+});
+
+// PUT /api/users/:id — update user (Admin only)
+router.put('/:id', roleMiddleware(['Admin']), async (req, res) => {
+  const id = req.params.id as string;
+  const body = validateBody(UpdateUserSchema, req.body, res);
+  if (!body) return;
+
+  try {
+    // Check unique username if changing
+    if (body.username) {
+      const existing = await prisma.user.findFirst({
+        where: { username: body.username, NOT: { id } },
+      });
+      if (existing) {
+        return res.status(400).json({ error: 'Username sudah digunakan.' });
+      }
+    }
+
+    // Check unique email if changing
+    if (body.email) {
+      const existing = await prisma.user.findFirst({
+        where: { email: body.email, NOT: { id } },
+      });
+      if (existing) {
+        return res.status(400).json({ error: 'Email sudah digunakan.' });
+      }
+    }
+
+    const updateData: any = {};
+    if (body.username !== undefined) updateData.username = body.username;
+    if (body.email !== undefined) updateData.email = body.email;
+    if (body.fullName !== undefined) updateData.fullName = body.fullName;
+    if (body.role !== undefined) updateData.role = body.role;
+    if (body.isActive !== undefined) updateData.isActive = body.isActive;
+    if (body.password) {
+      updateData.passwordHash = await bcrypt.hash(body.password, 10);
+    }
+
+    const user = await prisma.user.update({
+      where: { id },
+      data: updateData,
+      select: {
+        id: true,
+        username: true,
+        fullName: true,
+        email: true,
+        role: true,
+        isActive: true,
+        lastLoginAt: true,
+        createdAt: true,
+      },
+    });
+
+    return res.json(user);
+  } catch (error: any) {
+    if (error.code === 'P2025') return res.status(404).json({ error: 'User tidak ditemukan.' });
+    return handleRouteError(res, error, 'PUT /users/:id', 'Gagal mengupdate user.');
+  }
+});
+
+// PATCH /api/users/:id/toggle — toggle isActive (Admin only)
+router.patch('/:id/toggle', roleMiddleware(['Admin']), async (req: AuthRequest, res) => {
+  const id = req.params.id as string;
+
+  try {
+    // Prevent admin from deactivating themselves
+    if (req.user?.userId === id) {
+      return res.status(400).json({ error: 'Tidak dapat menonaktifkan akun sendiri.' });
+    }
+
+    const current = await prisma.user.findUnique({ where: { id }, select: { isActive: true } });
+    if (!current) {
+      return res.status(404).json({ error: 'User tidak ditemukan.' });
+    }
+
+    const user = await prisma.user.update({
+      where: { id },
+      data: { isActive: !current.isActive },
+      select: {
+        id: true,
+        username: true,
+        fullName: true,
+        email: true,
+        role: true,
+        isActive: true,
+        lastLoginAt: true,
+        createdAt: true,
+      },
+    });
+
+    return res.json(user);
+  } catch (error) {
+    return handleRouteError(res, error, 'PATCH /users/:id/toggle', 'Gagal mengubah status user.');
+  }
+});
+
+// PUT /api/users/me/password — change own password (any authenticated user)
+router.put('/me/password', async (req: AuthRequest, res) => {
+  const body = validateBody(ChangePasswordSchema, req.body, res);
+  if (!body) return;
+
+  try {
+    const userId = req.user!.userId;
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      return res.status(404).json({ error: 'User tidak ditemukan.' });
+    }
+
+    const isValid = await bcrypt.compare(body.currentPassword, user.passwordHash);
+    if (!isValid) {
+      return res.status(400).json({ error: 'Password saat ini salah.' });
+    }
+
+    const passwordHash = await bcrypt.hash(body.newPassword, 10);
+    await prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash },
+    });
+
+    return res.json({ message: 'Password berhasil diubah.' });
+  } catch (error) {
+    return handleRouteError(res, error, 'PUT /users/me/password', 'Gagal mengubah password.');
+  }
+});
+
+export default router;

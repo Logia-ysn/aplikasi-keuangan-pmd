@@ -1,0 +1,325 @@
+import { useState } from 'react';
+import { Search, Loader2, ScrollText, ChevronDown, ChevronRight, ChevronLeft } from 'lucide-react';
+import { cn } from '../lib/utils';
+import { useQuery } from '@tanstack/react-query';
+import api from '../lib/api';
+import { formatDate, formatTime } from '../lib/formatters';
+
+interface AuditLogEntry {
+  id: string;
+  userId: string;
+  action: string;
+  entityType: string;
+  entityId: string;
+  oldValues: any;
+  newValues: any;
+  ipAddress: string | null;
+  userAgent: string | null;
+  createdAt: string;
+  user: {
+    fullName: string;
+    email: string;
+  };
+}
+
+const ACTION_OPTIONS = [
+  { value: '', label: 'Semua Aksi' },
+  { value: 'CREATE', label: 'CREATE' },
+  { value: 'UPDATE', label: 'UPDATE' },
+  { value: 'DELETE', label: 'DELETE' },
+  { value: 'LOGIN', label: 'LOGIN' },
+];
+
+export const AuditTrail = () => {
+  const [page, setPage] = useState(1);
+  const [filterUserId, setFilterUserId] = useState('');
+  const [filterAction, setFilterAction] = useState('');
+  const [filterEntityType, setFilterEntityType] = useState('');
+  const [filterStartDate, setFilterStartDate] = useState('');
+  const [filterEndDate, setFilterEndDate] = useState('');
+  const [expandedRow, setExpandedRow] = useState<string | null>(null);
+  const limit = 25;
+
+  // Fetch users for filter dropdown
+  const { data: usersData } = useQuery({
+    queryKey: ['users-for-filter'],
+    queryFn: async () => {
+      const response = await api.get('/users', { params: { limit: 200 } });
+      return response.data.data ?? [];
+    },
+  });
+
+  // Fetch audit logs
+  const { data, isLoading } = useQuery({
+    queryKey: ['audit-logs', page, filterUserId, filterAction, filterEntityType, filterStartDate, filterEndDate],
+    queryFn: async () => {
+      const params: any = { page, limit };
+      if (filterUserId) params.userId = filterUserId;
+      if (filterAction) params.action = filterAction;
+      if (filterEntityType) params.entityType = filterEntityType;
+      if (filterStartDate) params.startDate = filterStartDate;
+      if (filterEndDate) params.endDate = filterEndDate;
+      const response = await api.get('/audit-logs', { params });
+      return response.data;
+    },
+  });
+
+  const logs: AuditLogEntry[] = data?.data ?? [];
+  const total = data?.total ?? 0;
+  const totalPages = Math.ceil(total / limit);
+
+  const actionBadge = (action: string) => {
+    switch (action) {
+      case 'CREATE':
+        return <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400">CREATE</span>;
+      case 'UPDATE':
+        return <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">UPDATE</span>;
+      case 'DELETE':
+        return <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-400">DELETE</span>;
+      case 'LOGIN':
+        return <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300">LOGIN</span>;
+      default:
+        return <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300">{action}</span>;
+    }
+  };
+
+  const handleResetFilters = () => {
+    setFilterUserId('');
+    setFilterAction('');
+    setFilterEntityType('');
+    setFilterStartDate('');
+    setFilterEndDate('');
+    setPage(1);
+  };
+
+  const selectCls = 'border rounded-lg py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500';
+  const inputCls = 'border rounded-lg py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500';
+
+  return (
+    <div className="space-y-5 pb-8">
+      {/* Header */}
+      <div>
+        <h1 className="text-xl font-semibold" style={{ color: 'var(--color-text-primary)' }}>Jejak Audit</h1>
+        <p className="text-sm mt-0.5" style={{ color: 'var(--color-text-muted)' }}>Riwayat aktivitas pengguna di aplikasi.</p>
+      </div>
+
+      {/* Filter Bar */}
+      <div
+        className="rounded-xl border p-4"
+        style={{ backgroundColor: 'var(--color-bg-primary)', borderColor: 'var(--color-border)' }}
+      >
+        <div className="flex flex-wrap items-end gap-3">
+          {/* User filter */}
+          <div className="flex-1 min-w-[160px]">
+            <label className="block text-xs font-medium mb-1" style={{ color: 'var(--color-text-muted)' }}>Pengguna</label>
+            <select
+              value={filterUserId}
+              onChange={(e) => { setFilterUserId(e.target.value); setPage(1); }}
+              className={cn(selectCls, 'w-full')}
+              style={{ backgroundColor: 'var(--color-bg-primary)', borderColor: 'var(--color-border)', color: 'var(--color-text-primary)' }}
+            >
+              <option value="">Semua Pengguna</option>
+              {(usersData ?? []).map((u: any) => (
+                <option key={u.id} value={u.id}>{u.fullName}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Action filter */}
+          <div className="min-w-[140px]">
+            <label className="block text-xs font-medium mb-1" style={{ color: 'var(--color-text-muted)' }}>Aksi</label>
+            <select
+              value={filterAction}
+              onChange={(e) => { setFilterAction(e.target.value); setPage(1); }}
+              className={cn(selectCls, 'w-full')}
+              style={{ backgroundColor: 'var(--color-bg-primary)', borderColor: 'var(--color-border)', color: 'var(--color-text-primary)' }}
+            >
+              {ACTION_OPTIONS.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Entity type filter */}
+          <div className="min-w-[140px]">
+            <label className="block text-xs font-medium mb-1" style={{ color: 'var(--color-text-muted)' }}>Tipe Entitas</label>
+            <div className="relative">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--color-text-muted)' }} />
+              <input
+                type="text"
+                value={filterEntityType}
+                onChange={(e) => { setFilterEntityType(e.target.value); setPage(1); }}
+                placeholder="e.g. sales, users"
+                className={cn(inputCls, 'w-full pl-9')}
+                style={{ backgroundColor: 'var(--color-bg-primary)', borderColor: 'var(--color-border)', color: 'var(--color-text-primary)' }}
+              />
+            </div>
+          </div>
+
+          {/* Date range */}
+          <div className="min-w-[130px]">
+            <label className="block text-xs font-medium mb-1" style={{ color: 'var(--color-text-muted)' }}>Dari Tanggal</label>
+            <input
+              type="date"
+              value={filterStartDate}
+              onChange={(e) => { setFilterStartDate(e.target.value); setPage(1); }}
+              className={cn(inputCls, 'w-full')}
+              style={{ backgroundColor: 'var(--color-bg-primary)', borderColor: 'var(--color-border)', color: 'var(--color-text-primary)' }}
+            />
+          </div>
+          <div className="min-w-[130px]">
+            <label className="block text-xs font-medium mb-1" style={{ color: 'var(--color-text-muted)' }}>Sampai Tanggal</label>
+            <input
+              type="date"
+              value={filterEndDate}
+              onChange={(e) => { setFilterEndDate(e.target.value); setPage(1); }}
+              className={cn(inputCls, 'w-full')}
+              style={{ backgroundColor: 'var(--color-bg-primary)', borderColor: 'var(--color-border)', color: 'var(--color-text-primary)' }}
+            />
+          </div>
+
+          {/* Reset */}
+          <button
+            onClick={handleResetFilters}
+            className="btn-secondary text-xs"
+          >
+            Reset
+          </button>
+        </div>
+      </div>
+
+      {/* Table */}
+      <div
+        className="rounded-xl border overflow-hidden"
+        style={{ backgroundColor: 'var(--color-bg-primary)', borderColor: 'var(--color-border)' }}
+      >
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b" style={{ borderColor: 'var(--color-border)', backgroundColor: 'var(--color-bg-secondary)' }}>
+                <th className="w-8 px-2 py-3"></th>
+                <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Waktu</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Pengguna</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Aksi</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Entitas</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>ID Entitas</th>
+              </tr>
+            </thead>
+            <tbody>
+              {isLoading ? (
+                <tr>
+                  <td colSpan={6} className="py-16 text-center">
+                    <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" style={{ color: 'var(--color-text-muted)' }} />
+                    <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>Memuat data audit...</p>
+                  </td>
+                </tr>
+              ) : logs.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="py-16 text-center">
+                    <ScrollText className="w-10 h-10 mx-auto mb-2" style={{ color: 'var(--color-text-muted)' }} />
+                    <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>Tidak ada data audit log.</p>
+                  </td>
+                </tr>
+              ) : (
+                logs.map((log) => (
+                  <>
+                    <tr
+                      key={log.id}
+                      className={cn(
+                        'border-b transition-colors cursor-pointer hover:bg-gray-50/50 dark:hover:bg-gray-800/30',
+                        expandedRow === log.id && 'bg-gray-50/80 dark:bg-gray-800/40'
+                      )}
+                      style={{ borderColor: 'var(--color-border)' }}
+                      onClick={() => setExpandedRow(expandedRow === log.id ? null : log.id)}
+                    >
+                      <td className="px-2 py-3 text-center" style={{ color: 'var(--color-text-muted)' }}>
+                        {expandedRow === log.id ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap" style={{ color: 'var(--color-text-secondary)' }}>
+                        <div className="text-xs">{formatDate(log.createdAt)}</div>
+                        <div className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>{formatTime(log.createdAt)}</div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="text-xs font-medium" style={{ color: 'var(--color-text-primary)' }}>{log.user?.fullName ?? '-'}</div>
+                        <div className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>{log.user?.email ?? ''}</div>
+                      </td>
+                      <td className="px-4 py-3">{actionBadge(log.action)}</td>
+                      <td className="px-4 py-3 font-mono text-xs" style={{ color: 'var(--color-text-secondary)' }}>{log.entityType}</td>
+                      <td className="px-4 py-3 font-mono text-[10px]" style={{ color: 'var(--color-text-muted)' }}>
+                        {log.entityId.length > 12 ? `${log.entityId.slice(0, 8)}...` : log.entityId}
+                      </td>
+                    </tr>
+                    {expandedRow === log.id && (
+                      <tr key={`${log.id}-detail`} style={{ borderColor: 'var(--color-border)' }} className="border-b">
+                        <td colSpan={6} className="px-6 py-4" style={{ backgroundColor: 'var(--color-bg-secondary)' }}>
+                          <div className="space-y-2">
+                            {log.ipAddress && (
+                              <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                                <span className="font-medium">IP Address:</span> {log.ipAddress}
+                              </p>
+                            )}
+                            {log.newValues && (
+                              <div>
+                                <p className="text-xs font-medium mb-1" style={{ color: 'var(--color-text-secondary)' }}>Data:</p>
+                                <pre
+                                  className="text-xs rounded-lg p-3 overflow-x-auto border max-h-60"
+                                  style={{
+                                    backgroundColor: 'var(--color-bg-primary)',
+                                    borderColor: 'var(--color-border)',
+                                    color: 'var(--color-text-secondary)',
+                                  }}
+                                >
+                                  <code>{JSON.stringify(log.newValues, null, 2)}</code>
+                                </pre>
+                              </div>
+                            )}
+                            {!log.newValues && !log.ipAddress && (
+                              <p className="text-xs italic" style={{ color: 'var(--color-text-muted)' }}>Tidak ada detail tambahan.</p>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div
+            className="flex items-center justify-between px-4 py-3 border-t"
+            style={{ borderColor: 'var(--color-border)' }}
+          >
+            <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+              Menampilkan {(page - 1) * limit + 1}-{Math.min(page * limit, total)} dari {total} entri
+            </p>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page <= 1}
+                className="p-1.5 rounded-lg transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed"
+                style={{ color: 'var(--color-text-muted)' }}
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <span className="text-xs font-medium px-2" style={{ color: 'var(--color-text-secondary)' }}>
+                {page} / {totalPages}
+              </span>
+              <button
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                disabled={page >= totalPages}
+                className="p-1.5 rounded-lg transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed"
+                style={{ color: 'var(--color-text-muted)' }}
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};

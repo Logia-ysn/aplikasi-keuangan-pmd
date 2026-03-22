@@ -18,6 +18,8 @@ import BalanceSheet from './pages/reports/BalanceSheet';
 import AgingAnalysis from './pages/reports/AgingAnalysis';
 import CashFlow from './pages/reports/CashFlow';
 import { SettingsPage } from './pages/Settings';
+import { UserManagement } from './pages/UserManagement';
+import { AuditTrail } from './pages/AuditTrail';
 
 const ProtectedRoute = () => {
   const token = localStorage.getItem('token');
@@ -54,6 +56,8 @@ function App() {
             <Route path="/reports/aging-ap" element={<AgingAnalysis type="Supplier" />} />
 
             <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/users" element={<UserManagement />} />
+            <Route path="/audit" element={<AuditTrail />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Route>

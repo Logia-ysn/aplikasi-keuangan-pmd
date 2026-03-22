@@ -15,13 +15,15 @@ import {
   Sun,
   Moon,
   Monitor,
+  Shield,
+  ScrollText,
 } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '../lib/utils';
 import { useCompanySettings } from '../contexts/CompanySettingsContext';
 import { useTheme } from '../contexts/ThemeContext';
 
-const navItems = [
+const baseNavItems = [
   { icon: LayoutDashboard, label: 'Dashboard', href: '/' },
   { icon: Network, label: 'Bagan Akun', href: '/coa' },
   { icon: Receipt, label: 'Buku Besar', href: '/gl' },
@@ -32,6 +34,11 @@ const navItems = [
   { icon: Users, label: 'Pelanggan & Vendor', href: '/parties' },
   { icon: FileBarChart, label: 'Laporan Keuangan', href: '/reports' },
   { icon: Settings, label: 'Pengaturan', href: '/settings' },
+];
+
+const adminNavItems = [
+  { icon: Shield, label: 'Manajemen User', href: '/users' },
+  { icon: ScrollText, label: 'Jejak Audit', href: '/audit' },
 ];
 
 export const Sidebar = () => {
@@ -55,6 +62,14 @@ export const Sidebar = () => {
       return null;
     }
   }, []);
+
+  const navItems = useMemo(() => {
+    const items = [...baseNavItems];
+    if (user?.role === 'Admin') {
+      items.push(...adminNavItems);
+    }
+    return items;
+  }, [user?.role]);
 
   return (
     <aside
