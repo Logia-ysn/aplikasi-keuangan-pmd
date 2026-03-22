@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import api from '../lib/api';
@@ -9,7 +9,6 @@ import {
   Plus,
   ArrowLeft,
   Check,
-  X,
   Loader2,
   Trash2,
   CheckCircle2,

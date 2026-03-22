@@ -155,7 +155,6 @@ export const Notifications = () => {
         style={{
           backgroundColor: 'var(--color-bg-primary)',
           borderColor: 'var(--color-border)',
-          divideColor: 'var(--color-border-light)',
         }}
       >
         {isLoading ? (
