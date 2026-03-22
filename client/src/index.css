@@ -94,6 +94,8 @@ body {
 .badge-gray   { @apply bg-gray-100 text-gray-600; }
 .badge-blue   { @apply bg-blue-50 text-blue-700; }
 .badge-amber  { @apply bg-amber-50 text-amber-700; }
+.badge-purple { @apply bg-purple-50 text-purple-700; }
+.badge-orange { @apply bg-orange-50 text-orange-700; }
 
 .dark .badge-green  { background-color: rgba(34,197,94,0.15); color: #86efac; }
 .dark .badge-red    { background-color: rgba(239,68,68,0.15); color: #fca5a5; }
@@ -101,6 +103,8 @@ body {
 .dark .badge-gray   { background-color: var(--color-bg-tertiary); color: var(--color-text-secondary); }
 .dark .badge-blue   { background-color: rgba(59,130,246,0.15); color: #93c5fd; }
 .dark .badge-amber  { background-color: rgba(245,158,11,0.15); color: #fcd34d; }
+.dark .badge-purple { background-color: rgba(168,85,247,0.15); color: #d8b4fe; }
+.dark .badge-orange { background-color: rgba(249,115,22,0.15); color: #fdba74; }
 
 /* ─── Section divider label ──────────── */
 .section-label {

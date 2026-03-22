@@ -52,10 +52,8 @@ const StockAlert: React.FC = () => {
               </div>
               <span
                 className={cn(
-                  'text-[10px] px-2 py-0.5 rounded-full font-semibold',
-                  item.status === 'Habis'
-                    ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-                    : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+                  'badge rounded-full text-[10px] font-semibold',
+                  item.status === 'Habis' ? 'badge-red' : 'badge-yellow'
                 )}
               >
                 {item.status}

@@ -19,7 +19,7 @@ const movementTypeConfig: Record<string, { label: string; className: string }> =
   In: { label: 'Masuk', className: 'badge badge-green' },
   Out: { label: 'Keluar', className: 'badge badge-red' },
   AdjustmentIn: { label: 'Penyesuaian +', className: 'badge badge-blue' },
-  AdjustmentOut: { label: 'Penyesuaian −', className: 'badge bg-orange-100 text-orange-700' },
+  AdjustmentOut: { label: 'Penyesuaian −', className: 'badge badge-orange' },
 };
 
 export function InventoryPage() {

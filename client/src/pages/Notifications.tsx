@@ -56,14 +56,14 @@ function notificationIcon(type: string) {
 
 function typeBadge(type: string) {
   const labels: Record<string, { label: string; color: string }> = {
-    invoice_overdue: { label: 'Jatuh Tempo', color: 'bg-red-100 text-red-700' },
-    payment_received: { label: 'Pembayaran', color: 'bg-green-100 text-green-700' },
-    low_stock: { label: 'Stok Rendah', color: 'bg-amber-100 text-amber-700' },
-    system: { label: 'Sistem', color: 'bg-gray-100 text-gray-700' },
+    invoice_overdue: { label: 'Jatuh Tempo', color: 'badge-red' },
+    payment_received: { label: 'Pembayaran', color: 'badge-green' },
+    low_stock: { label: 'Stok Rendah', color: 'badge-amber' },
+    system: { label: 'Sistem', color: 'badge-gray' },
   };
   const info = labels[type] || labels.system;
   return (
-    <span className={cn('text-[10px] font-medium px-1.5 py-0.5 rounded-full', info!.color)}>
+    <span className={cn('badge rounded-full text-[10px]', info!.color)}>
       {info!.label}
     </span>
   );

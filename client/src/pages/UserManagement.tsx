@@ -85,11 +85,11 @@ export const UserManagement = () => {
   const roleBadge = (role: string) => {
     switch (role) {
       case 'Admin':
-        return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"><ShieldCheck size={10} /> Admin</span>;
+        return <span className="badge badge-blue gap-1 rounded-full text-[10px] font-semibold"><ShieldCheck size={10} /> Admin</span>;
       case 'Accountant':
-        return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400"><Shield size={10} /> Accountant</span>;
+        return <span className="badge badge-green gap-1 rounded-full text-[10px] font-semibold"><Shield size={10} /> Accountant</span>;
       default:
-        return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300"><Eye size={10} /> Viewer</span>;
+        return <span className="badge badge-gray gap-1 rounded-full text-[10px] font-semibold"><Eye size={10} /> Viewer</span>;
     }
   };
 
@@ -199,9 +199,9 @@ export const UserManagement = () => {
                     <td className="px-4 py-3">{roleBadge(user.role)}</td>
                     <td className="px-4 py-3">
                       {user.isActive ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400">Aktif</span>
+                        <span className="badge badge-green rounded-full text-[10px] font-semibold">Aktif</span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-400">Nonaktif</span>
+                        <span className="badge badge-red rounded-full text-[10px] font-semibold">Nonaktif</span>
                       )}
                     </td>
                     <td className="px-4 py-3 text-xs" style={{ color: 'var(--color-text-muted)' }}>

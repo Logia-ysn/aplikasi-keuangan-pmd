@@ -71,15 +71,15 @@ export const AuditTrail = () => {
   const actionBadge = (action: string) => {
     switch (action) {
       case 'CREATE':
-        return <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400">CREATE</span>;
+        return <span className="badge badge-green">CREATE</span>;
       case 'UPDATE':
-        return <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">UPDATE</span>;
+        return <span className="badge badge-blue">UPDATE</span>;
       case 'DELETE':
-        return <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-400">DELETE</span>;
+        return <span className="badge badge-red">DELETE</span>;
       case 'LOGIN':
-        return <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300">LOGIN</span>;
+        return <span className="badge badge-gray">LOGIN</span>;
       default:
-        return <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300">{action}</span>;
+        return <span className="badge badge-gray">{action}</span>;
     }
   };
 

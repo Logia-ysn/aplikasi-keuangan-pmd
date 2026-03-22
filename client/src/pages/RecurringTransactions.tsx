@@ -24,9 +24,9 @@ interface RecurringTemplate {
 }
 
 const typeLabels: Record<string, { label: string; color: string }> = {
-  journal: { label: 'Jurnal', color: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300' },
-  sales_invoice: { label: 'Invoice Penjualan', color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' },
-  purchase_invoice: { label: 'Invoice Pembelian', color: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300' },
+  journal: { label: 'Jurnal', color: 'badge-purple' },
+  sales_invoice: { label: 'Invoice Penjualan', color: 'badge-blue' },
+  purchase_invoice: { label: 'Invoice Pembelian', color: 'badge-orange' },
 };
 
 const frequencyLabels: Record<string, string> = {
@@ -164,7 +164,7 @@ export const RecurringTransactions = () => {
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        <span className={cn('text-[10px] font-medium px-2 py-0.5 rounded-full', typeInfo!.color)}>
+                        <span className={cn('badge rounded-full text-[10px]', typeInfo!.color)}>
                           {typeInfo!.label}
                         </span>
                       </td>
@@ -194,10 +194,8 @@ export const RecurringTransactions = () => {
                       </td>
                       <td className="px-4 py-3">
                         <span className={cn(
-                          'text-[10px] font-medium px-2 py-0.5 rounded-full',
-                          t.isActive
-                            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
-                            : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'
+                          'badge rounded-full text-[10px]',
+                          t.isActive ? 'badge-green' : 'badge-gray'
                         )}>
                           {t.isActive ? 'Aktif' : 'Nonaktif'}
                         </span>

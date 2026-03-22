@@ -50,10 +50,8 @@ const OverdueInvoices: React.FC = () => {
                   </span>
                   <span
                     className={cn(
-                      'text-[10px] px-1.5 py-0.5 rounded font-medium',
-                      inv.type === 'sales'
-                        ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
-                        : 'bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400'
+                      'badge text-[10px]',
+                      inv.type === 'sales' ? 'badge-blue' : 'badge-purple'
                     )}
                   >
                     {inv.type === 'sales' ? 'AR' : 'AP'}
