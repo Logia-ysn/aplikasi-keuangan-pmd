@@ -123,7 +123,7 @@ const LoginPage: React.FC = () => {
       </div>
 
       {/* ── Right Panel: Login Form ── */}
-      <div className="flex-1 flex items-center justify-center bg-gray-50 px-6 py-12">
+      <div className="flex-1 flex items-center justify-center px-6 py-12" style={{ backgroundColor: 'var(--color-bg-secondary)' }}>
         <div className="w-full max-w-sm">
           {/* Mobile logo */}
           <div className="flex lg:hidden justify-center mb-10">
@@ -131,12 +131,12 @@ const LoginPage: React.FC = () => {
           </div>
 
           <div className="mb-8">
-            <h1 className="text-2xl font-bold text-gray-900">Selamat datang</h1>
-            <p className="text-gray-500 mt-1 text-sm">Masuk ke akun Anda untuk melanjutkan</p>
+            <h1 className="text-2xl font-bold" style={{ color: 'var(--color-text-primary)' }}>Selamat datang</h1>
+            <p className="mt-1 text-sm" style={{ color: 'var(--color-text-secondary)' }}>Masuk ke akun Anda untuk melanjutkan</p>
           </div>
 
           {error && (
-            <div className="mb-5 p-3.5 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3 text-red-600 text-sm">
+            <div className="mb-5 p-3.5 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3 text-red-600 text-sm dark:bg-red-900/20 dark:border-red-800 dark:text-red-400">
               <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
               <span>{error}</span>
             </div>
@@ -145,16 +145,23 @@ const LoginPage: React.FC = () => {
           <form onSubmit={handleLogin} className="space-y-4">
             {/* Email */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Email</label>
+              <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--color-text-secondary)' }}>Email</label>
               <div className="relative">
-                <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--color-text-muted)' }} />
                 <input
                   type="text"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   autoComplete="email"
                   autoFocus
-                  className="w-full bg-white border border-gray-200 rounded-xl py-3 pl-10 pr-4 text-gray-900 placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all shadow-sm"
+                  className="w-full rounded-xl py-3 pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all shadow-sm"
+                  style={{
+                    backgroundColor: 'var(--color-input-bg)',
+                    borderWidth: '1px',
+                    borderStyle: 'solid',
+                    borderColor: 'var(--color-border)',
+                    color: 'var(--color-text-primary)',
+                  }}
                   placeholder="admin@perusahaan.com"
                   required
                 />
@@ -163,22 +170,30 @@ const LoginPage: React.FC = () => {
 
             {/* Password */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Password</label>
+              <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--color-text-secondary)' }}>Password</label>
               <div className="relative">
-                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--color-text-muted)' }} />
                 <input
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   autoComplete="current-password"
-                  className="w-full bg-white border border-gray-200 rounded-xl py-3 pl-10 pr-11 text-gray-900 placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all shadow-sm"
+                  className="w-full rounded-xl py-3 pl-10 pr-11 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all shadow-sm"
+                  style={{
+                    backgroundColor: 'var(--color-input-bg)',
+                    borderWidth: '1px',
+                    borderStyle: 'solid',
+                    borderColor: 'var(--color-border)',
+                    color: 'var(--color-text-primary)',
+                  }}
                   placeholder="Masukkan password"
                   required
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword((v) => !v)}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 transition-colors"
+                  style={{ color: 'var(--color-text-muted)' }}
                   tabIndex={-1}
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -206,17 +221,25 @@ const LoginPage: React.FC = () => {
             </button>
           </form>
 
-          <p className="text-center text-gray-400 text-xs mt-8">
+          <p className="text-center text-xs mt-8" style={{ color: 'var(--color-text-muted)' }}>
             Lupa password?{' '}
-            <span className="text-gray-600 font-medium">Hubungi Administrator</span>
+            <span className="font-medium" style={{ color: 'var(--color-text-secondary)' }}>Hubungi Administrator</span>
           </p>
 
           {/* Version badge */}
           <div className="mt-10 flex items-center justify-center gap-2">
-            <span className="text-[10px] font-mono text-gray-400 bg-gray-100 border border-gray-200 rounded px-2 py-0.5">
+            <span className="text-[10px] font-mono rounded px-2 py-0.5"
+              style={{
+                color: 'var(--color-text-muted)',
+                backgroundColor: 'var(--color-bg-tertiary)',
+                borderWidth: '1px',
+                borderStyle: 'solid',
+                borderColor: 'var(--color-border)',
+              }}
+            >
               v{APP_VERSION}
             </span>
-            <span className="text-[10px] text-gray-300">build {APP_BUILD_DATE}</span>
+            <span className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>build {APP_BUILD_DATE}</span>
           </div>
         </div>
       </div>

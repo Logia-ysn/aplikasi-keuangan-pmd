@@ -1,6 +1,35 @@
 @import "tailwindcss";
 @config "../tailwind.config.js";
 
+/* ── Theme Variables ── */
+:root {
+  --color-bg-primary: #ffffff;
+  --color-bg-secondary: #f9fafb;
+  --color-bg-tertiary: #f3f4f6;
+  --color-text-primary: #111827;
+  --color-text-secondary: #6b7280;
+  --color-text-muted: #9ca3af;
+  --color-border: #e5e7eb;
+  --color-border-light: #f3f4f6;
+  --color-card-bg: #ffffff;
+  --color-input-bg: #ffffff;
+  --color-hover: #f9fafb;
+}
+
+.dark {
+  --color-bg-primary: #0f172a;
+  --color-bg-secondary: #1e293b;
+  --color-bg-tertiary: #334155;
+  --color-text-primary: #f1f5f9;
+  --color-text-secondary: #94a3b8;
+  --color-text-muted: #64748b;
+  --color-border: #334155;
+  --color-border-light: #1e293b;
+  --color-card-bg: #1e293b;
+  --color-input-bg: #1e293b;
+  --color-hover: #334155;
+}
+
 :root {
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   line-height: 1.5;
@@ -11,10 +40,16 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+.dark {
+  color-scheme: dark;
+}
+
 body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+  background-color: var(--color-bg-secondary);
+  color: var(--color-text-primary);
 }
 
 @layer base {
@@ -25,7 +60,10 @@ body {
 
 /* ─── Clean Card ─────────────────────── */
 .card {
-  @apply bg-white border border-gray-200 rounded-xl shadow-sm;
+  background-color: var(--color-card-bg);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-primary);
+  @apply rounded-xl shadow-sm;
 }
 
 /* ─── Buttons ────────────────────────── */
@@ -36,8 +74,14 @@ body {
 }
 
 .btn-secondary {
-  @apply bg-white text-gray-700 font-medium px-4 py-2 rounded-lg text-sm border border-gray-200
-         hover:bg-gray-50 transition-colors inline-flex items-center gap-2;
+  background-color: var(--color-card-bg);
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border);
+  @apply font-medium px-4 py-2 rounded-lg text-sm
+         transition-colors inline-flex items-center gap-2;
+}
+.btn-secondary:hover {
+  background-color: var(--color-hover);
 }
 
 /* ─── Status badges ──────────────────── */
@@ -51,26 +95,45 @@ body {
 .badge-blue   { @apply bg-blue-50 text-blue-700; }
 .badge-amber  { @apply bg-amber-50 text-amber-700; }
 
+.dark .badge-green  { background-color: rgba(34,197,94,0.15); color: #86efac; }
+.dark .badge-red    { background-color: rgba(239,68,68,0.15); color: #fca5a5; }
+.dark .badge-yellow { background-color: rgba(234,179,8,0.15); color: #fde047; }
+.dark .badge-gray   { background-color: var(--color-bg-tertiary); color: var(--color-text-secondary); }
+.dark .badge-blue   { background-color: rgba(59,130,246,0.15); color: #93c5fd; }
+.dark .badge-amber  { background-color: rgba(245,158,11,0.15); color: #fcd34d; }
+
 /* ─── Section divider label ──────────── */
 .section-label {
-  @apply text-xs font-semibold uppercase tracking-wider text-gray-400;
+  color: var(--color-text-muted);
+  @apply text-xs font-semibold uppercase tracking-wider;
 }
 
 /* ─── Report section header ─────────── */
 .section-header {
-  @apply px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wider bg-gray-50 border-b border-gray-100;
+  color: var(--color-text-secondary);
+  background-color: var(--color-bg-secondary);
+  border-bottom: 1px solid var(--color-border-light);
+  @apply px-4 py-2.5 text-xs font-semibold uppercase tracking-wider;
 }
 
 /* ─── Table ──────────────────────────── */
 .data-table { @apply w-full text-sm; }
-.data-table thead tr { @apply border-b border-gray-100; }
+.data-table thead tr { border-bottom: 1px solid var(--color-border-light); }
 .data-table thead th {
-  @apply text-left text-xs font-semibold text-gray-400 uppercase tracking-wide px-4 py-3;
+  color: var(--color-text-muted);
+  @apply text-left text-xs font-semibold uppercase tracking-wide px-4 py-3;
 }
 .data-table tbody tr {
-  @apply border-b border-gray-50 hover:bg-gray-50/80 transition-colors;
+  border-bottom: 1px solid var(--color-border-light);
+  @apply transition-colors;
 }
-.data-table tbody td { @apply px-4 py-3 text-gray-700; }
+.data-table tbody tr:hover {
+  background-color: var(--color-hover);
+}
+.data-table tbody td {
+  color: var(--color-text-secondary);
+  @apply px-4 py-3;
+}
 
 /* ─── Drawer animation ──────────────── */
 @keyframes slide-in-right {
@@ -82,8 +145,37 @@ body {
 }
 
 /* legacy aliases — remapped to clean white cards */
-.glass { @apply bg-white border border-gray-200 rounded-xl shadow-sm; }
-.premium-gradient { @apply bg-white; }
+.glass {
+  background-color: var(--color-card-bg);
+  border: 1px solid var(--color-border);
+  @apply rounded-xl shadow-sm;
+}
+.premium-gradient {
+  background-color: var(--color-card-bg);
+}
+
+/* ── Dark Mode Overrides ── */
+.dark input, .dark select, .dark textarea {
+  background-color: var(--color-input-bg);
+  color: var(--color-text-primary);
+  border-color: var(--color-border);
+}
+
+.dark input::placeholder, .dark textarea::placeholder {
+  color: var(--color-text-muted);
+}
+
+.dark .bg-white { background-color: var(--color-card-bg); }
+.dark .bg-gray-50, .dark .bg-gray-100 { background-color: var(--color-bg-secondary); }
+.dark .text-gray-900 { color: var(--color-text-primary); }
+.dark .text-gray-700, .dark .text-gray-800 { color: var(--color-text-secondary); }
+.dark .text-gray-500, .dark .text-gray-600 { color: var(--color-text-muted); }
+.dark .text-gray-400 { color: var(--color-text-muted); }
+.dark .border-gray-200, .dark .border-gray-100 { border-color: var(--color-border); }
+.dark .hover\:bg-gray-50:hover, .dark .hover\:bg-gray-100:hover { background-color: var(--color-hover); }
+.dark .divide-gray-100 > * + *, .dark .divide-gray-200 > * + * { border-color: var(--color-border); }
+.dark .ring-gray-200 { --tw-ring-color: var(--color-border); }
+.dark .shadow-sm, .dark .shadow { box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
 
 /* ─── Print Styles ─────────────────── */
 @media print {

@@ -12,10 +12,14 @@ import {
   Package,
   Network,
   Warehouse,
+  Sun,
+  Moon,
+  Monitor,
 } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '../lib/utils';
 import { useCompanySettings } from '../contexts/CompanySettingsContext';
+import { useTheme } from '../contexts/ThemeContext';
 
 const navItems = [
   { icon: LayoutDashboard, label: 'Dashboard', href: '/' },
@@ -34,6 +38,15 @@ export const Sidebar = () => {
   const [isCollapsed, setIsCollapsed] = React.useState(false);
   const location = useLocation();
   const settings = useCompanySettings();
+  const { theme, setTheme } = useTheme();
+
+  const cycleTheme = () => {
+    const next = theme === 'light' ? 'dark' : theme === 'dark' ? 'system' : 'light';
+    setTheme(next);
+  };
+
+  const ThemeIcon = theme === 'dark' ? Moon : theme === 'system' ? Monitor : Sun;
+  const themeLabel = theme === 'dark' ? 'Tema: Gelap' : theme === 'system' ? 'Tema: Sistem' : 'Tema: Terang';
 
   const user = useMemo(() => {
     try {
@@ -47,12 +60,17 @@ export const Sidebar = () => {
     <aside
       data-no-print
       className={cn(
-        'h-screen bg-white border-r border-gray-200 text-gray-700 transition-all duration-300 flex flex-col z-50 flex-shrink-0',
+        'h-screen border-r transition-all duration-300 flex flex-col z-50 flex-shrink-0',
         isCollapsed ? 'w-[60px]' : 'w-[220px]'
       )}
+      style={{
+        backgroundColor: 'var(--color-bg-primary)',
+        borderColor: 'var(--color-border)',
+        color: 'var(--color-text-secondary)',
+      }}
     >
       {/* Logo */}
-      <div className="h-14 flex items-center justify-between px-3 border-b border-gray-100">
+      <div className="h-14 flex items-center justify-between px-3 border-b" style={{ borderColor: 'var(--color-border-light)' }}>
         {!isCollapsed && (
           <div className="flex items-center gap-2 overflow-hidden">
             {settings?.logoUrl ? (
@@ -122,16 +140,32 @@ export const Sidebar = () => {
         })}
       </nav>
 
+      {/* Theme Toggle */}
+      <div className="px-2 pb-1">
+        <button
+          onClick={cycleTheme}
+          title={themeLabel}
+          className={cn(
+            'flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm transition-colors',
+            'hover:bg-gray-50 dark:hover:bg-gray-700/50'
+          )}
+          style={{ color: 'var(--color-text-muted)' }}
+        >
+          <ThemeIcon size={16} className="flex-shrink-0" />
+          {!isCollapsed && <span className="truncate text-xs font-medium">{themeLabel}</span>}
+        </button>
+      </div>
+
       {/* User */}
-      <div className="border-t border-gray-100 p-3">
+      <div className="border-t p-3" style={{ borderColor: 'var(--color-border-light)' }}>
         <div className={cn('flex items-center gap-2 p-2 rounded-lg', isCollapsed && 'justify-center')}>
           <div className="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center font-semibold text-xs text-blue-700 flex-shrink-0">
             {user?.fullName?.charAt(0) || 'U'}
           </div>
           {!isCollapsed && (
             <div className="overflow-hidden">
-              <p className="text-xs font-semibold text-gray-900 truncate">{user?.fullName || 'User'}</p>
-              <p className="text-[10px] text-gray-400 uppercase tracking-wide">{user?.role || 'Admin'}</p>
+              <p className="text-xs font-semibold truncate" style={{ color: 'var(--color-text-primary)' }}>{user?.fullName || 'User'}</p>
+              <p className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>{user?.role || 'Admin'}</p>
             </div>
           )}
         </div>
