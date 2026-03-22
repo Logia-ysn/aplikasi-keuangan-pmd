@@ -7,6 +7,7 @@ import {
   Building2, Save, Settings, Loader2, Upload, X, ImageIcon,
   Info, Tag, Clock, Sparkles, ExternalLink, RefreshCw, CheckCircle, ArrowUpCircle,
   Receipt, Edit2, Trash2, ToggleLeft, ToggleRight,
+  HardDrive, Download, RotateCcw, AlertTriangle, Shield,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
@@ -904,13 +905,253 @@ const TaxConfigTab: React.FC = () => {
   );
 };
 
+// ─── Backup Tab ─────────────────────────────────────────
+const BackupTab: React.FC = () => {
+  const queryClient = useQueryClient();
+  const [confirmRestore, setConfirmRestore] = useState<string | null>(null);
+  const [restoreInput, setRestoreInput] = useState('');
+
+  const { data: backups, isLoading } = useQuery<Array<{ filename: string; size: number; date: string }>>({
+    queryKey: ['backups'],
+    queryFn: async () => { const res = await api.get('/backup/list'); return res.data; },
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async () => api.post('/backup/create'),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['backups'] });
+      toast.success('Backup berhasil dibuat.');
+    },
+    onError: (error: any) => toast.error(error.response?.data?.error || 'Gagal membuat backup.'),
+  });
+
+  const restoreMutation = useMutation({
+    mutationFn: async (filename: string) => api.post('/backup/restore', { filename }),
+    onSuccess: () => {
+      toast.success('Restore berhasil. Silakan refresh halaman.');
+      setConfirmRestore(null);
+      setRestoreInput('');
+    },
+    onError: (error: any) => toast.error(error.response?.data?.error || 'Gagal restore backup.'),
+  });
+
+  const handleDownload = (filename: string) => {
+    const token = localStorage.getItem('token');
+    const baseUrl = (import.meta as any).env?.VITE_API_URL || '/api';
+    const url = `${baseUrl}/backup/download/${encodeURIComponent(filename)}`;
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', filename);
+    // Add auth header via fetch and create blob URL
+    fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+      .then((res) => res.blob())
+      .then((blob) => {
+        const blobUrl = URL.createObjectURL(blob);
+        link.href = blobUrl;
+        link.click();
+        URL.revokeObjectURL(blobUrl);
+      })
+      .catch(() => toast.error('Gagal mengunduh backup.'));
+  };
+
+  const formatSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  const lastBackup = backups?.[0];
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-base font-semibold" style={{ color: 'var(--color-text-primary)' }}>Backup & Restore</h2>
+          <p className="text-sm mt-0.5" style={{ color: 'var(--color-text-muted)' }}>Kelola cadangan database aplikasi.</p>
+        </div>
+        <button
+          onClick={() => createMutation.mutate()}
+          disabled={createMutation.isPending}
+          className="btn-primary"
+        >
+          {createMutation.isPending ? <Loader2 size={15} className="animate-spin" /> : <HardDrive size={15} />}
+          {createMutation.isPending ? 'Memproses...' : 'Buat Backup Sekarang'}
+        </button>
+      </div>
+
+      {/* Last backup info */}
+      {lastBackup && (
+        <div
+          className="flex items-center gap-4 p-4 rounded-xl border"
+          style={{ backgroundColor: 'var(--color-bg-secondary)', borderColor: 'var(--color-border)' }}
+        >
+          <div className="w-10 h-10 rounded-lg bg-green-50 dark:bg-green-900/30 flex items-center justify-center flex-shrink-0">
+            <Shield size={18} className="text-green-600" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+              Backup Terakhir
+            </p>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+              {new Date(lastBackup.date).toLocaleString('id-ID', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+              {' '}&middot; {formatSize(lastBackup.size)}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Warning */}
+      <div className="flex items-start gap-3 p-3 rounded-lg bg-yellow-50 dark:bg-yellow-900/10 border border-yellow-200 dark:border-yellow-800">
+        <AlertTriangle size={16} className="text-yellow-600 shrink-0 mt-0.5" />
+        <div className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
+          <p className="font-semibold text-yellow-800 dark:text-yellow-400">Perhatian:</p>
+          <p>Restore akan <strong>menimpa seluruh data</strong> yang ada. Pastikan Anda membuat backup sebelum melakukan restore. Maksimal 5 backup disimpan secara otomatis.</p>
+        </div>
+      </div>
+
+      {/* Backup list */}
+      {isLoading ? (
+        <div className="py-16 flex items-center justify-center gap-2 text-sm" style={{ color: 'var(--color-text-muted)' }}>
+          <Loader2 className="animate-spin" size={18} /> Memuat...
+        </div>
+      ) : (
+        <div className="rounded-xl border overflow-hidden" style={{ backgroundColor: 'var(--color-bg-primary)', borderColor: 'var(--color-border)' }}>
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Nama File</th>
+                <th className="text-right">Ukuran</th>
+                <th>Tanggal</th>
+                <th className="text-center">Aksi</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(!backups || backups.length === 0) ? (
+                <tr>
+                  <td colSpan={4} className="py-16 text-center" style={{ color: 'var(--color-text-muted)' }}>
+                    Belum ada file backup
+                  </td>
+                </tr>
+              ) : (
+                backups.map((backup) => (
+                  <tr key={backup.filename}>
+                    <td>
+                      <span className="text-xs font-mono font-medium" style={{ color: 'var(--color-text-primary)' }}>
+                        {backup.filename}
+                      </span>
+                    </td>
+                    <td className="text-right tabular-nums" style={{ color: 'var(--color-text-secondary)' }}>
+                      {formatSize(backup.size)}
+                    </td>
+                    <td style={{ color: 'var(--color-text-secondary)' }}>
+                      {new Date(backup.date).toLocaleString('id-ID', {
+                        day: 'numeric', month: 'short', year: 'numeric',
+                        hour: '2-digit', minute: '2-digit',
+                      })}
+                    </td>
+                    <td className="text-center">
+                      <div className="flex items-center justify-center gap-1">
+                        <button
+                          onClick={() => handleDownload(backup.filename)}
+                          className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                          title="Unduh"
+                        >
+                          <Download size={13} className="text-blue-500" />
+                        </button>
+                        <button
+                          onClick={() => { setConfirmRestore(backup.filename); setRestoreInput(''); }}
+                          className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                          title="Restore"
+                        >
+                          <RotateCcw size={13} className="text-orange-500" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Restore confirmation dialog */}
+      {confirmRestore && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30"
+          onKeyDown={(e) => e.key === 'Escape' && setConfirmRestore(null)}
+        >
+          <div
+            className="rounded-xl border shadow-xl p-6 w-full max-w-md"
+            style={{ backgroundColor: 'var(--color-bg-primary)', borderColor: 'var(--color-border)' }}
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-lg bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+                <AlertTriangle size={20} className="text-red-600" />
+              </div>
+              <div>
+                <h2 className="text-base font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+                  Konfirmasi Restore
+                </h2>
+                <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                  Aksi ini tidak dapat dibatalkan
+                </p>
+              </div>
+            </div>
+
+            <p className="text-sm mb-3" style={{ color: 'var(--color-text-secondary)' }}>
+              Restore akan menimpa <strong>seluruh data</strong> saat ini dengan data dari:
+            </p>
+            <p className="text-xs font-mono font-semibold mb-4 p-2 rounded-lg" style={{ backgroundColor: 'var(--color-bg-secondary)', color: 'var(--color-text-primary)' }}>
+              {confirmRestore}
+            </p>
+            <p className="text-xs mb-2" style={{ color: 'var(--color-text-secondary)' }}>
+              Ketik <strong>RESTORE</strong> untuk mengonfirmasi:
+            </p>
+            <input
+              type="text"
+              value={restoreInput}
+              onChange={(e) => setRestoreInput(e.target.value)}
+              placeholder="Ketik RESTORE"
+              className="w-full px-3 py-2 text-sm rounded-lg border focus:ring-2 focus:ring-red-400 outline-none mb-4"
+              style={{
+                backgroundColor: 'var(--color-bg-primary)',
+                borderColor: 'var(--color-border)',
+                color: 'var(--color-text-primary)',
+              }}
+              autoFocus
+            />
+
+            <div className="flex gap-3">
+              <button onClick={() => setConfirmRestore(null)} className="flex-1 btn-secondary justify-center">
+                Batal
+              </button>
+              <button
+                onClick={() => restoreMutation.mutate(confirmRestore)}
+                disabled={restoreInput !== 'RESTORE' || restoreMutation.isPending}
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {restoreMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <RotateCcw size={14} />}
+                {restoreMutation.isPending ? 'Memproses...' : 'Restore'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ─── Main Settings Page ───────────────────────────────────
 export const SettingsPage: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'fiscal' | 'company' | 'tax' | 'about'>('fiscal');
+  const [activeTab, setActiveTab] = useState<'fiscal' | 'company' | 'tax' | 'backup' | 'about'>('fiscal');
   const tabs = [
     { id: 'fiscal', label: 'Tahun Buku', icon: Calendar },
     { id: 'company', label: 'Profil Perusahaan', icon: Building2 },
     { id: 'tax', label: 'Pajak', icon: Receipt },
+    { id: 'backup', label: 'Backup', icon: HardDrive },
     { id: 'about', label: 'Tentang Aplikasi', icon: Info },
   ];
 
@@ -946,6 +1187,7 @@ export const SettingsPage: React.FC = () => {
       {activeTab === 'fiscal' && <FiscalYearsTab />}
       {activeTab === 'company' && <CompanySettingsTab />}
       {activeTab === 'tax' && <TaxConfigTab />}
+      {activeTab === 'backup' && <BackupTab />}
       {activeTab === 'about' && <AboutTab />}
     </div>
   );

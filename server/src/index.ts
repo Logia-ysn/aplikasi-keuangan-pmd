@@ -28,6 +28,7 @@ import recurringRoutes from './routes/recurring';
 import importRoutes from './routes/import';
 import reconciliationRoutes from './routes/reconciliation';
 import taxRoutes from './routes/tax';
+import backupRoutes from './routes/backup';
 
 const app = express();
 const port = process.env.PORT || 3001;
@@ -107,6 +108,7 @@ app.use('/api/recurring', recurringRoutes);
 app.use('/api/import', importRoutes);
 app.use('/api/reconciliation', reconciliationRoutes);
 app.use('/api/tax', taxRoutes);
+app.use('/api/backup', backupRoutes);
 
 // ─── Serve Frontend (Production) ──────────────────────────────────────────────
 // In production, serve the built React client from ../client/dist

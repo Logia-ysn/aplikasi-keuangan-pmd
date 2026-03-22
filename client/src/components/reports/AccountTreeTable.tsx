@@ -24,6 +24,8 @@ interface TreeTableProps {
   showAccountNumber?: boolean;
   /** Highlight isGroup rows with bg (default true) */
   highlightGroups?: boolean;
+  /** Callback when a leaf account balance is clicked (for drill-down) */
+  onAccountClick?: (accountId: string, accountName: string) => void;
 }
 
 /* ─── Recursive Row ────────────────────────────────────────────────────────── */
@@ -36,9 +38,18 @@ const AccountTreeRow: React.FC<{
   fmt: (v: number) => string;
   showAccountNumber: boolean;
   highlightGroups: boolean;
-}> = ({ account, depth, indentPx, valueColWidth, fmt, showAccountNumber, highlightGroups }) => {
+  onAccountClick?: (accountId: string, accountName: string) => void;
+}> = ({ account, depth, indentPx, valueColWidth, fmt, showAccountNumber, highlightGroups, onAccountClick }) => {
   const [isOpen, setIsOpen] = useState(true);
   const hasChildren = (account.children?.length ?? 0) > 0;
+  const isClickable = !account.isGroup && onAccountClick;
+
+  const handleBalanceClick = (e: React.MouseEvent) => {
+    if (isClickable) {
+      e.stopPropagation();
+      onAccountClick!(account.id, account.name);
+    }
+  };
 
   return (
     <>
@@ -76,8 +87,10 @@ const AccountTreeRow: React.FC<{
           className={cn(
             'text-sm tabular-nums font-medium text-right px-4',
             valueColWidth,
-            account.balance < 0 ? 'text-red-600' : 'text-gray-900'
+            account.balance < 0 ? 'text-red-600' : 'text-gray-900',
+            isClickable ? 'cursor-pointer hover:underline text-blue-600 dark:text-blue-400' : ''
           )}
+          onClick={handleBalanceClick}
         >
           {fmt(Math.abs(account.balance))}
         </div>
@@ -95,6 +108,7 @@ const AccountTreeRow: React.FC<{
             fmt={fmt}
             showAccountNumber={showAccountNumber}
             highlightGroups={highlightGroups}
+            onAccountClick={onAccountClick}
           />
         ))}
     </>
@@ -110,6 +124,7 @@ const AccountTreeTable: React.FC<TreeTableProps> = ({
   formatValue = formatRupiah,
   showAccountNumber = true,
   highlightGroups = true,
+  onAccountClick,
 }) => (
   <>
     {data.map((account) => (
@@ -122,6 +137,7 @@ const AccountTreeTable: React.FC<TreeTableProps> = ({
         fmt={formatValue}
         showAccountNumber={showAccountNumber}
         highlightGroups={highlightGroups}
+        onAccountClick={onAccountClick}
       />
     ))}
   </>

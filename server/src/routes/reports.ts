@@ -357,6 +357,74 @@ router.get('/aging', async (req, res) => {
   }
 });
 
+// GET /api/reports/ledger-detail — detailed ledger entries for a specific account
+router.get('/ledger-detail', async (req, res) => {
+  const { accountId, startDate, endDate } = req.query;
+
+  if (!accountId || typeof accountId !== 'string') {
+    return res.status(400).json({ error: 'Parameter accountId wajib diisi.' });
+  }
+
+  try {
+    const account = await prisma.account.findUnique({
+      where: { id: accountId },
+      select: { id: true, name: true, accountNumber: true, rootType: true },
+    });
+    if (!account) {
+      return res.status(404).json({ error: 'Akun tidak ditemukan.' });
+    }
+
+    const where: Prisma.AccountingLedgerEntryWhereInput = {
+      accountId,
+      isCancelled: false,
+    };
+    if (startDate || endDate) {
+      where.date = {};
+      if (startDate) (where.date as any).gte = new Date(startDate as string);
+      if (endDate) (where.date as any).lte = new Date(endDate as string);
+    }
+
+    const entries = await prisma.accountingLedgerEntry.findMany({
+      where,
+      orderBy: { date: 'asc' },
+      select: {
+        id: true,
+        date: true,
+        debit: true,
+        credit: true,
+        description: true,
+        referenceType: true,
+        referenceId: true,
+      },
+    });
+
+    // Compute running balance
+    const isDebitNormal = account.rootType === 'ASSET' || account.rootType === 'EXPENSE';
+    let runningBalance = 0;
+    const rows = entries.map((e) => {
+      const debit = Number(e.debit);
+      const credit = Number(e.credit);
+      runningBalance += isDebitNormal ? (debit - credit) : (credit - debit);
+      return {
+        ...e,
+        debit,
+        credit,
+        runningBalance,
+      };
+    });
+
+    return res.json({
+      accountId: account.id,
+      accountName: account.name,
+      accountNumber: account.accountNumber,
+      entries: rows,
+    });
+  } catch (error) {
+    logger.error({ error }, 'GET /reports/ledger-detail error');
+    return res.status(500).json({ error: 'Gagal mengambil detail buku besar.' });
+  }
+});
+
 // POST /api/reports/export — export to Excel
 router.post('/export', async (req, res) => {
   const { filename, data } = req.body;

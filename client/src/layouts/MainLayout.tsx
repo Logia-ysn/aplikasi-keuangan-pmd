@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Sidebar } from '../components/Sidebar';
 import { LogOut, Search, Keyboard, KeyRound } from 'lucide-react';
@@ -7,6 +7,8 @@ import { useHotkey } from '../hooks/useHotkeys';
 import { CommandPalette } from '../components/CommandPalette';
 import { ShortcutHelp } from '../components/ShortcutHelp';
 import ChangePasswordModal from '../components/ChangePasswordModal';
+import OnboardingWizard from '../components/OnboardingWizard';
+import { useCompanySettings } from '../contexts/CompanySettingsContext';
 
 const routeNames: Record<string, string> = {
   '': 'Dashboard',
@@ -32,6 +34,17 @@ export const MainLayout = () => {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isShortcutHelpOpen, setIsShortcutHelpOpen] = useState(false);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const companySettings = useCompanySettings();
+
+  useEffect(() => {
+    const done = localStorage.getItem('onboardingDone');
+    if (done === 'true') return;
+    const name = companySettings?.companyName;
+    if (!name || name === 'Perusahaan Anda' || name.trim() === '') {
+      setShowOnboarding(true);
+    }
+  }, [companySettings]);
 
   useHotkey('mod+k', () => setIsSearchOpen(true));
   useHotkey('?', () => setIsShortcutHelpOpen(true), !isSearchOpen && !isShortcutHelpOpen);
@@ -139,6 +152,9 @@ export const MainLayout = () => {
 
       {/* Change Password Modal */}
       <ChangePasswordModal isOpen={isPasswordModalOpen} onClose={() => setIsPasswordModalOpen(false)} />
+
+      {/* Onboarding Wizard */}
+      {showOnboarding && <OnboardingWizard onComplete={() => setShowOnboarding(false)} />}
     </div>
   );
 };
