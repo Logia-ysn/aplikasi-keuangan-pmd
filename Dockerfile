@@ -48,11 +48,15 @@ COPY --from=builder /app/server/prisma ./server/prisma
 COPY --from=builder /app/server/prisma.config.ts ./server/prisma.config.ts
 COPY --from=builder /app/client/dist ./client/dist
 
+# Entrypoint: migrate + auto-seed + start
+COPY docker-app-entrypoint.sh /docker-app-entrypoint.sh
+RUN chmod +x /docker-app-entrypoint.sh
+
 # Health check
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
   CMD wget -qO- http://localhost:3001/health || exit 1
 
 EXPOSE 3001
 WORKDIR /app/server
 
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/index.js"]
+CMD ["/docker-app-entrypoint.sh"]
