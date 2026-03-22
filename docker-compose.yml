@@ -1,19 +1,26 @@
 # ============================================================================
-# PMD Finance — Docker Compose (Full Stack)
+# PMD Finance — Docker Compose
 #
-# Usage:
-#   cp .env.docker.example .env        # lalu edit JWT_SECRET
-#   docker compose up -d --build       # build & start semua
-#   docker compose logs -f app         # lihat log
-#   docker compose exec app npx prisma db seed  # seed data awal (pertama kali)
-#   docker compose down                # stop semua (data tetap tersimpan)
+# Mode 1 — Dua Container (default, best practice):
+#   docker compose up -d --build
+#
+# Mode 2 — All-in-One (1 container, PostgreSQL + App):
+#   docker compose --profile allinone up -d --build
+#
+# Seed data awal (pertama kali):
+#   docker compose exec app npx prisma db seed
+#
+# Setup:
+#   cp .env.docker.example .env && nano .env   # edit JWT_SECRET
 # ============================================================================
 
 services:
-  # ── PostgreSQL Database ───────────────────────────────────────────────────
+  # ── Mode 1: Dua Container ─────────────────────────────────────────────────
+
   db:
     image: postgres:16-alpine
     restart: unless-stopped
+    profiles: ["", "default"]
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-pmd}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pmd_secret_2026}
@@ -26,12 +33,12 @@ services:
       timeout: 3s
       retries: 5
 
-  # ── Application (API + Frontend) ──────────────────────────────────────────
   app:
     build:
       context: .
       dockerfile: Dockerfile
     restart: unless-stopped
+    profiles: ["", "default"]
     ports:
       - "${PORT:-3001}:3001"
     environment:
@@ -44,5 +51,27 @@ services:
       db:
         condition: service_healthy
 
+  # ── Mode 2: All-in-One (1 container) ──────────────────────────────────────
+
+  pmd:
+    build:
+      context: .
+      dockerfile: Dockerfile.allinone
+    restart: unless-stopped
+    profiles: ["allinone"]
+    ports:
+      - "${PORT:-3001}:3001"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-pmd}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pmd_secret_2026}
+      POSTGRES_DB: ${POSTGRES_DB:-pmd_finance}
+      PORT: "3001"
+      JWT_SECRET: "${JWT_SECRET:-ganti-dengan-secret-yang-aman}"
+      ALLOWED_ORIGINS: "${ALLOWED_ORIGINS:-http://localhost:3001,https://keuangan.panganmasadepan.com}"
+      NODE_ENV: "production"
+    volumes:
+      - pmd-allinone-data:/var/lib/postgresql/data
+
 volumes:
   pgdata:
+  pmd-allinone-data:
