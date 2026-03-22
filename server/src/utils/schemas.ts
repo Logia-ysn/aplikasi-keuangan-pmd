@@ -184,6 +184,26 @@ export const ChangePasswordSchema = z.object({
   newPassword: z.string().min(8, 'Password baru minimal 8 karakter.'),
 });
 
+// ─── Recurring Template ─────────────────────────────────────────────────────
+export const CreateRecurringSchema = z.object({
+  name: z.string().min(1, 'Nama template wajib diisi.'),
+  templateType: z.enum(['journal', 'sales_invoice', 'purchase_invoice']),
+  frequency: z.enum(['daily', 'weekly', 'monthly', 'quarterly', 'yearly']),
+  dayOfMonth: z.number().min(1).max(31).nullable().optional(),
+  nextRunDate: z.string().min(1, 'Tanggal berikutnya wajib diisi.'),
+  templateData: z.any(),
+});
+
+export const UpdateRecurringSchema = z.object({
+  name: z.string().min(1, 'Nama template wajib diisi.').optional(),
+  templateType: z.enum(['journal', 'sales_invoice', 'purchase_invoice']).optional(),
+  frequency: z.enum(['daily', 'weekly', 'monthly', 'quarterly', 'yearly']).optional(),
+  dayOfMonth: z.number().min(1).max(31).nullable().optional(),
+  nextRunDate: z.string().optional(),
+  templateData: z.any().optional(),
+  isActive: z.boolean().optional(),
+});
+
 // ─── Production Run ───────────────────────────────────────────────────────────
 const ProductionLineSchema = z.object({
   itemId: z.string().min(1, 'Item wajib dipilih.'),

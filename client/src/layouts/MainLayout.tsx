@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Sidebar } from '../components/Sidebar';
 import { LogOut, Search, Keyboard, KeyRound } from 'lucide-react';
+import { NotificationBell } from '../components/NotificationBell';
 import { useHotkey } from '../hooks/useHotkeys';
 import { CommandPalette } from '../components/CommandPalette';
 import { ShortcutHelp } from '../components/ShortcutHelp';
@@ -20,6 +21,8 @@ const routeNames: Record<string, string> = {
   'settings': 'Pengaturan',
   'users': 'Manajemen User',
   'audit': 'Jejak Audit',
+  'notifications': 'Notifikasi',
+  'recurring': 'Transaksi Berulang',
 };
 
 export const MainLayout = () => {
@@ -88,6 +91,8 @@ export const MainLayout = () => {
             >
               <Keyboard className="w-4 h-4" />
             </button>
+            {/* Notification bell */}
+            <NotificationBell />
             <div className="flex items-center gap-2.5 pl-2 ml-1 border-l" style={{ borderColor: 'var(--color-border)' }}>
               <div className="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-semibold text-xs">
                 {user?.fullName?.charAt(0) || 'U'}

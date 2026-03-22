@@ -317,10 +317,12 @@ model User {
   payments         Payment[]
   closedYears      FiscalYear[]      @relation("ClosedBy")
   audits           AuditLog[]
-  stockMovements   StockMovement[]   @relation("MovementCreatedBy")
-  productionRuns   ProductionRun[]     @relation("ProductionCreatedBy")
-  createdAt        DateTime          @default(now()) @map("created_at")
-  updatedAt        DateTime          @updatedAt @map("updated_at")
+  stockMovements       StockMovement[]       @relation("MovementCreatedBy")
+  productionRuns       ProductionRun[]       @relation("ProductionCreatedBy")
+  notifications        Notification[]        @relation("UserNotifications")
+  recurringTemplates   RecurringTemplate[]   @relation("UserRecurring")
+  createdAt            DateTime              @default(now()) @map("created_at")
+  updatedAt            DateTime              @updatedAt @map("updated_at")
 
   @@map("users")
 }
@@ -478,4 +480,39 @@ model ProductionRunItem {
 
   @@index([productionRunId])
   @@map("production_run_items")
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  user      User     @relation("UserNotifications", fields: [userId], references: [id])
+  type      String   // invoice_overdue, payment_received, low_stock, system
+  title     String
+  message   String
+  isRead    Boolean  @default(false) @map("is_read")
+  metadata  Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId, isRead])
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+model RecurringTemplate {
+  id           String    @id @default(uuid())
+  name         String
+  templateType String    @map("template_type") // journal, sales_invoice, purchase_invoice
+  frequency    String    // daily, weekly, monthly, quarterly, yearly
+  dayOfMonth   Int?      @map("day_of_month")
+  nextRunDate  DateTime  @map("next_run_date")
+  lastRunDate  DateTime? @map("last_run_date")
+  isActive     Boolean   @default(true) @map("is_active")
+  templateData Json      @map("template_data")
+  createdBy    String    @map("created_by")
+  user         User      @relation("UserRecurring", fields: [createdBy], references: [id])
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  @@index([isActive, nextRunDate])
+  @@map("recurring_templates")
 }

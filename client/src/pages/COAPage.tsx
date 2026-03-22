@@ -3,12 +3,13 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../lib/api';
 import {
   ChevronRight, ChevronDown, Plus, Folder, FileText,
-  Search, PlusCircle, Pencil, X, Loader2, AlertCircle, Trash2, Wallet
+  Search, PlusCircle, Pencil, X, Loader2, AlertCircle, Trash2, Wallet, Upload
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { formatRupiah } from '../lib/formatters';
 import { toast } from 'sonner';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import ImportModal from '../components/ImportModal';
 
 // --- Types ---
 interface Account {
@@ -476,6 +477,7 @@ export const COAPage: React.FC = () => {
   const [deleteTarget, setDeleteTarget] = useState<Account | null>(null);
   const [balanceTarget, setBalanceTarget] = useState<Account | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isImportOpen, setIsImportOpen] = useState(false);
   const queryClient = useQueryClient();
 
   const { data: accounts, isLoading } = useQuery({
@@ -521,12 +523,17 @@ export const COAPage: React.FC = () => {
           <h1 className="text-xl font-semibold text-gray-900">Bagan Akun</h1>
           <p className="text-sm text-gray-500 mt-0.5">Kelola struktur Chart of Accounts secara hierarkis.</p>
         </div>
-        <button
-          onClick={() => setModalState({ isVisible: true, parent: null })}
-          className="btn-primary"
-        >
-          <Plus size={15} /> Tambah Akun Root
-        </button>
+        <div className="flex items-center gap-2">
+          <button className="btn-secondary flex items-center gap-1.5" onClick={() => setIsImportOpen(true)}>
+            <Upload size={14} /> Import
+          </button>
+          <button
+            onClick={() => setModalState({ isVisible: true, parent: null })}
+            className="btn-primary"
+          >
+            <Plus size={15} /> Tambah Akun Root
+          </button>
+        </div>
       </div>
 
       {/* Search & Table */}
@@ -625,6 +632,13 @@ export const COAPage: React.FC = () => {
         variant="danger"
         onConfirm={handleDelete}
         onCancel={() => setDeleteTarget(null)}
+      />
+
+      {/* Import Modal */}
+      <ImportModal
+        isOpen={isImportOpen}
+        onClose={() => setIsImportOpen(false)}
+        importType="coa"
       />
     </div>
   );

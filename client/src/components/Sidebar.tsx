@@ -17,6 +17,7 @@ import {
   Monitor,
   Shield,
   ScrollText,
+  Repeat,
 } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '../lib/utils';
@@ -32,6 +33,7 @@ const baseNavItems = [
   { icon: Warehouse, label: 'Stok & Gudang', href: '/inventory' },
   { icon: CreditCard, label: 'Bank & Kas', href: '/payments' },
   { icon: Users, label: 'Pelanggan & Vendor', href: '/parties' },
+  { icon: Repeat, label: 'Transaksi Berulang', href: '/recurring' },
   { icon: FileBarChart, label: 'Laporan Keuangan', href: '/reports' },
   { icon: Settings, label: 'Pengaturan', href: '/settings' },
 ];

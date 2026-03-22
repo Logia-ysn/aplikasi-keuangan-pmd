@@ -1,16 +1,18 @@
 import { useState } from 'react';
 import {
   Plus, Search, MoreHorizontal, Calendar as CalendarIcon,
-  Loader2, FileSpreadsheet
+  Loader2, FileSpreadsheet, Upload
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useQuery } from '@tanstack/react-query';
 import api from '../lib/api';
 import JournalEntryModal from '../components/JournalEntryModal';
+import ImportModal from '../components/ImportModal';
 import { formatRupiah, formatDate } from '../lib/formatters';
 
 export const GeneralLedger = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isImportOpen, setIsImportOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -48,9 +50,14 @@ export const GeneralLedger = () => {
           <h1 className="text-xl font-semibold text-gray-900">Buku Besar</h1>
           <p className="text-sm text-gray-500 mt-0.5">Kelola dan tinjau semua transaksi jurnal harian.</p>
         </div>
-        <button onClick={() => setIsModalOpen(true)} className="btn-primary">
-          <Plus size={15} /> Buat Jurnal Baru
-        </button>
+        <div className="flex items-center gap-2">
+          <button className="btn-secondary flex items-center gap-1.5" onClick={() => setIsImportOpen(true)}>
+            <Upload size={14} /> Import
+          </button>
+          <button onClick={() => setIsModalOpen(true)} className="btn-primary">
+            <Plus size={15} /> Buat Jurnal Baru
+          </button>
+        </div>
       </div>
 
       {/* Search */}
@@ -162,6 +169,12 @@ export const GeneralLedger = () => {
       <JournalEntryModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
+      />
+
+      <ImportModal
+        isOpen={isImportOpen}
+        onClose={() => setIsImportOpen(false)}
+        importType="journals"
       />
     </div>
   );

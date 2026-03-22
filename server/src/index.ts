@@ -23,6 +23,9 @@ import inventoryRoutes from './routes/inventory';
 import searchRoutes from './routes/search';
 import usersRoutes from './routes/users';
 import auditRoutes from './routes/audit';
+import notificationRoutes from './routes/notifications';
+import recurringRoutes from './routes/recurring';
+import importRoutes from './routes/import';
 
 const app = express();
 const port = process.env.PORT || 3001;
@@ -97,6 +100,9 @@ app.use('/api/inventory', inventoryRoutes);
 app.use('/api/search', searchRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/audit-logs', auditRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/recurring', recurringRoutes);
+app.use('/api/import', importRoutes);
 
 // ─── Serve Frontend (Production) ──────────────────────────────────────────────
 // In production, serve the built React client from ../client/dist

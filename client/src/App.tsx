@@ -20,6 +20,8 @@ import CashFlow from './pages/reports/CashFlow';
 import { SettingsPage } from './pages/Settings';
 import { UserManagement } from './pages/UserManagement';
 import { AuditTrail } from './pages/AuditTrail';
+import { Notifications } from './pages/Notifications';
+import { RecurringTransactions } from './pages/RecurringTransactions';
 
 const ProtectedRoute = () => {
   const token = localStorage.getItem('token');
@@ -58,6 +60,8 @@ function App() {
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/users" element={<UserManagement />} />
             <Route path="/audit" element={<AuditTrail />} />
+            <Route path="/notifications" element={<Notifications />} />
+            <Route path="/recurring" element={<RecurringTransactions />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Route>

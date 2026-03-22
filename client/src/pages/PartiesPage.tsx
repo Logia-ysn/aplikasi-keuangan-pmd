@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect } from 'react';
-import { Plus, Search, MoreHorizontal, Users, Loader2, Mail, Phone, MapPin, Pencil, Trash2, AlertCircle } from 'lucide-react';
+import { Plus, Search, MoreHorizontal, Users, Loader2, Mail, Phone, MapPin, Pencil, Trash2, AlertCircle, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '../lib/utils';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../lib/api';
 import { formatRupiah } from '../lib/formatters';
 import PartyFormModal from '../components/PartyFormModal';
+import ImportModal from '../components/ImportModal';
 
 export const PartiesPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -14,6 +15,7 @@ export const PartiesPage = () => {
   const [editParty, setEditParty] = useState<any | null>(null);
   const [menuPartyId, setMenuPartyId] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<any | null>(null);
+  const [isImportOpen, setIsImportOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
 
@@ -80,9 +82,14 @@ export const PartiesPage = () => {
           <h1 className="text-xl font-semibold text-gray-900">Pelanggan & Vendor</h1>
           <p className="text-sm text-gray-500 mt-0.5">Kelola data mitra bisnis, saldo piutang, dan hutang usaha.</p>
         </div>
-        <button className="btn-primary" onClick={() => { setEditParty(null); setIsModalOpen(true); }}>
-          <Plus size={15} /> Tambah Mitra Baru
-        </button>
+        <div className="flex items-center gap-2">
+          <button className="btn-secondary flex items-center gap-1.5" onClick={() => setIsImportOpen(true)}>
+            <Upload size={14} /> Import
+          </button>
+          <button className="btn-primary" onClick={() => { setEditParty(null); setIsModalOpen(true); }}>
+            <Plus size={15} /> Tambah Mitra Baru
+          </button>
+        </div>
       </div>
 
       {/* Search & Filter */}
@@ -283,6 +290,13 @@ export const PartiesPage = () => {
           </div>
         </div>
       )}
+
+      {/* Import Modal */}
+      <ImportModal
+        isOpen={isImportOpen}
+        onClose={() => setIsImportOpen(false)}
+        importType="parties"
+      />
     </div>
   );
 };
