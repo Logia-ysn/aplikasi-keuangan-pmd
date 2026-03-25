@@ -33,6 +33,9 @@ import backupRoutes from './routes/backup';
 const app = express();
 const port = process.env.PORT || 3001;
 
+// Trust proxy — required when running behind Docker/reverse proxy
+app.set('trust proxy', 1);
+
 // ─── CORS ──────────────────────────────────────────────────────────────────────
 const allowedOrigins = (
   process.env.ALLOWED_ORIGINS ||
@@ -48,13 +51,15 @@ app.use(
       if (!origin) return callback(null, true);
       // Allow explicitly listed origins
       if (allowedOrigins.includes(origin) || allowedOrigins.includes('*')) return callback(null, true);
-      // Auto-allow same-origin: if frontend is served by this Express server,
-      // the browser may still send Origin header — always allow it
+      // Auto-allow same-origin and private network IPs (LAN access)
       try {
         const originHost = new URL(origin).hostname;
         if (
           originHost === 'localhost' ||
-          originHost === '127.0.0.1'
+          originHost === '127.0.0.1' ||
+          originHost.startsWith('192.168.') ||
+          originHost.startsWith('10.') ||
+          /^172\.(1[6-9]|2\d|3[01])\./.test(originHost)
         ) {
           return callback(null, true);
         }
