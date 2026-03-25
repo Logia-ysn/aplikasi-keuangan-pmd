@@ -198,7 +198,7 @@ router.post('/:id/cancel', roleMiddleware(['Admin']), async (req: AuthRequest, r
   try {
     const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const payment = await tx.payment.findUnique({
-        where: { id: req.params.id },
+        where: { id: req.params.id as string },
         include: { party: true },
       });
       if (!payment) throw new BusinessError('Pembayaran tidak ditemukan.');

@@ -177,7 +177,7 @@ router.post('/:id/cancel', roleMiddleware(['Admin']), async (req: AuthRequest, r
   try {
     const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const invoice = await tx.salesInvoice.findUnique({
-        where: { id: req.params.id },
+        where: { id: req.params.id as string },
         include: { customer: true },
       });
       if (!invoice) throw new BusinessError('Invoice tidak ditemukan.');
