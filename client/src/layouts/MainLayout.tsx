@@ -8,7 +8,6 @@ import { CommandPalette } from '../components/CommandPalette';
 import { ShortcutHelp } from '../components/ShortcutHelp';
 import ChangePasswordModal from '../components/ChangePasswordModal';
 import OnboardingWizard from '../components/OnboardingWizard';
-import { useCompanySettings } from '../contexts/CompanySettingsContext';
 
 const routeNames: Record<string, string> = {
   '': 'Dashboard',
@@ -36,16 +35,13 @@ export const MainLayout = () => {
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const companySettings = useCompanySettings();
 
   useEffect(() => {
     const done = localStorage.getItem('onboardingDone');
-    if (done === 'true') return;
-    const name = companySettings?.companyName;
-    if (!name || name === 'Perusahaan Anda' || name.trim() === '') {
+    if (done !== 'true') {
       setShowOnboarding(true);
     }
-  }, [companySettings]);
+  }, []);
 
   // Close mobile menu on route change
   useEffect(() => {

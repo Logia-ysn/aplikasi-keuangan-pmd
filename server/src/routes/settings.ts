@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import os from 'os';
+import path from 'path';
 import { prisma } from '../lib/prisma';
 import { roleMiddleware } from '../middleware/auth';
 import { validateBody } from '../utils/validate';
@@ -105,6 +106,84 @@ router.put('/company', roleMiddleware(['Admin']), async (req, res) => {
   } catch (error) {
     logger.error({ error }, 'PUT /settings/company error');
     return res.status(500).json({ error: 'Gagal menyimpan pengaturan perusahaan.' });
+  }
+});
+
+// POST /api/settings/reset-data — Reset all data and re-seed (Admin only, development)
+router.post('/reset-data', roleMiddleware(['Admin']), async (req, res) => {
+  const body = req.body;
+  if (body?.confirmation !== 'RESET') {
+    return res.status(400).json({ error: 'Ketik RESET untuk mengonfirmasi.' });
+  }
+
+  try {
+    // Delete all data in correct order (respect FK constraints)
+    await prisma.$transaction(async (tx) => {
+      // Clear token blacklist
+      await tx.tokenBlacklist.deleteMany();
+      // Clear notifications
+      await tx.notification.deleteMany();
+      // Clear audit logs
+      await tx.auditLog.deleteMany();
+      // Clear bank reconciliation items then reconciliations
+      await tx.bankReconciliationItem.deleteMany();
+      await tx.bankReconciliation.deleteMany();
+      // Clear recurring templates
+      await tx.recurringTemplate.deleteMany();
+      // Clear payment allocations then payments
+      await tx.paymentAllocation.deleteMany();
+      await tx.payment.deleteMany();
+      // Clear invoice items then invoices
+      await tx.salesInvoiceItem.deleteMany();
+      await tx.salesInvoice.deleteMany();
+      await tx.purchaseInvoiceItem.deleteMany();
+      await tx.purchaseInvoice.deleteMany();
+      // Clear production run items then runs
+      await tx.productionRunItem.deleteMany();
+      await tx.productionRun.deleteMany();
+      // Clear stock movements
+      await tx.stockMovement.deleteMany();
+      // Clear inventory items
+      await tx.inventoryItem.deleteMany();
+      // Clear journal items, ledger entries, then journals
+      await tx.journalItem.deleteMany();
+      await tx.accountingLedgerEntry.deleteMany();
+      await tx.journalEntry.deleteMany();
+      // Clear parties
+      await tx.party.deleteMany();
+      // Clear accounts
+      await tx.account.deleteMany();
+      // Clear tax config
+      await tx.taxConfig.deleteMany();
+      // Clear fiscal years
+      await tx.fiscalYear.deleteMany();
+      // Clear company settings
+      await tx.companySettings.deleteMany();
+      // Clear users — seed will recreate them
+      await tx.user.deleteMany();
+    }, { timeout: 60000 });
+
+    // Re-seed by running the seed script
+    const { execFile } = await import('child_process');
+    const { promisify } = await import('util');
+    const execFileAsync = promisify(execFile);
+
+    try {
+      await execFileAsync('npx', ['tsx', 'prisma/seed.ts'], {
+        cwd: path.resolve(__dirname, '../..'),
+        env: { ...process.env },
+        timeout: 30000,
+      });
+    } catch (seedError) {
+      logger.error({ error: seedError }, 'Seed failed after reset');
+      return res.status(500).json({ error: 'Data berhasil dihapus, tapi gagal re-seed. Silakan restart server.' });
+    }
+
+    logger.info('Database reset and re-seeded successfully');
+    return res.json({ message: 'Data berhasil direset. Silakan login ulang.' });
+  } catch (error) {
+    logger.error({ error }, 'POST /settings/reset-data error');
+    return res.status(500).json({ error: 'Gagal mereset data.' });
   }
 });
 

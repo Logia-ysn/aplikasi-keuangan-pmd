@@ -927,6 +927,21 @@ const BackupTab: React.FC = () => {
   const queryClient = useQueryClient();
   const [confirmRestore, setConfirmRestore] = useState<string | null>(null);
   const [restoreInput, setRestoreInput] = useState('');
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [resetInput, setResetInput] = useState('');
+
+  const resetMutation = useMutation({
+    mutationFn: async () => api.post('/settings/reset-data', { confirmation: 'RESET' }),
+    onSuccess: () => {
+      toast.success('Data berhasil direset. Login ulang...');
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      localStorage.removeItem('onboardingDone');
+      localStorage.removeItem('widgetPrefs');
+      setTimeout(() => { window.location.href = '/login'; }, 1500);
+    },
+    onError: (error: any) => toast.error(error.response?.data?.error || 'Gagal mereset data.'),
+  });
 
   const { data: backups, isLoading } = useQuery<Array<{ filename: string; size: number; date: string }>>({
     queryKey: ['backups'],
@@ -1158,6 +1173,97 @@ const BackupTab: React.FC = () => {
               >
                 {restoreMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <RotateCcw size={14} />}
                 {restoreMutation.isPending ? 'Memproses...' : 'Restore'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reset Data — Development Only */}
+      <div className="mt-8 pt-6 border-t" style={{ borderColor: 'var(--color-border)' }}>
+        <div className="flex items-start gap-3 p-4 rounded-xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/10">
+          <AlertTriangle size={20} className="text-red-600 shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <h3 className="text-sm font-semibold text-red-800 dark:text-red-400">Reset Seluruh Data</h3>
+            <p className="text-xs mt-1" style={{ color: 'var(--color-text-secondary)' }}>
+              Hapus semua data transaksi, akun, mitra, dan pengguna. Database akan dikembalikan ke kondisi awal (seed data).
+              Fitur ini hanya untuk development/testing.
+            </p>
+            <button
+              onClick={() => { setShowResetConfirm(true); setResetInput(''); }}
+              className="mt-3 px-4 py-2 text-xs font-medium text-red-700 bg-red-100 hover:bg-red-200 dark:text-red-300 dark:bg-red-900/30 dark:hover:bg-red-900/50 rounded-lg transition-colors"
+            >
+              Reset Data
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Reset confirmation dialog */}
+      {showResetConfirm && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30"
+          onKeyDown={(e) => e.key === 'Escape' && setShowResetConfirm(false)}
+        >
+          <div
+            className="rounded-xl border shadow-xl p-6 w-full max-w-md"
+            style={{ backgroundColor: 'var(--color-bg-primary)', borderColor: 'var(--color-border)' }}
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-lg bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+                <AlertTriangle size={20} className="text-red-600" />
+              </div>
+              <div>
+                <h2 className="text-base font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+                  Reset Seluruh Data
+                </h2>
+                <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                  Aksi ini tidak dapat dibatalkan
+                </p>
+              </div>
+            </div>
+
+            <p className="text-sm mb-3" style={{ color: 'var(--color-text-secondary)' }}>
+              Semua data akan dihapus dan dikembalikan ke kondisi awal:
+            </p>
+            <ul className="text-xs mb-4 space-y-1" style={{ color: 'var(--color-text-secondary)' }}>
+              <li>• Semua transaksi (invoice, payment, journal)</li>
+              <li>• Semua mitra (customer, supplier)</li>
+              <li>• Semua akun (COA) dan saldo</li>
+              <li>• Semua user (akan dibuat ulang dari seed)</li>
+              <li>• Semua stok dan gerakan inventori</li>
+            </ul>
+
+            <p className="text-xs mb-2" style={{ color: 'var(--color-text-secondary)' }}>
+              Ketik <strong>RESET</strong> untuk mengonfirmasi:
+            </p>
+            <input
+              type="text"
+              value={resetInput}
+              onChange={(e) => setResetInput(e.target.value)}
+              placeholder="Ketik RESET"
+              className="w-full px-3 py-2 text-sm rounded-lg border focus:ring-2 focus:ring-red-400 outline-none mb-4"
+              style={{
+                backgroundColor: 'var(--color-bg-primary)',
+                borderColor: 'var(--color-border)',
+                color: 'var(--color-text-primary)',
+              }}
+              autoFocus
+            />
+
+            <div className="flex gap-3">
+              <button onClick={() => setShowResetConfirm(false)} className="flex-1 btn-secondary justify-center">
+                Batal
+              </button>
+              <button
+                onClick={() => resetMutation.mutate()}
+                disabled={resetInput !== 'RESET' || resetMutation.isPending}
+                className="flex-1 bg-red-600 hover:bg-red-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-sm font-medium py-2.5 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
+              >
+                {resetMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <AlertTriangle size={14} />}
+                {resetMutation.isPending ? 'Mereset...' : 'Reset Data'}
               </button>
             </div>
           </div>
