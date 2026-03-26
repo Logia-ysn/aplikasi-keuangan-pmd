@@ -12,6 +12,12 @@ import TopCustomers from '../components/widgets/TopCustomers';
 import OverdueInvoices from '../components/widgets/OverdueInvoices';
 import ExpenseBreakdown from '../components/widgets/ExpenseBreakdown';
 import StockAlert from '../components/widgets/StockAlert';
+import WarehouseKPICards from '../components/widgets/WarehouseKPICards';
+import MovementTrendChart from '../components/widgets/MovementTrendChart';
+import CategoryDistribution from '../components/widgets/CategoryDistribution';
+import TopItemsByStock from '../components/widgets/TopItemsByStock';
+import RecentMovements from '../components/widgets/RecentMovements';
+import ProductionStatsWidget from '../components/widgets/ProductionStatsWidget';
 import DashboardSettings, { DEFAULT_WIDGETS, type WidgetConfig } from '../components/DashboardSettings';
 
 const STORAGE_KEY = 'dashboard-widgets';
@@ -141,6 +147,42 @@ export const Dashboard = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <StockAlert />
         </div>
+      )}
+
+      {/* ── Warehouse Section ── */}
+      {(isEnabled('warehouse-kpi') || isEnabled('movement-trend') || isEnabled('category-distribution') || isEnabled('top-items') || isEnabled('recent-movements') || isEnabled('production-stats')) && (
+        <>
+          {/* Section Divider */}
+          <div className="flex items-center gap-3 pt-2">
+            <div className="h-px flex-1" style={{ backgroundColor: 'var(--color-border)' }} />
+            <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
+              Gudang & Inventori
+            </span>
+            <div className="h-px flex-1" style={{ backgroundColor: 'var(--color-border)' }} />
+          </div>
+
+          {isEnabled('warehouse-kpi') && <WarehouseKPICards />}
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            {isEnabled('movement-trend') && (
+              <div className="lg:col-span-2">
+                <MovementTrendChart />
+              </div>
+            )}
+            {isEnabled('category-distribution') && <CategoryDistribution />}
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {isEnabled('top-items') && <TopItemsByStock />}
+            {isEnabled('recent-movements') && <RecentMovements />}
+          </div>
+
+          {isEnabled('production-stats') && (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              <ProductionStatsWidget />
+            </div>
+          )}
+        </>
       )}
 
       {/* Dashboard Settings Modal */}

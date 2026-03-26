@@ -24,7 +24,7 @@ import { Notifications } from './pages/Notifications';
 import { RecurringTransactions } from './pages/RecurringTransactions';
 import { BankReconciliation } from './pages/BankReconciliation';
 import TaxReport from './pages/reports/TaxReport';
-import WarehouseDashboard from './pages/WarehouseDashboard';
+
 
 const ProtectedRoute = () => {
   const token = localStorage.getItem('token');
@@ -50,7 +50,6 @@ function App() {
             <Route path="/payments" element={<Payments />} />
             <Route path="/parties" element={<PartiesPage />} />
             <Route path="/inventory" element={<InventoryPage />} />
-            <Route path="/warehouse" element={<WarehouseDashboard />} />
 
             {/* Report Routes */}
             <Route path="/reports" element={<Reports />} />
