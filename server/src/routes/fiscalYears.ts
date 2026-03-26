@@ -155,8 +155,14 @@ router.post('/:id/close', roleMiddleware(['Admin']), async (req: AuthRequest, re
         _sum: { debit: true, credit: true },
       });
 
+      const fyAccounts = await tx.account.findMany({
+        where: { id: { in: fyAccountSums.map((e) => e.accountId) } },
+        select: { id: true, rootType: true },
+      });
+      const fyAccountMap = new Map(fyAccounts.map((a) => [a.id, a]));
+
       for (const entry of fyAccountSums) {
-        const acct = await tx.account.findUnique({ where: { id: entry.accountId }, select: { rootType: true } });
+        const acct = fyAccountMap.get(entry.accountId);
         if (!acct) continue;
         const debit = Number(entry._sum.debit || 0);
         const credit = Number(entry._sum.credit || 0);

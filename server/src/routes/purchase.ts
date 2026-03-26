@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { Prisma } from '@prisma/client';
+import Decimal from 'decimal.js';
 import { prisma } from '../lib/prisma';
 import { AuthRequest, roleMiddleware } from '../middleware/auth';
 import { updateAccountBalance } from '../utils/accountBalance';
@@ -88,12 +89,17 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
       if (!apAccount || !inventoryAccount) throw new BusinessError('Konfigurasi akun AP/Persediaan tidak ditemukan.');
 
       const subtotal = body.items.reduce((sum, item) => {
-        const base = item.quantity * item.rate;
-        const disc = base * ((item.discount ?? 0) / 100);
-        return sum + base - disc;
-      }, 0);
-      const taxAmount = subtotal * ((body.taxPct ?? 0) / 100);
-      const grandTotal = subtotal + taxAmount - (body.potongan ?? 0) + (body.biayaLain ?? 0);
+        const base = new Decimal(item.quantity).mul(new Decimal(item.rate));
+        const disc = base.mul(new Decimal(item.discount ?? 0).div(100));
+        return sum.plus(base.minus(disc));
+      }, new Decimal(0));
+      const taxAmount = subtotal.mul(new Decimal(body.taxPct ?? 0).div(100));
+      const grandTotal = subtotal
+        .plus(taxAmount)
+        .minus(new Decimal(body.potongan ?? 0))
+        .plus(new Decimal(body.biayaLain ?? 0))
+        .toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
+      const grandTotalNum = grandTotal.toNumber();
       const invoiceNumber = await generateDocumentNumber(tx, 'PI', parsedDate, fiscalYear.id);
 
       const invoice = await tx.purchaseInvoice.create({
@@ -102,8 +108,8 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
           date: parsedDate,
           dueDate: body.dueDate ? new Date(body.dueDate) : null,
           partyId: body.partyId,
-          grandTotal,
-          outstanding: grandTotal,
+          grandTotal: grandTotalNum,
+          outstanding: grandTotalNum,
           taxPct: body.taxPct ?? 0,
           potongan: body.potongan ?? 0,
           biayaLain: body.biayaLain ?? 0,
@@ -113,16 +119,23 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
           createdBy: req.user!.userId,
           submittedAt: new Date(),
           items: {
-            create: body.items.map((item) => ({
-              itemName: item.itemName,
-              quantity: item.quantity,
-              unit: item.unit || 'pcs',
-              rate: item.rate,
-              discount: item.discount ?? 0,
-              amount: item.quantity * item.rate * (1 - (item.discount ?? 0) / 100),
-              accountId: inventoryAccount.id,
-              description: item.description || null,
-            })),
+            create: body.items.map((item) => {
+              const itemAmount = new Decimal(item.quantity)
+                .mul(new Decimal(item.rate))
+                .mul(new Decimal(1).minus(new Decimal(item.discount ?? 0).div(100)))
+                .toDecimalPlaces(2, Decimal.ROUND_HALF_UP)
+                .toNumber();
+              return {
+                itemName: item.itemName,
+                quantity: item.quantity,
+                unit: item.unit || 'pcs',
+                rate: item.rate,
+                discount: item.discount ?? 0,
+                amount: itemAmount,
+                accountId: inventoryAccount.id,
+                description: item.description || null,
+              };
+            }),
           },
         },
         include: { supplier: true, items: true },
@@ -141,8 +154,8 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
           submittedAt: new Date(),
           items: {
             create: [
-              { accountId: inventoryAccount.id, debit: grandTotal, credit: 0, description: `Persediaan: ${invoice.invoiceNumber}` },
-              { accountId: apAccount.id, partyId: body.partyId, debit: 0, credit: grandTotal, description: `Hutang: ${invoice.invoiceNumber}` },
+              { accountId: inventoryAccount.id, debit: grandTotalNum, credit: 0, description: `Persediaan: ${invoice.invoiceNumber}` },
+              { accountId: apAccount.id, partyId: body.partyId, debit: 0, credit: grandTotalNum, description: `Hutang: ${invoice.invoiceNumber}` },
             ],
           },
         },
@@ -150,14 +163,14 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
 
       await tx.accountingLedgerEntry.createMany({
         data: [
-          { date: parsedDate, accountId: inventoryAccount.id, debit: grandTotal, credit: 0, referenceType: 'JournalEntry', referenceId: journalEntry.id, description: `Persediaan: ${invoice.invoiceNumber}`, fiscalYearId: fiscalYear.id },
-          { date: parsedDate, accountId: apAccount.id, partyId: body.partyId, debit: 0, credit: grandTotal, referenceType: 'JournalEntry', referenceId: journalEntry.id, description: `Hutang: ${invoice.invoiceNumber}`, fiscalYearId: fiscalYear.id },
+          { date: parsedDate, accountId: inventoryAccount.id, debit: grandTotalNum, credit: 0, referenceType: 'JournalEntry', referenceId: journalEntry.id, description: `Persediaan: ${invoice.invoiceNumber}`, fiscalYearId: fiscalYear.id },
+          { date: parsedDate, accountId: apAccount.id, partyId: body.partyId, debit: 0, credit: grandTotalNum, referenceType: 'JournalEntry', referenceId: journalEntry.id, description: `Hutang: ${invoice.invoiceNumber}`, fiscalYearId: fiscalYear.id },
         ],
       });
 
-      await updateAccountBalance(tx, inventoryAccount.id, grandTotal, 0);   // ASSET: debit → +balance
-      await updateAccountBalance(tx, apAccount.id, 0, grandTotal);          // LIABILITY: credit → +balance
-      await tx.party.update({ where: { id: body.partyId }, data: { outstandingAmount: { increment: grandTotal } } });
+      await updateAccountBalance(tx, inventoryAccount.id, grandTotalNum, 0);   // ASSET: debit → +balance
+      await updateAccountBalance(tx, apAccount.id, 0, grandTotalNum);          // LIABILITY: credit → +balance
+      await tx.party.update({ where: { id: body.partyId }, data: { outstandingAmount: { increment: grandTotalNum } } });
 
       return invoice;
     }, { timeout: 15000 });
@@ -189,17 +202,16 @@ router.post('/:id/cancel', roleMiddleware(['Admin']), async (req: AuthRequest, r
 
       await tx.purchaseInvoice.update({
         where: { id: invoice.id },
-        data: { status: 'Cancelled', outstanding: 0 },
-      });
-
-      await tx.accountingLedgerEntry.updateMany({
-        where: { referenceId: invoice.id },
-        data: { isCancelled: true },
+        data: { status: 'Cancelled', outstanding: 0, cancelledAt: new Date() },
       });
 
       const jvNumber = `JV-${invoice.invoiceNumber}`;
       const journal = await tx.journalEntry.findUnique({ where: { entryNumber: jvNumber } });
       if (journal) {
+        await tx.journalEntry.update({
+          where: { id: journal.id },
+          data: { status: 'Cancelled', cancelledAt: new Date() },
+        });
         await tx.accountingLedgerEntry.updateMany({
           where: { referenceId: journal.id },
           data: { isCancelled: true },
@@ -213,7 +225,7 @@ router.post('/:id/cancel', roleMiddleware(['Admin']), async (req: AuthRequest, r
 
       await tx.party.update({
         where: { id: invoice.partyId },
-        data: { outstandingAmount: { decrement: Number(invoice.outstanding) } },
+        data: { outstandingAmount: { decrement: Number(invoice.grandTotal) } },
       });
 
       return { id: invoice.id, status: 'Cancelled' };

@@ -425,9 +425,14 @@ router.post('/production-runs', roleMiddleware(['Admin', 'Accountant']), async (
       });
       if (!fiscalYear) throw new BusinessError('Tidak ada tahun fiskal aktif untuk tanggal transaksi ini.');
 
-      // 2. Validate and fetch all input items
+      // 2. Pre-fetch all input and output items in a single query
+      const allItemIds = [...body.inputs.map((i) => i.itemId), ...body.outputs.map((o) => o.itemId)];
+      const allItems = await tx.inventoryItem.findMany({ where: { id: { in: allItemIds } } });
+      const itemMap = new Map(allItems.map((i) => [i.id, i]));
+
+      // Validate input items
       for (const input of body.inputs) {
-        const item = await tx.inventoryItem.findUnique({ where: { id: input.itemId } });
+        const item = itemMap.get(input.itemId);
         if (!item) throw new BusinessError(`Item input tidak ditemukan.`);
         if (!item.isActive) throw new BusinessError(`Item '${item.name}' tidak aktif.`);
         if (Number(item.currentStock) < input.quantity) {
@@ -439,7 +444,7 @@ router.post('/production-runs', roleMiddleware(['Admin', 'Accountant']), async (
 
       // 3. Validate output items exist and are active
       for (const output of body.outputs) {
-        const item = await tx.inventoryItem.findUnique({ where: { id: output.itemId } });
+        const item = itemMap.get(output.itemId);
         if (!item) throw new BusinessError(`Item output tidak ditemukan.`);
         if (!item.isActive) throw new BusinessError(`Item output '${item.name}' tidak aktif.`);
       }
@@ -472,7 +477,7 @@ router.post('/production-runs', roleMiddleware(['Admin', 'Accountant']), async (
 
       // 7. Process inputs: reduce stock + create StockMovement Out
       for (const input of body.inputs) {
-        const item = await tx.inventoryItem.findUnique({ where: { id: input.itemId } });
+        const item = itemMap.get(input.itemId);
         if (!item) continue;
 
         await tx.inventoryItem.update({

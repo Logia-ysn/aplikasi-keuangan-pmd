@@ -1,4 +1,5 @@
 import { Prisma } from '@prisma/client';
+import Decimal from 'decimal.js';
 
 /**
  * Returns the correct balance impact for a given account root type.
@@ -7,11 +8,13 @@ import { Prisma } from '@prisma/client';
  *   ASSET, EXPENSE  → debit-normal  (debit increases, credit decreases)
  *   LIABILITY, EQUITY, REVENUE → credit-normal (credit increases, debit decreases)
  */
-export function computeImpact(rootType: string, debit: number, credit: number): number {
+export function computeImpact(rootType: string, debit: number | Decimal, credit: number | Decimal): number {
+  const d = new Decimal(debit.toString());
+  const c = new Decimal(credit.toString());
   if (rootType === 'ASSET' || rootType === 'EXPENSE') {
-    return debit - credit;
+    return d.minus(c).toNumber();
   }
-  return credit - debit;
+  return c.minus(d).toNumber();
 }
 
 /**
@@ -20,8 +23,8 @@ export function computeImpact(rootType: string, debit: number, credit: number): 
 export async function updateAccountBalance(
   tx: Prisma.TransactionClient,
   accountId: string,
-  debit: number,
-  credit: number
+  debit: number | Decimal,
+  credit: number | Decimal
 ): Promise<void> {
   const account = await tx.account.findUnique({
     where: { id: accountId },
@@ -41,7 +44,7 @@ export async function updateAccountBalance(
  */
 export async function updateBalancesForItems(
   tx: Prisma.TransactionClient,
-  items: Array<{ accountId: string; debit: number; credit: number }>
+  items: Array<{ accountId: string; debit: number | Decimal; credit: number | Decimal }>
 ): Promise<void> {
   for (const item of items) {
     await updateAccountBalance(tx, item.accountId, item.debit, item.credit);

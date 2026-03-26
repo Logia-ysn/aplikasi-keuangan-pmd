@@ -117,6 +117,7 @@ model JournalEntry {
   user         User             @relation(fields: [createdBy], references: [id])
   items         JournalItem[]
   stockMovement StockMovement?
+  payment       Payment?
   submittedAt   DateTime?        @map("submitted_at")
   cancelledAt   DateTime?        @map("cancelled_at")
   createdAt     DateTime         @default(now()) @map("created_at")
@@ -138,6 +139,8 @@ model JournalItem {
   credit         Decimal      @default(0) @db.Decimal(15, 2)
   description    String?
 
+  @@index([journalEntryId])
+  @@index([accountId])
   @@map("journal_entry_accounts")
 }
 
@@ -189,6 +192,7 @@ model SalesInvoiceItem {
   account        Account      @relation(fields: [accountId], references: [id])
   description    String?
 
+  @@index([salesInvoiceId])
   @@map("sales_invoice_items")
 }
 
@@ -237,6 +241,7 @@ model PurchaseInvoiceItem {
   account           Account         @relation(fields: [accountId], references: [id])
   description       String?
 
+  @@index([purchaseInvoiceId])
   @@map("purchase_invoice_items")
 }
 
@@ -255,8 +260,10 @@ model Payment {
   notes         String?
   createdBy     String              @map("created_by")
   user          User                @relation(fields: [createdBy], references: [id])
-  allocations   PaymentAllocation[]
-  fiscalYearId  String              @map("fiscal_year_id")
+  allocations      PaymentAllocation[]
+  journalEntryId   String?             @unique @map("journal_entry_id")
+  journalEntry     JournalEntry?       @relation(fields: [journalEntryId], references: [id])
+  fiscalYearId     String              @map("fiscal_year_id")
   fiscalYear    FiscalYear          @relation(fields: [fiscalYearId], references: [id])
   submittedAt   DateTime?           @map("submitted_at")
   cancelledAt   DateTime?           @map("cancelled_at")
@@ -322,10 +329,24 @@ model User {
   productionRuns       ProductionRun[]       @relation("ProductionCreatedBy")
   notifications        Notification[]        @relation("UserNotifications")
   recurringTemplates   RecurringTemplate[]   @relation("UserRecurring")
+  tokenBlacklist       TokenBlacklist[]
   createdAt            DateTime              @default(now()) @map("created_at")
   updatedAt            DateTime              @updatedAt @map("updated_at")
 
   @@map("users")
+}
+
+model TokenBlacklist {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([token])
+  @@index([expiresAt])
+  @@map("token_blacklist")
 }
 
 model AuditLog {
@@ -341,6 +362,9 @@ model AuditLog {
   userAgent  String?  @map("user_agent")
   createdAt  DateTime @default(now()) @map("created_at")
 
+  @@index([userId])
+  @@index([entityType, entityId])
+  @@index([createdAt])
   @@map("audit_trail")
 }
 

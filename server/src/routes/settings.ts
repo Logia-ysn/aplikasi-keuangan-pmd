@@ -25,6 +25,7 @@ router.put('/company', roleMiddleware(['Admin']), async (req, res) => {
     ...rawBody,
     companyName: rawBody.companyName || rawBody.name,
     currency: rawBody.defaultCurrency || rawBody.currency,
+    fiscalYearStartMonth: rawBody.fiscalYearStartMonth,
   };
 
   const body = validateBody(UpdateCompanySettingsSchema, mergedBody, res);
@@ -42,7 +43,7 @@ router.put('/company', roleMiddleware(['Admin']), async (req, res) => {
       email: body.email || null,
       taxId: body.taxId || null,
       defaultCurrency: body.currency || rawBody.defaultCurrency || 'IDR',
-      fiscalYearStartMonth: rawBody.fiscalYearStartMonth ?? 1,
+      fiscalYearStartMonth: body.fiscalYearStartMonth ?? 1,
       ...(body.logoUrl !== undefined && { logoUrl: body.logoUrl || null }),
     };
 

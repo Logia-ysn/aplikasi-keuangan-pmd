@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { Prisma } from '@prisma/client';
 import multer from 'multer';
 import { parse } from 'csv-parse/sync';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import { prisma } from '../lib/prisma';
 import { AuthRequest, roleMiddleware } from '../middleware/auth';
 import { updateBalancesForItems } from '../utils/accountBalance';
@@ -27,8 +27,17 @@ const upload = multer({
   },
 });
 
+// ─── Helper: Sanitize cell value to prevent formula injection ────────────────
+function sanitizeCellValue(value: unknown): string {
+  const str = String(value ?? '').trim();
+  if (/^[=+\-@\t\r]/.test(str)) {
+    return `'${str}`;
+  }
+  return str;
+}
+
 // ─── Helper: Parse uploaded file to array of objects ─────────────────────────
-function parseFile(buffer: Buffer, filename: string): Record<string, string>[] {
+async function parseFile(buffer: Buffer, filename: string): Promise<Record<string, string>[]> {
   const ext = filename.toLowerCase().substring(filename.lastIndexOf('.'));
 
   if (ext === '.csv') {
@@ -40,14 +49,41 @@ function parseFile(buffer: Buffer, filename: string): Record<string, string>[] {
     }) as Record<string, string>[];
   }
 
-  // Excel
-  const workbook = XLSX.read(buffer, { type: 'buffer' });
-  const firstSheet = workbook.SheetNames[0];
-  if (!firstSheet) throw new Error('File Excel kosong.');
-  const rows = XLSX.utils.sheet_to_json<Record<string, string>>(workbook.Sheets[firstSheet], {
-    defval: '',
-    raw: false,
+  // Excel (.xlsx / .xls)
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(buffer as unknown as ArrayBuffer);
+
+  const worksheet = workbook.worksheets[0];
+  if (!worksheet) throw new Error('File Excel kosong.');
+
+  const headers: string[] = [];
+  const rows: Record<string, string>[] = [];
+
+  worksheet.eachRow((row, rowNumber) => {
+    if (rowNumber === 1) {
+      row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+        // Ensure headers array is properly indexed by column number
+        while (headers.length < colNumber) {
+          headers.push('');
+        }
+        headers[colNumber - 1] = String(cell.value ?? '').trim();
+      });
+    } else {
+      const rowData: Record<string, string> = {};
+      // Initialize all headers with empty string (equivalent to defval: '')
+      for (const h of headers) {
+        rowData[h] = '';
+      }
+      row.eachCell((cell, colNumber) => {
+        const header = headers[colNumber - 1];
+        if (header !== undefined) {
+          rowData[header] = String(cell.value ?? '');
+        }
+      });
+      rows.push(rowData);
+    }
   });
+
   return rows;
 }
 
@@ -60,7 +96,7 @@ router.post(
     if (!req.file) return res.status(400).json({ error: 'File wajib diunggah.' });
 
     try {
-      const rows = parseFile(req.file.buffer, req.file.originalname);
+      const rows = await parseFile(req.file.buffer, req.file.originalname);
       const isPreview = req.query.preview === 'true';
       const errors: Array<{ row: number; message: string }> = [];
       const validRows: Array<{
@@ -88,12 +124,12 @@ router.post(
         }
 
         validRows.push({
-          name: r.name.trim(),
+          name: sanitizeCellValue(r.name),
           partyType: partyType as 'Customer' | 'Supplier' | 'Both',
-          phone: r.phone?.trim() || undefined,
-          email: r.email?.trim() || undefined,
-          address: r.address?.trim() || undefined,
-          taxId: (r.taxId || r.tax_id || '').trim() || undefined,
+          phone: r.phone?.trim() ? sanitizeCellValue(r.phone) : undefined,
+          email: r.email?.trim() ? sanitizeCellValue(r.email) : undefined,
+          address: r.address?.trim() ? sanitizeCellValue(r.address) : undefined,
+          taxId: (r.taxId || r.tax_id || '').trim() ? sanitizeCellValue(r.taxId || r.tax_id) : undefined,
         });
       }
 
@@ -129,7 +165,7 @@ router.post(
     if (!req.file) return res.status(400).json({ error: 'File wajib diunggah.' });
 
     try {
-      const rows = parseFile(req.file.buffer, req.file.originalname);
+      const rows = await parseFile(req.file.buffer, req.file.originalname);
       const isPreview = req.query.preview === 'true';
       const errors: Array<{ row: number; message: string }> = [];
       const validTypes = ['ASSET', 'LIABILITY', 'EQUITY', 'REVENUE', 'EXPENSE'];
@@ -170,7 +206,14 @@ router.post(
           continue;
         }
 
-        validRows.push({ accountNumber, name, rootType, accountType, parentNumber, isGroup });
+        validRows.push({
+          accountNumber,
+          name: sanitizeCellValue(name),
+          rootType,
+          accountType,
+          parentNumber,
+          isGroup,
+        });
       }
 
       if (isPreview) {
@@ -223,7 +266,7 @@ router.post(
     if (!req.file) return res.status(400).json({ error: 'File wajib diunggah.' });
 
     try {
-      const rows = parseFile(req.file.buffer, req.file.originalname);
+      const rows = await parseFile(req.file.buffer, req.file.originalname);
       const isPreview = req.query.preview === 'true';
       const errors: Array<{ row: number; message: string }> = [];
 
@@ -235,11 +278,11 @@ router.post(
         const rowNum = i + 2;
 
         const date = (r.date || '').trim();
-        const narration = (r.narration || '').trim();
+        const narration = sanitizeCellValue(r.narration);
         const accountNumber = (r.accountNumber || r.account_number || '').trim();
         const debit = parseFloat(r.debit || '0') || 0;
         const credit = parseFloat(r.credit || '0') || 0;
-        const description = (r.description || '').trim();
+        const description = sanitizeCellValue(r.description);
 
         if (!date) { errors.push({ row: rowNum, message: 'Kolom "date" wajib diisi.' }); continue; }
         if (!narration) { errors.push({ row: rowNum, message: 'Kolom "narration" wajib diisi.' }); continue; }
@@ -254,7 +297,9 @@ router.post(
       // Validate balance per group
       const validGroups: Array<{ date: string; narration: string; items: typeof groups extends Map<string, infer V> ? V : never }> = [];
       for (const [key, items] of groups) {
-        const [date, narration] = key.split('||');
+        const separatorIndex = key.indexOf('||');
+        const date = key.substring(0, separatorIndex);
+        const narration = key.substring(separatorIndex + 2);
         const totalDebit = items.reduce((s, i) => s + i.debit, 0);
         const totalCredit = items.reduce((s, i) => s + i.credit, 0);
 

@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { Prisma } from '@prisma/client';
+import Decimal from 'decimal.js';
 import { prisma } from '../lib/prisma';
 import { AuthRequest, roleMiddleware } from '../middleware/auth';
 import { updateAccountBalance } from '../utils/accountBalance';
@@ -171,14 +172,17 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
       await updateAccountBalance(tx, debitAccountId, numAmount, 0);
       await updateAccountBalance(tx, creditAccountId, 0, numAmount);
 
-      // Update party outstanding
-      await tx.party.update({
-        where: { id: body.partyId },
-        data: { outstandingAmount: { decrement: numAmount } },
-      });
-
       // Auto-allocate payment to oldest outstanding invoices
       const unallocatedAmount = await autoAllocatePayment(tx, payment.id, body.partyId, body.paymentType, numAmount);
+
+      // Update party outstanding by the amount actually allocated (not full payment)
+      const allocatedAmount = new Decimal(numAmount).minus(new Decimal(unallocatedAmount)).toNumber();
+      if (allocatedAmount > 0) {
+        await tx.party.update({
+          where: { id: body.partyId },
+          data: { outstandingAmount: { decrement: allocatedAmount } },
+        });
+      }
 
       if (unallocatedAmount > 0.01) {
         logger.warn({ paymentId: payment.id, unallocatedAmount }, 'Overpayment: sisa pembayaran tidak teralokasi');
@@ -204,7 +208,7 @@ router.post('/:id/cancel', roleMiddleware(['Admin']), async (req: AuthRequest, r
       if (!payment) throw new BusinessError('Pembayaran tidak ditemukan.');
       if (payment.status === 'Cancelled') throw new BusinessError('Pembayaran sudah dibatalkan.');
 
-      const numAmount = Number(payment.amount);
+      const numAmount = new Decimal(payment.amount.toString());
 
       // Reverse payment allocations
       const allocations = await tx.paymentAllocation.findMany({
@@ -212,23 +216,25 @@ router.post('/:id/cancel', roleMiddleware(['Admin']), async (req: AuthRequest, r
       });
 
       for (const alloc of allocations) {
-        const allocAmt = Number(alloc.allocatedAmount);
+        const allocAmt = new Decimal(alloc.allocatedAmount.toString());
         if (alloc.invoiceType === 'SalesInvoice') {
           const inv = await tx.salesInvoice.findUnique({ where: { id: alloc.invoiceId } });
           if (inv) {
-            const newOutstanding = Number(inv.outstanding) + allocAmt;
+            const newOutstanding = new Decimal(inv.outstanding.toString()).plus(allocAmt);
+            const newOutstandingNum = newOutstanding.toNumber();
             await tx.salesInvoice.update({
               where: { id: inv.id },
-              data: { outstanding: newOutstanding, status: newOutstanding >= Number(inv.grandTotal) ? 'Submitted' : 'PartiallyPaid' },
+              data: { outstanding: newOutstandingNum, status: newOutstanding.gte(new Decimal(inv.grandTotal.toString())) ? 'Submitted' : 'PartiallyPaid' },
             });
           }
         } else if (alloc.invoiceType === 'PurchaseInvoice') {
           const inv = await tx.purchaseInvoice.findUnique({ where: { id: alloc.invoiceId } });
           if (inv) {
-            const newOutstanding = Number(inv.outstanding) + allocAmt;
+            const newOutstanding = new Decimal(inv.outstanding.toString()).plus(allocAmt);
+            const newOutstandingNum = newOutstanding.toNumber();
             await tx.purchaseInvoice.update({
               where: { id: inv.id },
-              data: { outstanding: newOutstanding, status: newOutstanding >= Number(inv.grandTotal) ? 'Submitted' : 'PartiallyPaid' },
+              data: { outstanding: newOutstandingNum, status: newOutstanding.gte(new Decimal(inv.grandTotal.toString())) ? 'Submitted' : 'PartiallyPaid' },
             });
           }
         }
@@ -237,12 +243,16 @@ router.post('/:id/cancel', roleMiddleware(['Admin']), async (req: AuthRequest, r
       // Delete allocations
       await tx.paymentAllocation.deleteMany({ where: { paymentId: payment.id } });
 
-      // Cancel related ledger entries
-      const jvNumber = `JV-PAY-${payment.paymentNumber.replace('PAY-', '')}`;
-      const journal = await tx.journalEntry.findFirst({
-        where: { entryNumber: { contains: payment.paymentNumber } },
+      // Cancel related ledger entries — match the JV number format used on creation
+      const jvNumber = `JV-${payment.paymentNumber}`;
+      const journal = await tx.journalEntry.findUnique({
+        where: { entryNumber: jvNumber },
       });
       if (journal) {
+        await tx.journalEntry.update({
+          where: { id: journal.id },
+          data: { status: 'Cancelled', cancelledAt: new Date() },
+        });
         await tx.accountingLedgerEntry.updateMany({
           where: { referenceId: journal.id },
           data: { isCancelled: true },
@@ -252,25 +262,30 @@ router.post('/:id/cancel', roleMiddleware(['Admin']), async (req: AuthRequest, r
       // Reverse account balances
       const arAccount = await tx.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.AR } });
       const apAccount = await tx.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.AP } });
+      const numAmountVal = numAmount.toNumber();
 
       if (payment.paymentType === 'Receive') {
-        await updateAccountBalance(tx, payment.accountId, 0, numAmount); // reverse bank debit
-        if (arAccount) await updateAccountBalance(tx, arAccount.id, numAmount, 0); // reverse AR credit
+        await updateAccountBalance(tx, payment.accountId, 0, numAmountVal); // reverse bank debit
+        if (arAccount) await updateAccountBalance(tx, arAccount.id, numAmountVal, 0); // reverse AR credit
       } else {
-        if (apAccount) await updateAccountBalance(tx, apAccount.id, 0, numAmount); // reverse AP debit
-        await updateAccountBalance(tx, payment.accountId, numAmount, 0); // reverse bank credit
+        if (apAccount) await updateAccountBalance(tx, apAccount.id, 0, numAmountVal); // reverse AP debit
+        await updateAccountBalance(tx, payment.accountId, numAmountVal, 0); // reverse bank credit
       }
 
-      // Reverse party outstanding
+      // Reverse party outstanding — use sum of actual reversed allocations, not full payment amount
+      const totalAllocated = allocations.reduce(
+        (sum, a) => sum.plus(new Decimal(a.allocatedAmount.toString())),
+        new Decimal(0)
+      );
       await tx.party.update({
         where: { id: payment.partyId },
-        data: { outstandingAmount: { increment: numAmount } },
+        data: { outstandingAmount: { increment: totalAllocated.toNumber() } },
       });
 
       // Mark payment as cancelled
       await tx.payment.update({
         where: { id: payment.id },
-        data: { status: 'Cancelled' },
+        data: { status: 'Cancelled', cancelledAt: new Date() },
       });
 
       return { id: payment.id, status: 'Cancelled' };
@@ -292,7 +307,14 @@ async function autoAllocatePayment(
   paymentType: string,
   amount: number
 ): Promise<number> {
-  let remaining = amount;
+  let remaining = new Decimal(amount);
+
+  // Lock invoice rows to prevent concurrent allocation
+  if (paymentType === 'Receive') {
+    await tx.$queryRaw`SELECT id FROM sales_invoices WHERE party_id = ${partyId} AND status IN ('Submitted', 'PartiallyPaid', 'Overdue') FOR UPDATE`;
+  } else {
+    await tx.$queryRaw`SELECT id FROM purchase_invoices WHERE party_id = ${partyId} AND status IN ('Submitted', 'PartiallyPaid', 'Overdue') FOR UPDATE`;
+  }
 
   if (paymentType === 'Receive') {
     const invoices = await tx.salesInvoice.findMany({
@@ -301,16 +323,17 @@ async function autoAllocatePayment(
     });
 
     for (const inv of invoices) {
-      if (remaining <= 0) break;
-      const allocate = Math.min(remaining, Number(inv.outstanding));
-      remaining -= allocate;
+      if (remaining.lte(0)) break;
+      const outstanding = new Decimal(inv.outstanding.toString());
+      const allocate = Decimal.min(remaining, outstanding);
+      remaining = remaining.minus(allocate);
 
-      const newOutstanding = Number(inv.outstanding) - allocate;
-      const newStatus = newOutstanding <= 0.01 ? 'Paid' : 'PartiallyPaid';
+      const newOutstanding = outstanding.minus(allocate);
+      const newStatus = newOutstanding.lte(new Decimal('0.01')) ? 'Paid' : 'PartiallyPaid';
 
       await tx.salesInvoice.update({
         where: { id: inv.id },
-        data: { outstanding: newOutstanding, status: newStatus },
+        data: { outstanding: newOutstanding.toNumber(), status: newStatus },
       });
 
       await tx.paymentAllocation.create({
@@ -318,7 +341,7 @@ async function autoAllocatePayment(
           paymentId,
           invoiceType: 'SalesInvoice',
           invoiceId: inv.id,
-          allocatedAmount: allocate,
+          allocatedAmount: allocate.toNumber(),
         },
       });
     }
@@ -329,16 +352,17 @@ async function autoAllocatePayment(
     });
 
     for (const inv of invoices) {
-      if (remaining <= 0) break;
-      const allocate = Math.min(remaining, Number(inv.outstanding));
-      remaining -= allocate;
+      if (remaining.lte(0)) break;
+      const outstanding = new Decimal(inv.outstanding.toString());
+      const allocate = Decimal.min(remaining, outstanding);
+      remaining = remaining.minus(allocate);
 
-      const newOutstanding = Number(inv.outstanding) - allocate;
-      const newStatus = newOutstanding <= 0.01 ? 'Paid' : 'PartiallyPaid';
+      const newOutstanding = outstanding.minus(allocate);
+      const newStatus = newOutstanding.lte(new Decimal('0.01')) ? 'Paid' : 'PartiallyPaid';
 
       await tx.purchaseInvoice.update({
         where: { id: inv.id },
-        data: { outstanding: newOutstanding, status: newStatus },
+        data: { outstanding: newOutstanding.toNumber(), status: newStatus },
       });
 
       await tx.paymentAllocation.create({
@@ -346,13 +370,13 @@ async function autoAllocatePayment(
           paymentId,
           invoiceType: 'PurchaseInvoice',
           invoiceId: inv.id,
-          allocatedAmount: allocate,
+          allocatedAmount: allocate.toNumber(),
         },
       });
     }
   }
 
-  return remaining > 0 ? remaining : 0;
+  return remaining.gt(0) ? remaining.toNumber() : 0;
 }
 
 export default router;

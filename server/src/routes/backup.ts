@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { execSync } from 'child_process';
+import { spawn } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import { roleMiddleware } from '../middleware/auth';
@@ -11,9 +11,11 @@ const BACKUP_DIR = path.resolve(process.cwd(), 'backups');
 const MAX_BACKUPS = 5;
 
 /** Ensure backup directory exists */
-function ensureBackupDir() {
-  if (!fs.existsSync(BACKUP_DIR)) {
-    fs.mkdirSync(BACKUP_DIR, { recursive: true });
+async function ensureBackupDir(): Promise<void> {
+  try {
+    await fs.promises.access(BACKUP_DIR);
+  } catch {
+    await fs.promises.mkdir(BACKUP_DIR, { recursive: true });
   }
 }
 
@@ -36,22 +38,24 @@ function parseDatabaseUrl(): { host: string; port: string; user: string; passwor
 }
 
 /** Auto-rotate: keep only last N backups */
-function rotateBackups() {
-  ensureBackupDir();
-  const files = fs
-    .readdirSync(BACKUP_DIR)
-    .filter((f) => f.endsWith('.sql.gz'))
-    .map((f) => ({
-      name: f,
-      time: fs.statSync(path.join(BACKUP_DIR, f)).mtime.getTime(),
-    }))
-    .sort((a, b) => b.time - a.time);
+async function rotateBackups(): Promise<void> {
+  await ensureBackupDir();
+  const entries = await fs.promises.readdir(BACKUP_DIR);
+  const sqlGzFiles = entries.filter((f) => f.endsWith('.sql.gz'));
+
+  const filesWithTime: Array<{ name: string; time: number }> = [];
+  for (const f of sqlGzFiles) {
+    const stat = await fs.promises.stat(path.join(BACKUP_DIR, f));
+    filesWithTime.push({ name: f, time: stat.mtime.getTime() });
+  }
+
+  filesWithTime.sort((a, b) => b.time - a.time);
 
   // Remove oldest if exceeding MAX_BACKUPS
-  const toRemove = files.slice(MAX_BACKUPS);
+  const toRemove = filesWithTime.slice(MAX_BACKUPS);
   for (const f of toRemove) {
     try {
-      fs.unlinkSync(path.join(BACKUP_DIR, f.name));
+      await fs.promises.unlink(path.join(BACKUP_DIR, f.name));
       logger.info(`Backup rotated: deleted ${f.name}`);
     } catch (err) {
       logger.error({ err }, `Failed to delete backup ${f.name}`);
@@ -59,22 +63,143 @@ function rotateBackups() {
   }
 }
 
+/** Spawn a pipeline and return a promise that resolves on success or rejects on failure */
+function spawnPgDump(
+  pgArgs: readonly string[],
+  outputPath: string,
+  env: NodeJS.ProcessEnv,
+  timeoutMs: number,
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const pgDump = spawn('pg_dump', pgArgs, { env, stdio: ['ignore', 'pipe', 'pipe'] });
+    const gzip = spawn('gzip', [], { stdio: ['pipe', 'pipe', 'pipe'] });
+    const outStream = fs.createWriteStream(outputPath);
+
+    let pgStderr = '';
+    let gzipStderr = '';
+
+    pgDump.stderr.on('data', (chunk: Buffer) => {
+      pgStderr += chunk.toString();
+    });
+    gzip.stderr.on('data', (chunk: Buffer) => {
+      gzipStderr += chunk.toString();
+    });
+
+    pgDump.stdout.pipe(gzip.stdin);
+    gzip.stdout.pipe(outStream);
+
+    const timer = setTimeout(() => {
+      pgDump.kill('SIGTERM');
+      gzip.kill('SIGTERM');
+      finish(new Error('pg_dump timed out'));
+    }, timeoutMs);
+
+    let settled = false;
+    const finish = (err?: Error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (err) {
+        reject(err);
+      } else {
+        resolve();
+      }
+    };
+
+    pgDump.on('error', (err) => finish(new Error(`pg_dump spawn error: ${err.message}`)));
+    gzip.on('error', (err) => finish(new Error(`gzip spawn error: ${err.message}`)));
+    outStream.on('error', (err) => finish(new Error(`File write error: ${err.message}`)));
+
+    pgDump.on('close', (code) => {
+      if (code !== 0) {
+        finish(new Error(`pg_dump exited with code ${code}: ${pgStderr}`));
+      }
+    });
+
+    outStream.on('finish', () => {
+      finish();
+    });
+  });
+}
+
+/** Spawn a gunzip | psql pipeline and return a promise */
+function spawnPsqlRestore(
+  inputPath: string,
+  psqlArgs: readonly string[],
+  env: NodeJS.ProcessEnv,
+  timeoutMs: number,
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const gunzip = spawn('gunzip', ['-c', inputPath], { env, stdio: ['ignore', 'pipe', 'pipe'] });
+    const psql = spawn('psql', psqlArgs, { env, stdio: ['pipe', 'pipe', 'pipe'] });
+
+    let gunzipStderr = '';
+    let psqlStderr = '';
+
+    gunzip.stderr.on('data', (chunk: Buffer) => {
+      gunzipStderr += chunk.toString();
+    });
+    psql.stderr.on('data', (chunk: Buffer) => {
+      psqlStderr += chunk.toString();
+    });
+
+    gunzip.stdout.pipe(psql.stdin);
+
+    const timer = setTimeout(() => {
+      gunzip.kill('SIGTERM');
+      psql.kill('SIGTERM');
+      finish(new Error('psql restore timed out'));
+    }, timeoutMs);
+
+    let settled = false;
+    const finish = (err?: Error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (err) {
+        reject(err);
+      } else {
+        resolve();
+      }
+    };
+
+    gunzip.on('error', (err) => finish(new Error(`gunzip spawn error: ${err.message}`)));
+    psql.on('error', (err) => finish(new Error(`psql spawn error: ${err.message}`)));
+
+    gunzip.on('close', (code) => {
+      if (code !== 0) {
+        finish(new Error(`gunzip exited with code ${code}: ${gunzipStderr}`));
+      }
+    });
+
+    psql.on('close', (code) => {
+      if (code !== 0) {
+        finish(new Error(`psql exited with code ${code}: ${psqlStderr}`));
+      } else {
+        finish();
+      }
+    });
+  });
+}
+
 // GET /api/backup/list — list backup files
 router.get('/list', roleMiddleware(['Admin']), async (_req, res) => {
   try {
-    ensureBackupDir();
-    const files = fs
-      .readdirSync(BACKUP_DIR)
-      .filter((f) => f.endsWith('.sql.gz'))
-      .map((f) => {
-        const stat = fs.statSync(path.join(BACKUP_DIR, f));
-        return {
-          filename: f,
-          size: stat.size,
-          date: stat.mtime.toISOString(),
-        };
-      })
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    await ensureBackupDir();
+    const entries = await fs.promises.readdir(BACKUP_DIR);
+    const sqlGzFiles = entries.filter((f) => f.endsWith('.sql.gz'));
+
+    const files: Array<{ filename: string; size: number; date: string }> = [];
+    for (const f of sqlGzFiles) {
+      const stat = await fs.promises.stat(path.join(BACKUP_DIR, f));
+      files.push({
+        filename: f,
+        size: stat.size,
+        date: stat.mtime.toISOString(),
+      });
+    }
+
+    files.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
     return res.json(files);
   } catch (error) {
@@ -86,7 +211,7 @@ router.get('/list', roleMiddleware(['Admin']), async (_req, res) => {
 // POST /api/backup/create — trigger pg_dump
 router.post('/create', roleMiddleware(['Admin']), async (_req, res) => {
   try {
-    ensureBackupDir();
+    await ensureBackupDir();
     const { host, port, user, password, db } = parseDatabaseUrl();
 
     const now = new Date();
@@ -95,28 +220,30 @@ router.post('/create', roleMiddleware(['Admin']), async (_req, res) => {
     const filepath = path.join(BACKUP_DIR, filename);
 
     const env = { ...process.env, PGPASSWORD: password };
-    const cmd = `pg_dump -h ${host} -p ${port} -U ${user} -d ${db} --no-owner --no-privileges | gzip > "${filepath}"`;
+    const pgArgs = ['-h', host, '-p', port, '-U', user, '-d', db, '--no-owner', '--no-privileges'] as const;
 
-    execSync(cmd, { env, timeout: 120_000, shell: '/bin/sh' });
+    await spawnPgDump(pgArgs, filepath, env, 120_000);
 
     // Verify file was created
-    if (!fs.existsSync(filepath)) {
+    try {
+      await fs.promises.access(filepath);
+    } catch {
       return res.status(500).json({ error: 'Backup gagal: file tidak terbuat.' });
     }
 
-    const stat = fs.statSync(filepath);
+    const stat = await fs.promises.stat(filepath);
 
     // Auto-rotate
-    rotateBackups();
+    await rotateBackups();
 
     return res.json({
       filename,
       size: stat.size,
       date: stat.mtime.toISOString(),
     });
-  } catch (error: any) {
-    logger.error({ error: error?.message, stderr: error?.stderr?.toString() }, 'POST /backup/create error');
-    return res.status(500).json({ error: `Gagal membuat backup: ${error?.message || 'Unknown error'}` });
+  } catch (error: unknown) {
+    logger.error({ error: error instanceof Error ? error.message : error }, 'POST /backup/create error');
+    return res.status(500).json({ error: 'Gagal membuat backup. Silakan coba lagi atau hubungi administrator.' });
   }
 });
 
@@ -132,7 +259,9 @@ router.get('/download/:filename', roleMiddleware(['Admin']), async (req, res) =>
     }
 
     const filepath = path.join(BACKUP_DIR, sanitized);
-    if (!fs.existsSync(filepath)) {
+    try {
+      await fs.promises.access(filepath);
+    } catch {
       return res.status(404).json({ error: 'File backup tidak ditemukan.' });
     }
 
@@ -162,21 +291,23 @@ router.post('/restore', roleMiddleware(['Admin']), async (req, res) => {
     }
 
     const filepath = path.join(BACKUP_DIR, sanitized);
-    if (!fs.existsSync(filepath)) {
+    try {
+      await fs.promises.access(filepath);
+    } catch {
       return res.status(404).json({ error: 'File backup tidak ditemukan.' });
     }
 
     const { host, port, user, password, db } = parseDatabaseUrl();
     const env = { ...process.env, PGPASSWORD: password };
-    const cmd = `gunzip -c "${filepath}" | psql -h ${host} -p ${port} -U ${user} -d ${db}`;
+    const psqlArgs = ['-h', host, '-p', port, '-U', user, '-d', db] as const;
 
-    execSync(cmd, { env, timeout: 300_000, shell: '/bin/sh' });
+    await spawnPsqlRestore(filepath, psqlArgs, env, 300_000);
 
     logger.info(`Backup restored: ${sanitized}`);
     return res.json({ message: `Restore berhasil dari ${sanitized}.` });
-  } catch (error: any) {
-    logger.error({ error: error?.message, stderr: error?.stderr?.toString() }, 'POST /backup/restore error');
-    return res.status(500).json({ error: `Gagal restore backup: ${error?.message || 'Unknown error'}` });
+  } catch (error: unknown) {
+    logger.error({ error: error instanceof Error ? error.message : error }, 'POST /backup/restore error');
+    return res.status(500).json({ error: 'Gagal restore backup. Silakan coba lagi atau hubungi administrator.' });
   }
 });
 

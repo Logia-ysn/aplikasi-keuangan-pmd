@@ -237,50 +237,23 @@ router.get('/expense-breakdown', async (req, res) => {
 // GET /api/dashboard/stock-alerts — items where currentStock < minimumStock
 router.get('/stock-alerts', async (req, res) => {
   try {
-    const items = await prisma.inventoryItem.findMany({
-      where: {
-        isActive: true,
-        currentStock: { lt: prisma.inventoryItem.fields.minimumStock },
-      },
-      select: {
-        id: true,
-        code: true,
-        name: true,
-        unit: true,
-        currentStock: true,
-        minimumStock: true,
-      },
-      orderBy: { currentStock: 'asc' },
-      take: 20,
-    });
+    const rawAlerts = await prisma.$queryRaw<any[]>`
+      SELECT id, code, name, unit, category, current_stock AS "currentStock", minimum_stock AS "minimumStock"
+      FROM inventory_items
+      WHERE is_active = true AND minimum_stock > 0 AND current_stock <= minimum_stock
+      ORDER BY current_stock ASC
+      LIMIT 20
+    `;
 
-    // Prisma's field-level comparison isn't supported directly in where clause,
-    // so we filter in application code
-    const allItems = await prisma.inventoryItem.findMany({
-      where: { isActive: true },
-      select: {
-        id: true,
-        code: true,
-        name: true,
-        unit: true,
-        currentStock: true,
-        minimumStock: true,
-      },
-      orderBy: { name: 'asc' },
-    });
-
-    const alerts = allItems
-      .filter((item) => Number(item.minimumStock) > 0 && Number(item.currentStock) < Number(item.minimumStock))
-      .map((item) => ({
-        id: item.id,
-        code: item.code,
-        name: item.name,
-        unit: item.unit,
-        currentStock: Number(item.currentStock),
-        minimumStock: Number(item.minimumStock),
-        status: Number(item.currentStock) === 0 ? 'Habis' : 'Rendah',
-      }))
-      .slice(0, 20);
+    const alerts = rawAlerts.map((item) => ({
+      id: item.id,
+      code: item.code,
+      name: item.name,
+      unit: item.unit,
+      currentStock: Number(item.currentStock),
+      minimumStock: Number(item.minimumStock),
+      status: Number(item.currentStock) === 0 ? 'Habis' : 'Rendah',
+    }));
 
     return res.json(alerts);
   } catch (error) {

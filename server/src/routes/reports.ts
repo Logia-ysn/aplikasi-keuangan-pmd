@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import { prisma } from '../lib/prisma';
 import { Prisma } from '@prisma/client';
 import { computeImpact } from '../utils/accountBalance';
@@ -8,15 +8,31 @@ import { logger } from '../lib/logger';
 
 const router = Router();
 
+function parseQueryDate(value: unknown): Date | undefined {
+  if (typeof value !== 'string' || !value) return undefined;
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return undefined;
+  return d;
+}
+
 // GET /api/reports/trial-balance
 router.get('/trial-balance', async (req, res) => {
-  const { startDate, endDate } = req.query;
+  const { startDate: rawStart, endDate: rawEnd } = req.query;
+  const startDate = parseQueryDate(rawStart);
+  const endDate = parseQueryDate(rawEnd);
+  if (rawStart && typeof rawStart === 'string' && rawStart !== '' && !startDate) {
+    return res.status(400).json({ error: 'Parameter startDate tidak valid.' });
+  }
+  if (rawEnd && typeof rawEnd === 'string' && rawEnd !== '' && !endDate) {
+    return res.status(400).json({ error: 'Parameter endDate tidak valid.' });
+  }
+
   try {
     const where: Prisma.AccountingLedgerEntryWhereInput = { isCancelled: false };
     if (startDate || endDate) {
       where.date = {};
-      if (startDate) (where.date as any).gte = new Date(startDate as string);
-      if (endDate) (where.date as any).lte = new Date(endDate as string);
+      if (startDate) (where.date as any).gte = startDate;
+      if (endDate) (where.date as any).lte = endDate;
     }
 
     const [entries, accounts] = await Promise.all([
@@ -52,7 +68,16 @@ router.get('/trial-balance', async (req, res) => {
 
 // GET /api/reports/profit-loss
 router.get('/profit-loss', async (req, res) => {
-  const { startDate, endDate } = req.query;
+  const { startDate: rawStart, endDate: rawEnd } = req.query;
+  const startDate = parseQueryDate(rawStart);
+  const endDate = parseQueryDate(rawEnd);
+  if (rawStart && typeof rawStart === 'string' && rawStart !== '' && !startDate) {
+    return res.status(400).json({ error: 'Parameter startDate tidak valid.' });
+  }
+  if (rawEnd && typeof rawEnd === 'string' && rawEnd !== '' && !endDate) {
+    return res.status(400).json({ error: 'Parameter endDate tidak valid.' });
+  }
+
   try {
     const where: Prisma.AccountingLedgerEntryWhereInput = {
       isCancelled: false,
@@ -60,8 +85,8 @@ router.get('/profit-loss', async (req, res) => {
     };
     if (startDate || endDate) {
       where.date = {};
-      if (startDate) (where.date as any).gte = new Date(startDate as string);
-      if (endDate) (where.date as any).lte = new Date(endDate as string);
+      if (startDate) (where.date as any).gte = startDate;
+      if (endDate) (where.date as any).lte = endDate;
     }
 
     const [allAccounts, entries] = await Promise.all([
@@ -140,7 +165,11 @@ router.get('/profit-loss', async (req, res) => {
 
 // GET /api/reports/balance-sheet
 router.get('/balance-sheet', async (req, res) => {
-  const targetDate = req.query.date ? new Date(req.query.date as string) : new Date();
+  const parsedDate = parseQueryDate(req.query.date);
+  if (req.query.date && typeof req.query.date === 'string' && req.query.date !== '' && !parsedDate) {
+    return res.status(400).json({ error: 'Parameter date tidak valid.' });
+  }
+  const targetDate = parsedDate ?? new Date();
 
   try {
     const [allAccounts, entries, revAgg, expAgg] = await Promise.all([
@@ -244,9 +273,17 @@ router.get('/balance-sheet', async (req, res) => {
 
 // GET /api/reports/cash-flow
 router.get('/cash-flow', async (req, res) => {
-  const { startDate, endDate } = req.query;
-  const start = startDate ? new Date(startDate as string) : new Date(new Date().getFullYear(), 0, 1);
-  const end = endDate ? new Date(endDate as string) : new Date();
+  const { startDate: rawStart, endDate: rawEnd } = req.query;
+  const parsedStart = parseQueryDate(rawStart);
+  const parsedEnd = parseQueryDate(rawEnd);
+  if (rawStart && typeof rawStart === 'string' && rawStart !== '' && !parsedStart) {
+    return res.status(400).json({ error: 'Parameter startDate tidak valid.' });
+  }
+  if (rawEnd && typeof rawEnd === 'string' && rawEnd !== '' && !parsedEnd) {
+    return res.status(400).json({ error: 'Parameter endDate tidak valid.' });
+  }
+  const start = parsedStart ?? new Date(new Date().getFullYear(), 0, 1);
+  const end = parsedEnd ?? new Date();
 
   try {
     const cashAccounts = await prisma.account.findMany({
@@ -260,6 +297,7 @@ router.get('/cash-flow', async (req, res) => {
 
     const cashEntries = await prisma.accountingLedgerEntry.findMany({
       where: { accountId: { in: cashAccountIds }, date: { gte: start, lte: end }, isCancelled: false },
+      take: 50000,
     });
 
     const refIds = [...new Set(cashEntries.map((e) => e.referenceId).filter((id): id is string => !!id))];
@@ -267,6 +305,7 @@ router.get('/cash-flow', async (req, res) => {
     const offsettingEntries = await prisma.accountingLedgerEntry.findMany({
       where: { referenceId: { in: refIds }, accountId: { notIn: cashAccountIds }, isCancelled: false },
       include: { account: { select: { name: true, rootType: true, accountNumber: true } } },
+      take: 50000,
     });
 
     let operating = 0;
@@ -321,12 +360,14 @@ router.get('/aging', async (req, res) => {
         where: { status: { in: ['Submitted', 'PartiallyPaid', 'Overdue'] } },
         include: { customer: { select: { name: true } } },
         orderBy: { date: 'asc' },
+        take: 10000,
       });
     } else {
       invoices = await prisma.purchaseInvoice.findMany({
         where: { status: { in: ['Submitted', 'PartiallyPaid', 'Overdue'] } },
         include: { supplier: { select: { name: true } } },
         orderBy: { date: 'asc' },
+        take: 10000,
       });
     }
 
@@ -359,10 +400,19 @@ router.get('/aging', async (req, res) => {
 
 // GET /api/reports/ledger-detail — detailed ledger entries for a specific account
 router.get('/ledger-detail', async (req, res) => {
-  const { accountId, startDate, endDate } = req.query;
+  const { accountId, startDate: rawStart, endDate: rawEnd } = req.query;
 
   if (!accountId || typeof accountId !== 'string') {
     return res.status(400).json({ error: 'Parameter accountId wajib diisi.' });
+  }
+
+  const startDate = parseQueryDate(rawStart);
+  const endDate = parseQueryDate(rawEnd);
+  if (rawStart && typeof rawStart === 'string' && rawStart !== '' && !startDate) {
+    return res.status(400).json({ error: 'Parameter startDate tidak valid.' });
+  }
+  if (rawEnd && typeof rawEnd === 'string' && rawEnd !== '' && !endDate) {
+    return res.status(400).json({ error: 'Parameter endDate tidak valid.' });
   }
 
   try {
@@ -380,8 +430,8 @@ router.get('/ledger-detail', async (req, res) => {
     };
     if (startDate || endDate) {
       where.date = {};
-      if (startDate) (where.date as any).gte = new Date(startDate as string);
-      if (endDate) (where.date as any).lte = new Date(endDate as string);
+      if (startDate) (where.date as any).gte = startDate;
+      if (endDate) (where.date as any).lte = endDate;
     }
 
     const entries = await prisma.accountingLedgerEntry.findMany({
@@ -396,6 +446,7 @@ router.get('/ledger-detail', async (req, res) => {
         referenceType: true,
         referenceId: true,
       },
+      take: 10000,
     });
 
     // Compute running balance
@@ -431,16 +482,35 @@ router.post('/export', async (req, res) => {
   if (!data || !Array.isArray(data)) {
     return res.status(400).json({ error: 'Data tidak valid untuk ekspor.' });
   }
+  if (data.length > 50000) {
+    return res.status(400).json({ error: 'Data terlalu banyak untuk ekspor (maks. 50.000 baris).' });
+  }
 
   try {
-    const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.json_to_sheet(data);
-    XLSX.utils.book_append_sheet(wb, ws, 'Report');
-    const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Report');
+
+    // Add headers from first data row keys
+    if (data.length > 0) {
+      worksheet.columns = Object.keys(data[0]).map((key) => ({
+        header: key,
+        key,
+        width: 20,
+      }));
+    }
+
+    // Add rows
+    data.forEach((row: Record<string, unknown>) => worksheet.addRow(row));
+
+    // Style header row
+    worksheet.getRow(1).font = { bold: true };
+
+    const buffer = await workbook.xlsx.writeBuffer();
 
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', `attachment; filename="${filename || 'report'}.xlsx"`);
-    return res.send(buffer);
+    const safeName = (filename || 'report').replace(/[^\w\-\.]/g, '_').slice(0, 100);
+    res.setHeader('Content-Disposition', `attachment; filename="${safeName}.xlsx"`);
+    return res.send(Buffer.from(buffer));
   } catch (error) {
     logger.error({ error }, 'POST /reports/export error');
     return res.status(500).json({ error: 'Gagal ekspor ke Excel.' });

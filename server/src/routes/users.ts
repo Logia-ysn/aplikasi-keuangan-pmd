@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import bcrypt from 'bcrypt';
+import jwt from 'jsonwebtoken';
 import { prisma } from '../lib/prisma';
 import { roleMiddleware, AuthRequest } from '../middleware/auth';
 import { validateBody } from '../utils/validate';
@@ -96,6 +97,50 @@ router.post('/', roleMiddleware(['Admin']), async (req, res) => {
   }
 });
 
+// PUT /api/users/me/password — change own password (any authenticated user)
+router.put('/me/password', async (req: AuthRequest, res) => {
+  const body = validateBody(ChangePasswordSchema, req.body, res);
+  if (!body) return;
+
+  try {
+    const userId = req.user!.userId;
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      return res.status(404).json({ error: 'User tidak ditemukan.' });
+    }
+
+    const isValid = await bcrypt.compare(body.currentPassword, user.passwordHash);
+    if (!isValid) {
+      return res.status(400).json({ error: 'Password saat ini salah.' });
+    }
+
+    const passwordHash = await bcrypt.hash(body.newPassword, 10);
+    await prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash },
+    });
+
+    // Blacklist current token so old sessions are invalidated
+    const currentToken = req.cookies?.token || req.headers.authorization?.substring(7);
+    if (currentToken) {
+      const decoded = jwt.decode(currentToken) as Record<string, unknown> | null;
+      await prisma.tokenBlacklist.upsert({
+        where: { token: currentToken },
+        create: {
+          token: currentToken,
+          userId,
+          expiresAt: new Date(((decoded?.exp as number) || 0) * 1000),
+        },
+        update: {},
+      });
+    }
+
+    return res.json({ message: 'Password berhasil diubah.' });
+  } catch (error) {
+    return handleRouteError(res, error, 'PUT /users/me/password', 'Gagal mengubah password.');
+  }
+});
+
 // PUT /api/users/:id — update user (Admin only)
 router.put('/:id', roleMiddleware(['Admin']), async (req, res) => {
   const id = req.params.id as string;
@@ -188,35 +233,6 @@ router.patch('/:id/toggle', roleMiddleware(['Admin']), async (req: AuthRequest, 
     return res.json(user);
   } catch (error) {
     return handleRouteError(res, error, 'PATCH /users/:id/toggle', 'Gagal mengubah status user.');
-  }
-});
-
-// PUT /api/users/me/password — change own password (any authenticated user)
-router.put('/me/password', async (req: AuthRequest, res) => {
-  const body = validateBody(ChangePasswordSchema, req.body, res);
-  if (!body) return;
-
-  try {
-    const userId = req.user!.userId;
-    const user = await prisma.user.findUnique({ where: { id: userId } });
-    if (!user) {
-      return res.status(404).json({ error: 'User tidak ditemukan.' });
-    }
-
-    const isValid = await bcrypt.compare(body.currentPassword, user.passwordHash);
-    if (!isValid) {
-      return res.status(400).json({ error: 'Password saat ini salah.' });
-    }
-
-    const passwordHash = await bcrypt.hash(body.newPassword, 10);
-    await prisma.user.update({
-      where: { id: userId },
-      data: { passwordHash },
-    });
-
-    return res.json({ message: 'Password berhasil diubah.' });
-  } catch (error) {
-    return handleRouteError(res, error, 'PUT /users/me/password', 'Gagal mengubah password.');
   }
 });
 

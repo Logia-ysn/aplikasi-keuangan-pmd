@@ -6,6 +6,7 @@ import { formatRupiah } from '../lib/formatters';
 
 
 interface InvoiceItem {
+  id: string;
   itemName: string;
   description: string;
   quantity: number;
@@ -17,15 +18,12 @@ interface InvoiceItem {
 const UNITS = ['Kg', 'Ton', 'Sak', 'Liter', 'Pcs', 'Box', 'Unit', 'Set', 'Meter', 'Jasa'];
 
 const defaultItem = (): InvoiceItem => ({
-  itemName: '', description: '', quantity: 1, unit: 'Kg', rate: 0, discount: 0
+  id: crypto.randomUUID(), itemName: '', description: '', quantity: 1, unit: 'Kg', rate: 0, discount: 0
 });
 
 const SalesInvoiceModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, onClose }) => {
-  const today = new Date().toISOString().split('T')[0];
-  const due30 = new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0];
-
-  const [invoiceDate, setInvoiceDate] = useState(today);
-  const [dueDate, setDueDate] = useState(due30);
+  const [invoiceDate, setInvoiceDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [dueDate, setDueDate] = useState(() => new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0]);
   const [partyId, setPartyId] = useState('');
   const [notes, setNotes] = useState('');
   const [terms, setTerms] = useState('Net 30');
@@ -54,8 +52,9 @@ const SalesInvoiceModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['sales-invoices'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-metrics'] });
-      setInvoiceDate(today);
-      setDueDate(due30);
+      queryClient.invalidateQueries({ queryKey: ['parties'] });
+      setInvoiceDate(new Date().toISOString().split('T')[0]);
+      setDueDate(new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0]);
       setPartyId('');
       setNotes('');
       setTerms('Net 30');
@@ -196,7 +195,7 @@ const SalesInvoiceModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
                 </thead>
                 <tbody>
                   {items.map((item, idx) => (
-                    <tr key={idx} className="group border-b border-gray-50 last:border-0 hover:bg-gray-50/50 transition-colors">
+                    <tr key={item.id} className="group border-b border-gray-50 last:border-0 hover:bg-gray-50/50 transition-colors">
                       <td className="px-4 py-3 text-center text-xs text-gray-300 font-medium">{idx + 1}</td>
                       <td className="px-4 py-3">
                         <input

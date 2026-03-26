@@ -22,12 +22,8 @@ export const CompanySettingsProvider: React.FC<{ children: React.ReactNode }> = 
   const { data } = useQuery<CompanySettings>({
     queryKey: ['company-settings'],
     queryFn: async () => {
-      try {
-        const res = await api.get('/settings/company');
-        return res.data;
-      } catch {
-        return null;
-      }
+      const res = await api.get('/settings/company');
+      return res.data;
     },
     staleTime: 5 * 60 * 1000,
     retry: false,

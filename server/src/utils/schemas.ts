@@ -117,6 +117,7 @@ export const UpdateCompanySettingsSchema = z.object({
   logoUrl: z.string().nullable().optional(),
   currency: z.string().optional(),
   dateFormat: z.string().optional(),
+  fiscalYearStartMonth: z.coerce.number().int().min(1, 'Bulan harus antara 1-12.').max(12, 'Bulan harus antara 1-12.').optional(),
 });
 
 // ─── Fiscal Year ──────────────────────────────────────────────────────────────
@@ -164,7 +165,11 @@ export const CreateUserSchema = z.object({
   username: z.string().min(3, 'Username minimal 3 karakter.'),
   email: z.string().email('Format email tidak valid.'),
   fullName: z.string().min(2, 'Nama lengkap minimal 2 karakter.'),
-  password: z.string().min(8, 'Password minimal 8 karakter.'),
+  password: z.string()
+    .min(8, 'Password minimal 8 karakter.')
+    .regex(/[A-Z]/, 'Password harus mengandung huruf besar.')
+    .regex(/[0-9]/, 'Password harus mengandung angka.')
+    .regex(/[^A-Za-z0-9]/, 'Password harus mengandung karakter spesial.'),
   role: UserRoleEnum,
 });
 
@@ -172,7 +177,12 @@ export const UpdateUserSchema = z.object({
   username: z.string().min(3, 'Username minimal 3 karakter.').optional(),
   email: z.string().email('Format email tidak valid.').optional(),
   fullName: z.string().min(2, 'Nama lengkap minimal 2 karakter.').optional(),
-  password: z.string().min(8, 'Password minimal 8 karakter.').optional(),
+  password: z.string()
+    .min(8, 'Password minimal 8 karakter.')
+    .regex(/[A-Z]/, 'Password harus mengandung huruf besar.')
+    .regex(/[0-9]/, 'Password harus mengandung angka.')
+    .regex(/[^A-Za-z0-9]/, 'Password harus mengandung karakter spesial.')
+    .optional(),
   role: UserRoleEnum.optional(),
   isActive: z.boolean().optional(),
 }).refine(data => Object.values(data).some(v => v !== undefined), {
@@ -181,17 +191,58 @@ export const UpdateUserSchema = z.object({
 
 export const ChangePasswordSchema = z.object({
   currentPassword: z.string().min(1, 'Password saat ini wajib diisi.'),
-  newPassword: z.string().min(8, 'Password baru minimal 8 karakter.'),
+  newPassword: z.string()
+    .min(8, 'Password baru minimal 8 karakter.')
+    .regex(/[A-Z]/, 'Password harus mengandung huruf besar.')
+    .regex(/[0-9]/, 'Password harus mengandung angka.')
+    .regex(/[^A-Za-z0-9]/, 'Password harus mengandung karakter spesial.'),
 });
 
 // ─── Recurring Template ─────────────────────────────────────────────────────
+const JournalTemplateItemSchema = z.object({
+  accountId: z.string().uuid('Account ID harus UUID yang valid.'),
+  partyId: z.string().uuid().nullable().optional(),
+  debit: z.coerce.number().min(0, 'Debit tidak boleh negatif.'),
+  credit: z.coerce.number().min(0, 'Credit tidak boleh negatif.'),
+  description: z.string().optional(),
+});
+
+const JournalTemplateDataSchema = z.object({
+  narration: z.string().min(1, 'Narasi wajib diisi.'),
+  items: z.array(JournalTemplateItemSchema).min(1, 'Minimal 1 item jurnal.'),
+});
+
+const InvoiceTemplateItemSchema = z.object({
+  itemName: z.string().min(1),
+  description: z.string().optional(),
+  quantity: z.coerce.number().positive(),
+  unit: z.string().optional(),
+  rate: z.coerce.number().min(0),
+  discount: z.coerce.number().min(0).max(100).optional(),
+  accountId: z.string().uuid().optional(),
+});
+
+const InvoiceTemplateDataSchema = z.object({
+  partyId: z.string().uuid().optional(),
+  taxPct: z.coerce.number().min(0).max(100).optional(),
+  potongan: z.coerce.number().min(0).optional(),
+  biayaLain: z.coerce.number().min(0).optional(),
+  notes: z.string().optional(),
+  items: z.array(InvoiceTemplateItemSchema).min(1, 'Minimal 1 item.'),
+});
+
+const TemplateDataSchema = z.union([
+  JournalTemplateDataSchema,
+  InvoiceTemplateDataSchema,
+]);
+
 export const CreateRecurringSchema = z.object({
   name: z.string().min(1, 'Nama template wajib diisi.'),
   templateType: z.enum(['journal', 'sales_invoice', 'purchase_invoice']),
   frequency: z.enum(['daily', 'weekly', 'monthly', 'quarterly', 'yearly']),
   dayOfMonth: z.coerce.number().min(1).max(31).nullable().optional(),
   nextRunDate: z.string().min(1, 'Tanggal berikutnya wajib diisi.'),
-  templateData: z.any(),
+  templateData: TemplateDataSchema,
 });
 
 export const UpdateRecurringSchema = z.object({
@@ -200,7 +251,7 @@ export const UpdateRecurringSchema = z.object({
   frequency: z.enum(['daily', 'weekly', 'monthly', 'quarterly', 'yearly']).optional(),
   dayOfMonth: z.coerce.number().min(1).max(31).nullable().optional(),
   nextRunDate: z.string().optional(),
-  templateData: z.any().optional(),
+  templateData: TemplateDataSchema.optional(),
   isActive: z.boolean().optional(),
 });
 

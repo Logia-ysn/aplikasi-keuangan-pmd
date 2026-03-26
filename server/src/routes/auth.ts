@@ -1,7 +1,10 @@
 import { Router } from 'express';
+import crypto from 'crypto';
 import bcrypt from 'bcrypt';
+import jwt from 'jsonwebtoken';
 import { prisma } from '../lib/prisma';
 import { generateToken } from '../utils/auth';
+import { authMiddleware, AuthRequest } from '../middleware/auth';
 import { loginRateLimiter } from '../middleware/rateLimiter';
 import { logger } from '../lib/logger';
 
@@ -50,6 +53,27 @@ router.post('/login', loginRateLimiter, async (req, res) => {
     });
 
     const token = generateToken({ userId: user.id, role: user.role });
+
+    // Set JWT as HttpOnly cookie
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 24 * 60 * 60 * 1000, // 24h
+      path: '/',
+    });
+
+    // Set CSRF token as non-HttpOnly cookie (readable by JS)
+    const csrfToken = crypto.randomBytes(32).toString('hex');
+    res.cookie('csrf-token', csrfToken, {
+      httpOnly: false,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 24 * 60 * 60 * 1000,
+      path: '/',
+    });
+
+    // Still return token in response body for backward compatibility
     return res.json({
       token,
       user: {
@@ -63,6 +87,28 @@ router.post('/login', loginRateLimiter, async (req, res) => {
     logger.error({ error }, 'Login error');
     return res.status(500).json({ error: 'Login gagal.' });
   }
+});
+
+// POST /api/auth/logout — clear cookies and blacklist token
+router.post('/logout', authMiddleware, async (req: AuthRequest, res) => {
+  const token = req.cookies?.token || req.headers.authorization?.substring(7);
+  if (token) {
+    try {
+      const decoded = jwt.decode(token) as Record<string, unknown> | null;
+      await prisma.tokenBlacklist.create({
+        data: {
+          token,
+          userId: req.user!.userId,
+          expiresAt: new Date(((decoded?.exp as number) || 0) * 1000),
+        },
+      });
+    } catch {
+      // ignore if already blacklisted
+    }
+  }
+  res.clearCookie('token', { path: '/' });
+  res.clearCookie('csrf-token', { path: '/' });
+  return res.json({ message: 'Logged out successfully.' });
 });
 
 export default router;

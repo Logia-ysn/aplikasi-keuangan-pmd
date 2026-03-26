@@ -12,6 +12,7 @@ interface Account {
 }
 
 interface JournalItem {
+  id: string;
   accountId: string;
   partyId: string | null;
   debit: number;
@@ -23,8 +24,8 @@ const JournalEntryModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [narration, setNarration] = useState('');
   const [items, setItems] = useState<JournalItem[]>([
-    { accountId: '', partyId: null, debit: 0, credit: 0, description: '' },
-    { accountId: '', partyId: null, debit: 0, credit: 0, description: '' }
+    { id: crypto.randomUUID(), accountId: '', partyId: null, debit: 0, credit: 0, description: '' },
+    { id: crypto.randomUUID(), accountId: '', partyId: null, debit: 0, credit: 0, description: '' }
   ]);
   const [error, setError] = useState('');
   const queryClient = useQueryClient();
@@ -52,6 +53,13 @@ const JournalEntryModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
       queryClient.invalidateQueries({ queryKey: ['journals'] });
       queryClient.invalidateQueries({ queryKey: ['coa'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-metrics'] });
+      setDate(new Date().toISOString().split('T')[0]);
+      setNarration('');
+      setItems([
+        { id: crypto.randomUUID(), accountId: '', partyId: null, debit: 0, credit: 0, description: '' },
+        { id: crypto.randomUUID(), accountId: '', partyId: null, debit: 0, credit: 0, description: '' },
+      ]);
+      setError('');
       onClose();
     },
     onError: (err: any) => setError(err.response?.data?.error || 'Gagal menyimpan jurnal.')
@@ -61,7 +69,7 @@ const JournalEntryModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
   const totalCredit = items.reduce((sum, item) => sum + (Number(item.credit) || 0), 0);
   const isBalanced = Math.abs(totalDebit - totalCredit) < 0.01 && totalDebit > 0;
 
-  const addItem = () => setItems([...items, { accountId: '', partyId: null, debit: 0, credit: 0, description: '' }]);
+  const addItem = () => setItems([...items, { id: crypto.randomUUID(), accountId: '', partyId: null, debit: 0, credit: 0, description: '' }]);
   const removeItem = (index: number) => setItems(items.filter((_, i) => i !== index));
   const updateItem = (index: number, field: keyof JournalItem, value: any) => {
     const newItems = [...items];
@@ -132,7 +140,7 @@ const JournalEntryModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
                 </thead>
                 <tbody className="divide-y divide-gray-50">
                   {items.map((item, index) => (
-                    <tr key={index} className="group hover:bg-gray-50 transition-colors">
+                    <tr key={item.id} className="group hover:bg-gray-50 transition-colors">
                       <td className="px-3 py-2">
                         <select
                           value={item.accountId}

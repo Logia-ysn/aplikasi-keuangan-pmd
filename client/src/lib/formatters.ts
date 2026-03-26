@@ -6,16 +6,22 @@ export const formatRupiah = (value: number) => {
   }).format(value);
 };
 
-export const formatDate = (date: string | Date) => {
-  return new Date(date).toLocaleDateString('id-ID', {
+export const formatDate = (date: string | Date | null | undefined) => {
+  if (!date) return '-';
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return '-';
+  return d.toLocaleDateString('id-ID', {
     day: '2-digit',
     month: 'short',
     year: 'numeric'
   });
 };
 
-export const formatTime = (date: string | Date) => {
-  return new Date(date).toLocaleTimeString('id-ID', {
+export const formatTime = (date: string | Date | null | undefined) => {
+  if (!date) return '-';
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return '-';
+  return d.toLocaleTimeString('id-ID', {
     hour: '2-digit',
     minute: '2-digit'
   });

@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import Decimal from 'decimal.js';
 import { prisma } from '../lib/prisma';
 import { roleMiddleware } from '../middleware/auth';
 import { validateBody } from '../utils/validate';
@@ -113,52 +114,54 @@ router.get('/report', async (req, res) => {
       select: { date: true, grandTotal: true, taxPct: true },
     });
 
-    // Group by month
-    const monthMap = new Map<string, { ppnKeluaran: number; ppnMasukan: number; pph: number }>();
+    // Group by month using Decimal for precision
+    const monthMap = new Map<string, { ppnKeluaran: Decimal; ppnMasukan: Decimal; pph: Decimal }>();
 
     for (const inv of salesInvoices) {
       const d = new Date(inv.date);
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-      const entry = monthMap.get(key) || { ppnKeluaran: 0, ppnMasukan: 0, pph: 0 };
+      const entry = monthMap.get(key) || { ppnKeluaran: new Decimal(0), ppnMasukan: new Decimal(0), pph: new Decimal(0) };
 
       // Calculate tax amount: grandTotal already includes tax, so tax = grandTotal * taxPct / (100 + taxPct)
-      const grandTotal = Number(inv.grandTotal);
-      const taxPct = Number(inv.taxPct);
-      const taxAmount = (grandTotal * taxPct) / (100 + taxPct);
-      entry.ppnKeluaran += taxAmount;
+      const grandTotal = new Decimal(inv.grandTotal.toString());
+      const taxPct = new Decimal(inv.taxPct.toString());
+      const taxAmount = grandTotal.mul(taxPct).div(new Decimal(100).plus(taxPct));
+      entry.ppnKeluaran = entry.ppnKeluaran.plus(taxAmount);
       monthMap.set(key, entry);
     }
 
     for (const inv of purchaseInvoices) {
       const d = new Date(inv.date);
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-      const entry = monthMap.get(key) || { ppnKeluaran: 0, ppnMasukan: 0, pph: 0 };
+      const entry = monthMap.get(key) || { ppnKeluaran: new Decimal(0), ppnMasukan: new Decimal(0), pph: new Decimal(0) };
 
-      const grandTotal = Number(inv.grandTotal);
-      const taxPct = Number(inv.taxPct);
-      const taxAmount = (grandTotal * taxPct) / (100 + taxPct);
-      entry.ppnMasukan += taxAmount;
+      const grandTotal = new Decimal(inv.grandTotal.toString());
+      const taxPct = new Decimal(inv.taxPct.toString());
+      const taxAmount = grandTotal.mul(taxPct).div(new Decimal(100).plus(taxPct));
+      entry.ppnMasukan = entry.ppnMasukan.plus(taxAmount);
       monthMap.set(key, entry);
     }
 
-    // Sort by month
+    // Sort by month — round accumulated totals at the end
     const months = Array.from(monthMap.entries())
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([month, data]) => ({
         month,
-        ppnKeluaran: Math.round(data.ppnKeluaran * 100) / 100,
-        ppnMasukan: Math.round(data.ppnMasukan * 100) / 100,
-        pph: Math.round(data.pph * 100) / 100,
-        net: Math.round((data.ppnKeluaran - data.ppnMasukan) * 100) / 100,
+        ppnKeluaran: data.ppnKeluaran.toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toNumber(),
+        ppnMasukan: data.ppnMasukan.toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toNumber(),
+        pph: data.pph.toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toNumber(),
+        net: data.ppnKeluaran.minus(data.ppnMasukan).toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toNumber(),
       }));
 
+    const totalPpnKeluaran = months.reduce((s, m) => s.plus(new Decimal(m.ppnKeluaran)), new Decimal(0));
+    const totalPpnMasukan = months.reduce((s, m) => s.plus(new Decimal(m.ppnMasukan)), new Decimal(0));
+    const totalPph = months.reduce((s, m) => s.plus(new Decimal(m.pph)), new Decimal(0));
     const totals = {
-      ppnKeluaran: months.reduce((s, m) => s + m.ppnKeluaran, 0),
-      ppnMasukan: months.reduce((s, m) => s + m.ppnMasukan, 0),
-      pph: months.reduce((s, m) => s + m.pph, 0),
-      net: 0,
+      ppnKeluaran: totalPpnKeluaran.toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toNumber(),
+      ppnMasukan: totalPpnMasukan.toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toNumber(),
+      pph: totalPph.toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toNumber(),
+      net: totalPpnKeluaran.minus(totalPpnMasukan).toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toNumber(),
     };
-    totals.net = Math.round((totals.ppnKeluaran - totals.ppnMasukan) * 100) / 100;
 
     return res.json({ months, totals });
   } catch (error) {

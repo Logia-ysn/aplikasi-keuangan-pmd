@@ -18,7 +18,7 @@ export const auditTrailMiddleware = async (req: AuthRequest, res: Response, next
       const segments = req.originalUrl.replace(/^\/api\//, '').split('/').filter(Boolean);
       const entityType = segments[0] || 'unknown';
 
-      prisma.auditLog
+      void prisma.auditLog
         .create({
           data: {
             userId: req.user!.userId,

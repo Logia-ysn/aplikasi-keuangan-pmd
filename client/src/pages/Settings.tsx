@@ -943,8 +943,14 @@ const BackupTab: React.FC = () => {
     link.href = url;
     link.setAttribute('download', filename);
     // Add auth header via fetch and create blob URL
-    fetch(url, { headers: { Authorization: `Bearer ${token}` } })
-      .then((res) => res.blob())
+    fetch(url, {
+      headers: { Authorization: `Bearer ${token}` },
+      credentials: 'include',
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.blob();
+      })
       .then((blob) => {
         const blobUrl = URL.createObjectURL(blob);
         link.href = blobUrl;
