@@ -3,8 +3,8 @@
  * Update file ini setiap kali release baru.
  */
 
-export const APP_VERSION = '1.5.0';
-export const APP_BUILD_DATE = '2026-03-20';
+export const APP_VERSION = '1.5.1';
+export const APP_BUILD_DATE = '2026-03-26';
 export const APP_NAME = 'Keuangan';
 
 export interface ChangelogEntry {

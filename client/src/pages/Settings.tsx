@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import api from '../lib/api';
@@ -391,9 +391,26 @@ function compareSemver(a: string, b: string): number {
   return 0;
 }
 
+interface RuntimeInfo {
+  platform: string;
+  domain: string;
+  hostname: string;
+  nodeVersion: string;
+  memory: string;
+  uptime: number;
+  env: string;
+}
+
 const AboutTab: React.FC = () => {
   const [checking, setChecking] = useState(false);
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
+  const [runtime, setRuntime] = useState<RuntimeInfo | null>(null);
+
+  useEffect(() => {
+    api.get('/settings/runtime').then(res => setRuntime(res.data)).catch(() => {
+      setRuntime({ platform: '-', domain: window.location.origin, hostname: '-', nodeVersion: '-', memory: '-', uptime: 0, env: '-' });
+    });
+  }, []);
 
   const handleCheckUpdate = async () => {
     setChecking(true);
@@ -463,14 +480,14 @@ const AboutTab: React.FC = () => {
                 <Info size={12} className="text-gray-400" />
                 <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Platform</span>
               </div>
-              <p className="text-sm font-bold text-gray-900">Raspberry Pi 5</p>
+              <p className="text-sm font-bold text-gray-900">{runtime?.platform || '...'}</p>
             </div>
             <div className="bg-gray-50 rounded-lg p-3">
               <div className="flex items-center gap-1.5 mb-1">
                 <ExternalLink size={12} className="text-gray-400" />
                 <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Domain</span>
               </div>
-              <p className="text-sm font-bold text-gray-900 truncate">localhost</p>
+              <p className="text-sm font-bold text-gray-900 truncate">{runtime?.domain || window.location.origin}</p>
             </div>
           </div>
 
