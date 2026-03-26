@@ -32,6 +32,9 @@ server/prisma/*.db-journal
 # Docker volumes
 pgdata/
 
+# Backup files
+server/backups/
+
 # Cache
 .cache/
 .parcel-cache/
