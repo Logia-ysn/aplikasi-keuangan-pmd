@@ -63,6 +63,7 @@ model Party {
   taxId             String?           @map("tax_id")
   outstandingAmount Decimal           @default(0) @db.Decimal(15, 2) @map("outstanding_amount")
   isActive          Boolean           @default(true) @map("is_active")
+  isDummy           Boolean           @default(false) @map("is_dummy")
   salesInvoices     SalesInvoice[]
   purchaseInvoices  PurchaseInvoice[]
   payments          Payment[]
@@ -168,6 +169,7 @@ model SalesInvoice {
   items          SalesInvoiceItem[]
   submittedAt    DateTime?          @map("submitted_at")
   cancelledAt    DateTime?          @map("cancelled_at")
+  isDummy        Boolean            @default(false) @map("is_dummy")
   createdAt      DateTime           @default(now()) @map("created_at")
   updatedAt      DateTime           @updatedAt @map("updated_at")
 
@@ -217,6 +219,7 @@ model PurchaseInvoice {
   items          PurchaseInvoiceItem[]
   submittedAt    DateTime?             @map("submitted_at")
   cancelledAt    DateTime?             @map("cancelled_at")
+  isDummy        Boolean               @default(false) @map("is_dummy")
   createdAt      DateTime              @default(now()) @map("created_at")
   updatedAt      DateTime              @updatedAt @map("updated_at")
 
@@ -426,6 +429,7 @@ model InventoryItem {
   currentStock Decimal         @default(0) @db.Decimal(15, 3) @map("current_stock")
   minimumStock Decimal         @default(0) @db.Decimal(15, 3) @map("minimum_stock")
   isActive     Boolean         @default(true) @map("is_active")
+  isDummy      Boolean         @default(false) @map("is_dummy")
   accountId    String?         @map("account_id")
   account      Account?        @relation("ItemAccount", fields: [accountId], references: [id])
   movements        StockMovement[]

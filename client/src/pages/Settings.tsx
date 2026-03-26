@@ -7,7 +7,7 @@ import {
   Building2, Save, Settings, Loader2, Upload, X, ImageIcon,
   Info, Tag, Clock, Sparkles, ExternalLink, RefreshCw, CheckCircle, ArrowUpCircle,
   Receipt, Edit2, Trash2, ToggleLeft, ToggleRight,
-  HardDrive, Download, RotateCcw, AlertTriangle, Shield,
+  HardDrive, Download, RotateCcw, AlertTriangle, Shield, Database,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
@@ -930,6 +930,26 @@ const BackupTab: React.FC = () => {
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [resetInput, setResetInput] = useState('');
 
+  const generateDummyMutation = useMutation({
+    mutationFn: async () => api.post('/settings/generate-dummy'),
+    onSuccess: (res) => {
+      const r = res.data.results;
+      toast.success(`Data dummy dibuat: ${r.parties} mitra, ${r.salesInvoices} SI, ${r.purchaseInvoices} PI, ${r.journals} jurnal, ${r.inventoryItems} item`);
+      queryClient.invalidateQueries();
+    },
+    onError: (error: any) => toast.error(error.response?.data?.error || 'Gagal membuat data dummy.'),
+  });
+
+  const deleteDummyMutation = useMutation({
+    mutationFn: async () => api.post('/settings/delete-dummy'),
+    onSuccess: (res) => {
+      const r = res.data.results;
+      toast.success(`Data dummy dihapus: ${r.parties} mitra, ${r.salesInvoices} SI, ${r.purchaseInvoices} PI, ${r.inventoryItems} item`);
+      queryClient.invalidateQueries();
+    },
+    onError: (error: any) => toast.error(error.response?.data?.error || 'Gagal menghapus data dummy.'),
+  });
+
   const resetMutation = useMutation({
     mutationFn: async () => api.post('/settings/reset-data', { confirmation: 'RESET' }),
     onSuccess: () => {
@@ -1178,6 +1198,38 @@ const BackupTab: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Dummy Data — Development */}
+      <div className="mt-6 pt-6 border-t" style={{ borderColor: 'var(--color-border)' }}>
+        <div className="p-4 rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/10">
+          <div className="flex items-start gap-3">
+            <Database size={20} className="text-blue-600 shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <h3 className="text-sm font-semibold text-blue-800 dark:text-blue-400">Data Dummy (Testing)</h3>
+              <p className="text-xs mt-1" style={{ color: 'var(--color-text-secondary)' }}>
+                Generate data transaksi contoh (customer, supplier, invoice, jurnal, inventory) untuk testing.
+                Data dummy bisa dihapus tanpa mempengaruhi data asli.
+              </p>
+              <div className="flex items-center gap-3 mt-3">
+                <button
+                  onClick={() => generateDummyMutation.mutate()}
+                  disabled={generateDummyMutation.isPending || deleteDummyMutation.isPending}
+                  className="px-4 py-2 text-xs font-medium text-blue-700 bg-blue-100 hover:bg-blue-200 dark:text-blue-300 dark:bg-blue-900/30 dark:hover:bg-blue-900/50 rounded-lg transition-colors disabled:opacity-50"
+                >
+                  {generateDummyMutation.isPending ? <><Loader2 size={12} className="animate-spin inline mr-1" /> Membuat...</> : '+ Generate Dummy'}
+                </button>
+                <button
+                  onClick={() => deleteDummyMutation.mutate()}
+                  disabled={generateDummyMutation.isPending || deleteDummyMutation.isPending}
+                  className="px-4 py-2 text-xs font-medium text-orange-700 bg-orange-100 hover:bg-orange-200 dark:text-orange-300 dark:bg-orange-900/30 dark:hover:bg-orange-900/50 rounded-lg transition-colors disabled:opacity-50"
+                >
+                  {deleteDummyMutation.isPending ? <><Loader2 size={12} className="animate-spin inline mr-1" /> Menghapus...</> : 'Hapus Dummy'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* Reset Data — Development Only */}
       <div className="mt-8 pt-6 border-t" style={{ borderColor: 'var(--color-border)' }}>
