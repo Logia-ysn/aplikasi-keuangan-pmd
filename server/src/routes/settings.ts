@@ -138,9 +138,50 @@ router.post('/generate-dummy', roleMiddleware(['Admin']), async (req, res) => {
       return res.status(400).json({ error: 'Akun dasar (Kas, AR, AP, Sales) belum tersedia. Jalankan seed terlebih dahulu.' });
     }
 
+    // Guard: skip if dummy data already exists
+    const existingDummy = await prisma.party.count({ where: { isDummy: true } });
+    if (existingDummy > 0) {
+      return res.status(400).json({ error: 'Data dummy sudah ada. Hapus terlebih dahulu sebelum generate ulang.' });
+    }
+
     const results = { parties: 0, salesInvoices: 0, purchaseInvoices: 0, payments: 0, journals: 0, inventoryItems: 0, movements: 0, productionRuns: 0 };
 
     await prisma.$transaction(async (tx) => {
+      const { generateDocumentNumber } = await import('../utils/documentNumber');
+      const { getOpenFiscalYear } = await import('../utils/fiscalYear');
+
+      // --- Initial Capital Injection: Kas + Bank ---
+      const today = new Date();
+      // Use fiscal year start date or Jan 1 of current year (whichever is within an open FY)
+      const initDate = new Date(fiscalYear.startDate);
+      const initFy = fiscalYear;
+      const modalId = acctMap.get('3.1'); // Modal Disetor
+
+      if (modalId) {
+        const jvInit = await generateDocumentNumber(tx, 'JV', initDate, initFy.id);
+        await tx.journalEntry.create({
+          data: {
+            entryNumber: jvInit, date: initDate, narration: 'Setoran modal awal',
+            status: 'Submitted', fiscalYearId: initFy.id, createdBy: admin.id, submittedAt: initDate,
+            items: { create: [
+              { accountId: kasId!, debit: 350000000, credit: 0 },
+              { accountId: bankId || kasId!, debit: 150000000, credit: 0 },
+              { accountId: modalId, debit: 0, credit: 500000000 },
+            ]},
+          },
+        });
+        await tx.accountingLedgerEntry.createMany({ data: [
+          { accountId: kasId!, date: initDate, debit: 350000000, credit: 0, referenceType: 'JournalEntry', referenceId: 'dummy-modal-init', fiscalYearId: initFy.id },
+          { accountId: bankId || kasId!, date: initDate, debit: 150000000, credit: 0, referenceType: 'JournalEntry', referenceId: 'dummy-modal-init', fiscalYearId: initFy.id },
+          { accountId: modalId, date: initDate, debit: 0, credit: 500000000, referenceType: 'JournalEntry', referenceId: 'dummy-modal-init', fiscalYearId: initFy.id },
+        ]});
+        // Update account balances
+        await tx.account.update({ where: { id: kasId! }, data: { balance: { increment: 350000000 } } });
+        if (bankId) await tx.account.update({ where: { id: bankId }, data: { balance: { increment: 150000000 } } });
+        await tx.account.update({ where: { id: modalId }, data: { balance: { increment: 500000000 } } });
+        results.journals++;
+      }
+
       // --- Dummy Parties ---
       const customerNames = [
         'Toko Beras Sejahtera', 'UD Pangan Jaya', 'CV Makmur Abadi', 'Toko Beras Melati',
@@ -284,7 +325,82 @@ router.post('/generate-dummy', roleMiddleware(['Admin']), async (req, res) => {
             { accountId: salesId!, date, debit: 0, credit: grandTotal, referenceId: si.id, referenceType: 'SalesInvoice', fiscalYearId: fy.id },
           ]});
 
+          // Create payment for first 2 of 5 sales invoices (40% collection rate, leaves AR balance)
+          if (i < 2) {
+            const payDate = new Date(date.getTime() + 7 * 86400000); // 7 days after invoice
+            const payFy = await getOpenFiscalYear(tx, payDate);
+            const payNum = await generateDocumentNumber(tx, 'PAY', payDate, payFy.id);
+            const payment = await tx.payment.create({
+              data: {
+                paymentNumber: payNum, date: payDate, paymentType: 'Receive', partyId: customer.id,
+                accountId: kasId!, amount: grandTotal, status: 'Submitted',
+                fiscalYearId: payFy.id, createdBy: admin.id, submittedAt: payDate, referenceNo: 'TF-' + payNum,
+                allocations: { create: [{ invoiceType: 'SalesInvoice', invoiceId: si.id, allocatedAmount: grandTotal }] },
+              },
+            });
+            // Update invoice status to Paid
+            await tx.salesInvoice.update({ where: { id: si.id }, data: { status: 'Paid', outstanding: 0 } });
+            // GL: DR Kas, CR AR
+            const jvPay = await generateDocumentNumber(tx, 'JV', payDate, payFy.id);
+            await tx.journalEntry.create({
+              data: {
+                entryNumber: jvPay, date: payDate, narration: 'Pembayaran ' + customer.name,
+                status: 'Submitted', fiscalYearId: payFy.id, createdBy: admin.id, submittedAt: payDate,
+                items: { create: [
+                  { accountId: kasId!, debit: grandTotal, credit: 0 },
+                  { accountId: arId!, debit: 0, credit: grandTotal },
+                ]},
+              },
+            });
+            await tx.accountingLedgerEntry.createMany({ data: [
+              { accountId: kasId!, date: payDate, debit: grandTotal, credit: 0, referenceId: payment.id, referenceType: 'Payment', fiscalYearId: payFy.id },
+              { accountId: arId!, date: payDate, debit: 0, credit: grandTotal, referenceId: payment.id, referenceType: 'Payment', fiscalYearId: payFy.id },
+            ]});
+            // Update party outstanding
+            await tx.party.update({ where: { id: customer.id }, data: { outstandingAmount: { decrement: grandTotal } } });
+            results.payments++;
+          }
+
           results.salesInvoices++;
+        }
+
+        // Create payment for first 1 of 3 purchase invoices (33% payment rate, leaves AP balance)
+        const monthPIs = await tx.purchaseInvoice.findMany({
+          where: { isDummy: true, date: { gte: month, lt: new Date(month.getFullYear(), month.getMonth() + 1, 1) } },
+          take: 1,
+        });
+        for (const pi of monthPIs) {
+          const payDate = new Date(new Date(pi.date).getTime() + 14 * 86400000);
+          const payFy = await getOpenFiscalYear(tx, payDate);
+          const payNum = await generateDocumentNumber(tx, 'PAY', payDate, payFy.id);
+          const piAmount = Number(pi.grandTotal);
+          await tx.payment.create({
+            data: {
+              paymentNumber: payNum, date: payDate, paymentType: 'Pay', partyId: pi.partyId,
+              accountId: kasId!, amount: piAmount, status: 'Submitted',
+              fiscalYearId: payFy.id, createdBy: admin.id, submittedAt: payDate, referenceNo: 'TF-' + payNum,
+              allocations: { create: [{ invoiceType: 'PurchaseInvoice', invoiceId: pi.id, allocatedAmount: piAmount }] },
+            },
+          });
+          await tx.purchaseInvoice.update({ where: { id: pi.id }, data: { status: 'Paid', outstanding: 0 } });
+          // GL: DR AP, CR Kas
+          const jvPay = await generateDocumentNumber(tx, 'JV', payDate, payFy.id);
+          await tx.journalEntry.create({
+            data: {
+              entryNumber: jvPay, date: payDate, narration: 'Pembayaran ke supplier',
+              status: 'Submitted', fiscalYearId: payFy.id, createdBy: admin.id, submittedAt: payDate,
+              items: { create: [
+                { accountId: apId!, debit: piAmount, credit: 0 },
+                { accountId: kasId!, debit: 0, credit: piAmount },
+              ]},
+            },
+          });
+          await tx.accountingLedgerEntry.createMany({ data: [
+            { accountId: apId!, date: payDate, debit: piAmount, credit: 0, referenceType: 'Payment', referenceId: 'dummy-pay-pi', fiscalYearId: payFy.id },
+            { accountId: kasId!, date: payDate, debit: 0, credit: piAmount, referenceType: 'Payment', referenceId: 'dummy-pay-pi', fiscalYearId: payFy.id },
+          ]});
+          await tx.party.update({ where: { id: pi.partyId }, data: { outstandingAmount: { decrement: piAmount } } });
+          results.payments++;
         }
 
         // Journal entries (expenses) — 2 per month
@@ -345,8 +461,8 @@ router.post('/generate-dummy', roleMiddleware(['Admin']), async (req, res) => {
       const menir = itemByCode.get('MNR-001');
 
       if (gkpItem && gkgItem && berasPrm) {
-        const { generateDocumentNumber: genSM } = await import('../utils/documentNumber');
-        const { getOpenFiscalYear: getFY } = await import('../utils/fiscalYear');
+        const genSM = generateDocumentNumber;
+        const getFY = getOpenFiscalYear;
 
         for (let monthOffset = 2; monthOffset >= 0; monthOffset--) {
           const month = new Date(now.getFullYear(), now.getMonth() - monthOffset, 1);
@@ -497,6 +613,43 @@ router.post('/generate-dummy', roleMiddleware(['Admin']), async (req, res) => {
           await tx.inventoryItem.update({ where: { id: berasMed.id }, data: { currentStock: { increment: outBeras2 } } });
           results.productionRuns++;
         }
+      }
+
+      // --- Recalculate all account balances from ledger entries ---
+      const allAccounts = await tx.account.findMany({ where: { isGroup: false }, select: { id: true, rootType: true } });
+      for (const acct of allAccounts) {
+        const sums = await tx.accountingLedgerEntry.aggregate({
+          where: { accountId: acct.id, isCancelled: false },
+          _sum: { debit: true, credit: true },
+        });
+        const totalDebit = Number(sums._sum.debit || 0);
+        const totalCredit = Number(sums._sum.credit || 0);
+        // Debit-normal: ASSET, EXPENSE → balance = debit - credit
+        // Credit-normal: LIABILITY, EQUITY, REVENUE → balance = credit - debit
+        const isDebitNormal = acct.rootType === 'ASSET' || acct.rootType === 'EXPENSE';
+        const balance = isDebitNormal ? totalDebit - totalCredit : totalCredit - totalDebit;
+        await tx.account.update({ where: { id: acct.id }, data: { balance } });
+      }
+
+      // --- Recalculate party outstanding amounts ---
+      const allParties = await tx.party.findMany({ select: { id: true, partyType: true } });
+      for (const party of allParties) {
+        let outstanding = 0;
+        if (party.partyType === 'Customer' || party.partyType === 'Both') {
+          const siSum = await tx.salesInvoice.aggregate({
+            where: { partyId: party.id, status: { in: ['Submitted', 'PartiallyPaid', 'Overdue'] } },
+            _sum: { outstanding: true },
+          });
+          outstanding += Number(siSum._sum.outstanding || 0);
+        }
+        if (party.partyType === 'Supplier' || party.partyType === 'Both') {
+          const piSum = await tx.purchaseInvoice.aggregate({
+            where: { partyId: party.id, status: { in: ['Submitted', 'PartiallyPaid', 'Overdue'] } },
+            _sum: { outstanding: true },
+          });
+          outstanding += Number(piSum._sum.outstanding || 0);
+        }
+        await tx.party.update({ where: { id: party.id }, data: { outstandingAmount: outstanding } });
       }
     }, { timeout: 120000 });
 
