@@ -634,4 +634,193 @@ router.put('/production-runs/:id/cancel', roleMiddleware(['Admin']), async (req:
   }
 });
 
+// ─── Dashboard ───────────────────────────────────────────────────────────────
+
+// GET /api/inventory/dashboard/metrics — KPI summary
+router.get('/dashboard/metrics', async (_req, res) => {
+  try {
+    const [totalItems, activeItems, lowStockRaw, movements] = await Promise.all([
+      prisma.inventoryItem.count(),
+      prisma.inventoryItem.count({ where: { isActive: true, currentStock: { gt: 0 } } }),
+      prisma.$queryRaw<Array<{ count: bigint }>>`
+        SELECT count(*) as count FROM inventory_items
+        WHERE is_active = true AND minimum_stock > 0 AND current_stock <= minimum_stock`,
+      prisma.stockMovement.count({
+        where: {
+          isCancelled: false,
+          date: { gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1) }
+        }
+      }),
+    ]);
+
+    const lowStockCount = Number(lowStockRaw[0]?.count ?? 0);
+
+    return res.json({
+      totalItems,
+      activeItems,
+      lowStockCount,
+      movementsThisMonth: movements,
+    });
+  } catch (error) {
+    logger.error({ error }, 'GET /inventory/dashboard/metrics error');
+    return res.status(500).json({ error: 'Gagal mengambil metrik gudang.' });
+  }
+});
+
+// GET /api/inventory/dashboard/by-category — Stock distribution by category
+router.get('/dashboard/by-category', async (_req, res) => {
+  try {
+    const items = await prisma.inventoryItem.findMany({
+      where: { isActive: true },
+      select: { category: true, currentStock: true },
+    });
+
+    const categoryMap = new Map<string, { itemCount: number; totalQty: number }>();
+    for (const item of items) {
+      const cat = item.category || 'Lainnya';
+      const entry = categoryMap.get(cat) || { itemCount: 0, totalQty: 0 };
+      entry.itemCount++;
+      entry.totalQty += Number(item.currentStock);
+      categoryMap.set(cat, entry);
+    }
+
+    const result = Array.from(categoryMap.entries()).map(([category, data]) => ({
+      category,
+      itemCount: data.itemCount,
+      totalQuantity: data.totalQty,
+    })).sort((a, b) => b.totalQuantity - a.totalQuantity);
+
+    return res.json(result);
+  } catch (error) {
+    logger.error({ error }, 'GET /inventory/dashboard/by-category error');
+    return res.status(500).json({ error: 'Gagal mengambil data kategori.' });
+  }
+});
+
+// GET /api/inventory/dashboard/movement-trend — 6-month movement trend
+router.get('/dashboard/movement-trend', async (_req, res) => {
+  try {
+    const months = 6;
+    const now = new Date();
+    const startDate = new Date(now.getFullYear(), now.getMonth() - months + 1, 1);
+
+    const movements = await prisma.stockMovement.findMany({
+      where: { isCancelled: false, date: { gte: startDate } },
+      select: { date: true, movementType: true, quantity: true },
+    });
+
+    // Group by month
+    const monthMap = new Map<string, { inQty: number; outQty: number; adjInQty: number; adjOutQty: number }>();
+
+    // Initialize all months
+    for (let i = 0; i < months; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth() - months + 1 + i, 1);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      monthMap.set(key, { inQty: 0, outQty: 0, adjInQty: 0, adjOutQty: 0 });
+    }
+
+    for (const m of movements) {
+      const d = new Date(m.date);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const entry = monthMap.get(key);
+      if (!entry) continue;
+      const qty = Number(m.quantity);
+      switch (m.movementType) {
+        case 'In': entry.inQty += qty; break;
+        case 'Out': entry.outQty += qty; break;
+        case 'AdjustmentIn': entry.adjInQty += qty; break;
+        case 'AdjustmentOut': entry.adjOutQty += qty; break;
+      }
+    }
+
+    const result = Array.from(monthMap.entries()).map(([month, data]) => ({
+      month,
+      ...data,
+      netChange: data.inQty + data.adjInQty - data.outQty - data.adjOutQty,
+    }));
+
+    return res.json(result);
+  } catch (error) {
+    logger.error({ error }, 'GET /inventory/dashboard/movement-trend error');
+    return res.status(500).json({ error: 'Gagal mengambil tren pergerakan.' });
+  }
+});
+
+// GET /api/inventory/dashboard/top-items — Top 10 items by stock quantity
+router.get('/dashboard/top-items', async (_req, res) => {
+  try {
+    const items = await prisma.inventoryItem.findMany({
+      where: { isActive: true, currentStock: { gt: 0 } },
+      orderBy: { currentStock: 'desc' },
+      take: 10,
+      select: { id: true, code: true, name: true, unit: true, category: true, currentStock: true, minimumStock: true },
+    });
+
+    return res.json(items.map(i => ({
+      ...i,
+      currentStock: Number(i.currentStock),
+      minimumStock: Number(i.minimumStock),
+      stockPct: Number(i.minimumStock) > 0 ? Math.round(Number(i.currentStock) / Number(i.minimumStock) * 100) : null,
+    })));
+  } catch (error) {
+    logger.error({ error }, 'GET /inventory/dashboard/top-items error');
+    return res.status(500).json({ error: 'Gagal mengambil data item.' });
+  }
+});
+
+// GET /api/inventory/dashboard/recent-movements — Last 10 movements
+router.get('/dashboard/recent-movements', async (_req, res) => {
+  try {
+    const movements = await prisma.stockMovement.findMany({
+      where: { isCancelled: false },
+      orderBy: { date: 'desc' },
+      take: 10,
+      select: {
+        id: true, movementNumber: true, date: true, movementType: true,
+        quantity: true, totalValue: true, notes: true,
+        item: { select: { name: true, unit: true, code: true } },
+      },
+    });
+
+    return res.json(movements.map(m => ({
+      ...m,
+      quantity: Number(m.quantity),
+      totalValue: Number(m.totalValue),
+    })));
+  } catch (error) {
+    logger.error({ error }, 'GET /inventory/dashboard/recent-movements error');
+    return res.status(500).json({ error: 'Gagal mengambil riwayat pergerakan.' });
+  }
+});
+
+// GET /api/inventory/dashboard/production-stats — Production run stats
+router.get('/dashboard/production-stats', async (_req, res) => {
+  try {
+    const thisMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    const [totalRuns, thisMonthRuns, runs] = await Promise.all([
+      prisma.productionRun.count({ where: { isCancelled: false } }),
+      prisma.productionRun.count({ where: { isCancelled: false, date: { gte: thisMonth } } }),
+      prisma.productionRun.findMany({
+        where: { isCancelled: false, rendemenPct: { not: null } },
+        select: { rendemenPct: true },
+        orderBy: { date: 'desc' },
+        take: 50,
+      }),
+    ]);
+
+    const avgRendemen = runs.length > 0
+      ? Math.round(runs.reduce((s, r) => s + Number(r.rendemenPct), 0) / runs.length * 100) / 100
+      : 0;
+
+    return res.json({
+      totalRuns,
+      thisMonthRuns,
+      avgRendemen,
+    });
+  } catch (error) {
+    logger.error({ error }, 'GET /inventory/dashboard/production-stats error');
+    return res.status(500).json({ error: 'Gagal mengambil statistik produksi.' });
+  }
+});
+
 export default router;
