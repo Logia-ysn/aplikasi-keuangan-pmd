@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { spawn } from 'child_process';
+import { spawn, execFileSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import { roleMiddleware } from '../middleware/auth';
@@ -9,6 +9,26 @@ const router = Router();
 
 const BACKUP_DIR = path.resolve(process.cwd(), 'backups');
 const MAX_BACKUPS = 5;
+
+/** Check if we're running inside Docker */
+function isInsideDocker(): boolean {
+  return fs.existsSync('/.dockerenv') || fs.existsSync('/run/.containerenv');
+}
+
+/** Check if pg_dump is available locally */
+function hasPgDumpLocally(): boolean {
+  try {
+    execFileSync('pg_dump', ['--version'], { stdio: 'pipe', timeout: 5000 });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Detect the Docker Compose service name for the DB container */
+function getDbContainerService(): string {
+  return process.env.DB_DOCKER_SERVICE || 'db';
+}
 
 /** Ensure backup directory exists */
 async function ensureBackupDir(): Promise<void> {
@@ -63,123 +83,112 @@ async function rotateBackups(): Promise<void> {
   }
 }
 
-/** Spawn a pipeline and return a promise that resolves on success or rejects on failure */
-function spawnPgDump(
-  pgArgs: readonly string[],
+/** Spawn a command pipeline and return a promise */
+function spawnPipeline(
+  dumpCmd: string,
+  dumpArgs: readonly string[],
+  compressCmd: string,
+  compressArgs: readonly string[],
   outputPath: string,
   env: NodeJS.ProcessEnv,
   timeoutMs: number,
 ): Promise<void> {
   return new Promise((resolve, reject) => {
-    const pgDump = spawn('pg_dump', pgArgs, { env, stdio: ['ignore', 'pipe', 'pipe'] });
-    const gzip = spawn('gzip', [], { stdio: ['pipe', 'pipe', 'pipe'] });
+    const dumper = spawn(dumpCmd, dumpArgs as string[], { env, stdio: ['ignore', 'pipe', 'pipe'] });
+    const compressor = spawn(compressCmd, compressArgs as string[], { stdio: ['pipe', 'pipe', 'pipe'] });
     const outStream = fs.createWriteStream(outputPath);
 
-    let pgStderr = '';
-    let gzipStderr = '';
+    let dumpStderr = '';
+    let compressStderr = '';
 
-    pgDump.stderr.on('data', (chunk: Buffer) => {
-      pgStderr += chunk.toString();
-    });
-    gzip.stderr.on('data', (chunk: Buffer) => {
-      gzipStderr += chunk.toString();
-    });
+    dumper.stderr.on('data', (chunk: Buffer) => { dumpStderr += chunk.toString(); });
+    compressor.stderr.on('data', (chunk: Buffer) => { compressStderr += chunk.toString(); });
 
-    pgDump.stdout.pipe(gzip.stdin);
-    gzip.stdout.pipe(outStream);
-
-    const timer = setTimeout(() => {
-      pgDump.kill('SIGTERM');
-      gzip.kill('SIGTERM');
-      finish(new Error('pg_dump timed out'));
-    }, timeoutMs);
+    dumper.stdout.pipe(compressor.stdin);
+    compressor.stdout.pipe(outStream);
 
     let settled = false;
+    const timer = setTimeout(() => {
+      dumper.kill('SIGTERM');
+      compressor.kill('SIGTERM');
+      finish(new Error(`${dumpCmd} timed out`));
+    }, timeoutMs);
+
     const finish = (err?: Error) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
-      if (err) {
-        reject(err);
-      } else {
-        resolve();
-      }
+      err ? reject(err) : resolve();
     };
 
-    pgDump.on('error', (err) => finish(new Error(`pg_dump spawn error: ${err.message}`)));
-    gzip.on('error', (err) => finish(new Error(`gzip spawn error: ${err.message}`)));
+    dumper.on('error', (err) => finish(new Error(`${dumpCmd} spawn error: ${err.message}`)));
+    compressor.on('error', (err) => finish(new Error(`${compressCmd} spawn error: ${err.message}`)));
     outStream.on('error', (err) => finish(new Error(`File write error: ${err.message}`)));
-
-    pgDump.on('close', (code) => {
-      if (code !== 0) {
-        finish(new Error(`pg_dump exited with code ${code}: ${pgStderr}`));
-      }
-    });
-
-    outStream.on('finish', () => {
-      finish();
-    });
+    dumper.on('close', (code) => { if (code !== 0) finish(new Error(`${dumpCmd} exited ${code}: ${dumpStderr}`)); });
+    outStream.on('finish', () => finish());
   });
 }
 
-/** Spawn a gunzip | psql pipeline and return a promise */
-function spawnPsqlRestore(
-  inputPath: string,
-  psqlArgs: readonly string[],
+/** Spawn a decompress | restore pipeline and return a promise */
+function spawnRestorePipeline(
+  decompressCmd: string,
+  decompressArgs: readonly string[],
+  restoreCmd: string,
+  restoreArgs: readonly string[],
   env: NodeJS.ProcessEnv,
   timeoutMs: number,
 ): Promise<void> {
   return new Promise((resolve, reject) => {
-    const gunzip = spawn('gunzip', ['-c', inputPath], { env, stdio: ['ignore', 'pipe', 'pipe'] });
-    const psql = spawn('psql', psqlArgs, { env, stdio: ['pipe', 'pipe', 'pipe'] });
+    const decompressor = spawn(decompressCmd, decompressArgs as string[], { env, stdio: ['ignore', 'pipe', 'pipe'] });
+    const restorer = spawn(restoreCmd, restoreArgs as string[], { env, stdio: ['pipe', 'pipe', 'pipe'] });
 
-    let gunzipStderr = '';
-    let psqlStderr = '';
+    let decompStderr = '';
+    let restoreStderr = '';
 
-    gunzip.stderr.on('data', (chunk: Buffer) => {
-      gunzipStderr += chunk.toString();
-    });
-    psql.stderr.on('data', (chunk: Buffer) => {
-      psqlStderr += chunk.toString();
-    });
+    decompressor.stderr.on('data', (chunk: Buffer) => { decompStderr += chunk.toString(); });
+    restorer.stderr.on('data', (chunk: Buffer) => { restoreStderr += chunk.toString(); });
 
-    gunzip.stdout.pipe(psql.stdin);
-
-    const timer = setTimeout(() => {
-      gunzip.kill('SIGTERM');
-      psql.kill('SIGTERM');
-      finish(new Error('psql restore timed out'));
-    }, timeoutMs);
+    decompressor.stdout.pipe(restorer.stdin);
 
     let settled = false;
+    const timer = setTimeout(() => {
+      decompressor.kill('SIGTERM');
+      restorer.kill('SIGTERM');
+      finish(new Error(`restore timed out`));
+    }, timeoutMs);
+
     const finish = (err?: Error) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
-      if (err) {
-        reject(err);
-      } else {
-        resolve();
-      }
+      err ? reject(err) : resolve();
     };
 
-    gunzip.on('error', (err) => finish(new Error(`gunzip spawn error: ${err.message}`)));
-    psql.on('error', (err) => finish(new Error(`psql spawn error: ${err.message}`)));
-
-    gunzip.on('close', (code) => {
-      if (code !== 0) {
-        finish(new Error(`gunzip exited with code ${code}: ${gunzipStderr}`));
-      }
-    });
-
-    psql.on('close', (code) => {
-      if (code !== 0) {
-        finish(new Error(`psql exited with code ${code}: ${psqlStderr}`));
-      } else {
-        finish();
-      }
-    });
+    decompressor.on('error', (err) => finish(new Error(`${decompressCmd} error: ${err.message}`)));
+    restorer.on('error', (err) => finish(new Error(`${restoreCmd} error: ${err.message}`)));
+    decompressor.on('close', (code) => { if (code !== 0) finish(new Error(`${decompressCmd} exited ${code}: ${decompStderr}`)); });
+    restorer.on('close', (code) => { if (code !== 0) finish(new Error(`${restoreCmd} exited ${code}: ${restoreStderr}`)); else finish(); });
   });
+}
+
+/** Build backup command args based on environment (Docker vs local) */
+function buildDumpCommand(host: string, port: string, user: string, db: string): { cmd: string; args: string[] } {
+  const pgFlags = ['--no-owner', '--no-privileges', '--clean', '--if-exists'];
+  if (isInsideDocker() || hasPgDumpLocally()) {
+    return { cmd: 'pg_dump', args: ['-h', host, '-p', port, '-U', user, '-d', db, ...pgFlags] };
+  }
+  // Run pg_dump inside Docker container
+  const svc = getDbContainerService();
+  return { cmd: 'docker', args: ['compose', 'exec', '-T', svc, 'pg_dump', '-U', user, '-d', db, ...pgFlags] };
+}
+
+/** Build restore command args based on environment (Docker vs local) */
+function buildRestoreCommand(host: string, port: string, user: string, db: string): { cmd: string; args: string[] } {
+  if (isInsideDocker() || hasPgDumpLocally()) {
+    return { cmd: 'psql', args: ['-h', host, '-p', port, '-U', user, '-d', db] };
+  }
+  const svc = getDbContainerService();
+  return { cmd: 'docker', args: ['compose', 'exec', '-T', svc, 'psql', '-U', user, '-d', db] };
 }
 
 // GET /api/backup/list — list backup files
@@ -220,9 +229,9 @@ router.post('/create', roleMiddleware(['Admin']), async (_req, res) => {
     const filepath = path.join(BACKUP_DIR, filename);
 
     const env = { ...process.env, PGPASSWORD: password };
-    const pgArgs = ['-h', host, '-p', port, '-U', user, '-d', db, '--no-owner', '--no-privileges'] as const;
+    const { cmd: dumpCmd, args: dumpArgs } = buildDumpCommand(host, port, user, db);
 
-    await spawnPgDump(pgArgs, filepath, env, 120_000);
+    await spawnPipeline(dumpCmd, dumpArgs, 'gzip', [], filepath, env, 120_000);
 
     // Verify file was created
     try {
@@ -299,9 +308,9 @@ router.post('/restore', roleMiddleware(['Admin']), async (req, res) => {
 
     const { host, port, user, password, db } = parseDatabaseUrl();
     const env = { ...process.env, PGPASSWORD: password };
-    const psqlArgs = ['-h', host, '-p', port, '-U', user, '-d', db] as const;
+    const { cmd: restoreCmd, args: restoreArgs } = buildRestoreCommand(host, port, user, db);
 
-    await spawnPsqlRestore(filepath, psqlArgs, env, 300_000);
+    await spawnRestorePipeline('gunzip', ['-c', filepath], restoreCmd, restoreArgs, env, 300_000);
 
     logger.info(`Backup restored: ${sanitized}`);
     return res.json({ message: `Restore berhasil dari ${sanitized}.` });
