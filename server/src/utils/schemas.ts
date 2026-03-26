@@ -22,8 +22,8 @@ export const UpdateAccountSchema = CreateAccountSchema.partial().extend({
 // ─── Journal Entry ────────────────────────────────────────────────────────────
 const JournalItemSchema = z.object({
   accountId: z.string().min(1, 'Akun wajib dipilih.'),
-  debit: z.number().min(0),
-  credit: z.number().min(0),
+  debit: z.coerce.number().min(0),
+  credit: z.coerce.number().min(0),
   partyId: z.string().nullable().optional(),
   description: z.string().optional(),
 });
@@ -37,10 +37,10 @@ export const CreateJournalSchema = z.object({
 // ─── Sales Invoice ────────────────────────────────────────────────────────────
 const InvoiceItemSchema = z.object({
   itemName: z.string().min(1, 'Nama item wajib diisi.'),
-  quantity: z.number().positive('Jumlah harus lebih dari 0.'),
+  quantity: z.coerce.number().positive('Jumlah harus lebih dari 0.'),
   unit: z.string().optional(),
-  rate: z.number().positive('Harga harus lebih dari 0.'),
-  discount: z.number().min(0).max(100).optional().default(0), // persen diskon per baris
+  rate: z.coerce.number().positive('Harga harus lebih dari 0.'),
+  discount: z.coerce.number().min(0).max(100).optional().default(0), // persen diskon per baris
   description: z.string().optional(),
 });
 
@@ -50,9 +50,9 @@ export const CreateSalesInvoiceSchema = z.object({
   items: z.array(InvoiceItemSchema).min(1, 'Minimal satu item.'),
   dueDate: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
-  taxPct: z.number().min(0).max(100).optional().default(0),    // PPN %
-  potongan: z.number().min(0).optional().default(0),           // potongan amount
-  biayaLain: z.number().min(0).optional().default(0),          // biaya tambahan
+  taxPct: z.coerce.number().min(0).max(100).optional().default(0),    // PPN %
+  potongan: z.coerce.number().min(0).optional().default(0),           // potongan amount
+  biayaLain: z.coerce.number().min(0).optional().default(0),          // biaya tambahan
   labelPotongan: z.string().nullable().optional(),
   labelBiaya: z.string().nullable().optional(),
   terms: z.string().nullable().optional(),
@@ -65,22 +65,22 @@ export const CreatePurchaseInvoiceSchema = z.object({
   items: z.array(InvoiceItemSchema).min(1, 'Minimal satu item.'),
   dueDate: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
-  taxPct: z.number().min(0).max(100).optional().default(0),
-  potongan: z.number().min(0).optional().default(0),
-  biayaLain: z.number().min(0).optional().default(0),
+  taxPct: z.coerce.number().min(0).max(100).optional().default(0),
+  potongan: z.coerce.number().min(0).optional().default(0),
+  biayaLain: z.coerce.number().min(0).optional().default(0),
 });
 
 // ─── Payment ──────────────────────────────────────────────────────────────────
 const AllocationSchema = z.object({
   invoiceType: z.enum(['SalesInvoice', 'PurchaseInvoice']),
   invoiceId: z.string().min(1),
-  amount: z.number().positive(),
+  amount: z.coerce.number().positive(),
 });
 
 export const CreatePaymentSchema = z.object({
   date: z.string().min(1, 'Tanggal wajib diisi.'),
   partyId: z.string().min(1, 'Pihak wajib dipilih.'),
-  amount: z.number().positive('Jumlah harus lebih dari 0.'),
+  amount: z.coerce.number().positive('Jumlah harus lebih dari 0.'),
   paymentType: z.enum(['Receive', 'Pay']),
   accountId: z.string().min(1, 'Akun kas/bank wajib dipilih.'),
   allocations: z.array(AllocationSchema).optional(),
@@ -104,7 +104,7 @@ export const UpdatePartySchema = CreatePartySchema.partial().extend({
 
 // ─── Opening Balance ─────────────────────────────────────────────────────────
 export const SetBalanceSchema = z.object({
-  balance: z.number({ error: 'Saldo harus berupa angka.' }),
+  balance: z.coerce.number({ error: 'Saldo harus berupa angka.' }),
 });
 
 // ─── Company Settings ─────────────────────────────────────────────────────────
@@ -133,7 +133,7 @@ export const CreateInventoryItemSchema = z.object({
   unit: z.string().min(1, 'Satuan wajib diisi.'),
   category: z.string().nullable().optional(),
   description: z.string().nullable().optional(),
-  minimumStock: z.number().min(0).optional(),
+  minimumStock: z.coerce.number().min(0).optional(),
   accountId: z.string().nullable().optional(),
 });
 
@@ -145,8 +145,8 @@ export const UpdateInventoryItemSchema = CreateInventoryItemSchema.partial().ext
 export const CreateStockMovementSchema = z.object({
   itemId: z.string().min(1, 'Item wajib dipilih.'),
   movementType: z.enum(['In', 'Out', 'AdjustmentIn', 'AdjustmentOut']),
-  quantity: z.number().positive('Kuantitas harus lebih dari 0.'),
-  unitCost: z.number().min(0).optional(),
+  quantity: z.coerce.number().positive('Kuantitas harus lebih dari 0.'),
+  unitCost: z.coerce.number().min(0).optional(),
   date: z.string().min(1, 'Tanggal wajib diisi.'),
   offsetAccountId: z.string().nullable().optional(),
   referenceType: z.string().nullable().optional(),
@@ -189,7 +189,7 @@ export const CreateRecurringSchema = z.object({
   name: z.string().min(1, 'Nama template wajib diisi.'),
   templateType: z.enum(['journal', 'sales_invoice', 'purchase_invoice']),
   frequency: z.enum(['daily', 'weekly', 'monthly', 'quarterly', 'yearly']),
-  dayOfMonth: z.number().min(1).max(31).nullable().optional(),
+  dayOfMonth: z.coerce.number().min(1).max(31).nullable().optional(),
   nextRunDate: z.string().min(1, 'Tanggal berikutnya wajib diisi.'),
   templateData: z.any(),
 });
@@ -198,7 +198,7 @@ export const UpdateRecurringSchema = z.object({
   name: z.string().min(1, 'Nama template wajib diisi.').optional(),
   templateType: z.enum(['journal', 'sales_invoice', 'purchase_invoice']).optional(),
   frequency: z.enum(['daily', 'weekly', 'monthly', 'quarterly', 'yearly']).optional(),
-  dayOfMonth: z.number().min(1).max(31).nullable().optional(),
+  dayOfMonth: z.coerce.number().min(1).max(31).nullable().optional(),
   nextRunDate: z.string().optional(),
   templateData: z.any().optional(),
   isActive: z.boolean().optional(),
@@ -207,7 +207,7 @@ export const UpdateRecurringSchema = z.object({
 // ─── Production Run ───────────────────────────────────────────────────────────
 const ProductionLineSchema = z.object({
   itemId: z.string().min(1, 'Item wajib dipilih.'),
-  quantity: z.number().positive('Kuantitas harus lebih dari 0.'),
+  quantity: z.coerce.number().positive('Kuantitas harus lebih dari 0.'),
 });
 
 export const CreateProductionRunSchema = z.object({
@@ -224,12 +224,12 @@ export const CreateProductionRunSchema = z.object({
 export const CreateReconciliationSchema = z.object({
   accountId: z.string().min(1, 'Akun bank wajib dipilih.'),
   statementDate: z.string().min(1, 'Tanggal statement wajib diisi.'),
-  statementBalance: z.number({ message: 'Saldo statement harus berupa angka.' }),
+  statementBalance: z.coerce.number({ message: 'Saldo statement harus berupa angka.' }),
   notes: z.string().nullable().optional(),
 });
 
 const StatementItemSchema = z.object({
-  statementAmount: z.number({ message: 'Jumlah harus berupa angka.' }),
+  statementAmount: z.coerce.number({ message: 'Jumlah harus berupa angka.' }),
   statementDesc: z.string().nullable().optional(),
   statementDate: z.string().nullable().optional(),
 });
@@ -250,7 +250,7 @@ export const UnmatchItemSchema = z.object({
 // ─── Tax Config ──────────────────────────────────────────────────────────────
 export const CreateTaxConfigSchema = z.object({
   name: z.string().min(1, 'Nama pajak wajib diisi.'),
-  rate: z.number().min(0, 'Tarif tidak boleh negatif.').max(100, 'Tarif maksimal 100%.'),
+  rate: z.coerce.number().min(0, 'Tarif tidak boleh negatif.').max(100, 'Tarif maksimal 100%.'),
   type: z.enum(['sales', 'purchase', 'withholding'], { message: 'Tipe harus: sales, purchase, atau withholding.' }),
   accountId: z.string().nullable().optional(),
 });

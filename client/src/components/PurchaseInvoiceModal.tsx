@@ -86,7 +86,7 @@ const PurchaseInvoiceModal: React.FC<{ isOpen: boolean; onClose: () => void }> =
 
   return (
     <div role="dialog" aria-modal="true" aria-labelledby="purchase-modal-title" className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4" onKeyDown={(e: React.KeyboardEvent) => e.key === "Escape" && onClose()}>
-      <div className="bg-white rounded-xl w-full max-w-[calc(100vw-1rem)] lg:max-w-5xl shadow-2xl flex flex-col max-h-[95vh] overflow-hidden">
+      <div className="rounded-xl w-full max-w-[calc(100vw-1rem)] lg:max-w-5xl shadow-2xl flex flex-col max-h-[95vh] overflow-hidden" style={{ backgroundColor: 'var(--color-bg-primary)' }}>
 
         {/* ── HEADER BAR ── */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">

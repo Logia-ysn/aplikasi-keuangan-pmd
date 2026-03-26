@@ -68,11 +68,15 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, defaultTyp
     queryKey: ['open-invoices', partyId, paymentType],
     queryFn: async () => {
       if (paymentType === 'Receive') {
-        const res = await api.get('/sales/invoices', { params: { partyId, status: 'Submitted' } });
-        return (res.data.data ?? res.data).filter((inv: any) => Number(inv.outstanding) > 0);
+        const res = await api.get('/sales/invoices', { params: { partyId } });
+        return (res.data.data ?? res.data).filter((inv: any) =>
+          Number(inv.outstanding) > 0 && !['Cancelled', 'Paid'].includes(inv.status)
+        );
       } else {
-        const res = await api.get('/purchase/invoices', { params: { partyId, status: 'Submitted' } });
-        return (res.data.data ?? res.data).filter((inv: any) => Number(inv.outstanding) > 0);
+        const res = await api.get('/purchase/invoices', { params: { partyId } });
+        return (res.data.data ?? res.data).filter((inv: any) =>
+          Number(inv.outstanding) > 0 && !['Cancelled', 'Paid'].includes(inv.status)
+        );
       }
     },
     enabled: isOpen && !!partyId,
@@ -120,10 +124,10 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, defaultTyp
       className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4"
       onKeyDown={(e: React.KeyboardEvent) => e.key === 'Escape' && onClose()}
     >
-      <div className="bg-white rounded-xl w-full max-w-[calc(100vw-1rem)] sm:max-w-lg shadow-2xl flex flex-col max-h-[95vh] overflow-hidden">
+      <div className="rounded-xl w-full max-w-[calc(100vw-1rem)] sm:max-w-lg shadow-2xl flex flex-col max-h-[95vh] overflow-hidden" style={{ backgroundColor: 'var(--color-bg-primary)' }}>
 
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+        <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: 'var(--color-border)' }}>
           <div className="flex items-center gap-3">
             <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isReceive ? 'bg-green-50' : 'bg-orange-50'}`}>
               {isReceive
@@ -131,7 +135,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, defaultTyp
                 : <TrendingUp size={16} className="text-orange-500" />}
             </div>
             <div>
-              <h2 id="payment-modal-title" className="text-base font-semibold text-gray-900">
+              <h2 id="payment-modal-title" className="text-base font-semibold" style={{ color: 'var(--color-text-primary)' }}>
                 {isReceive ? 'Terima Pembayaran' : 'Catat Pengeluaran'}
               </h2>
               <p className="text-xs text-gray-400 mt-0.5">Draft • belum disimpan</p>
@@ -294,7 +298,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, defaultTyp
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3">
+        <div className="px-6 py-4 border-t flex justify-end gap-3" style={{ borderColor: 'var(--color-border)' }}>
           <button onClick={onClose} className="btn-secondary">Batal</button>
           <button
             onClick={handleSubmit}

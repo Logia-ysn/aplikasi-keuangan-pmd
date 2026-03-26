@@ -34,11 +34,10 @@ const ReconciliationModal: React.FC<Props> = ({ isOpen, onClose }) => {
   const { data: accounts } = useQuery<Account[]>({
     queryKey: ['coa-cash-accounts'],
     queryFn: async () => {
-      const res = await api.get('/coa');
-      // Filter cash/bank accounts (1.1.1.x and 1.1.2.x)
-      const all = Array.isArray(res.data) ? res.data : res.data.data || [];
+      const res = await api.get('/coa/flat');
+      const all: Account[] = Array.isArray(res.data) ? res.data : res.data.data || [];
       return all.filter(
-        (a: Account) =>
+        (a) =>
           (a.accountNumber.startsWith('1.1.1') || a.accountNumber.startsWith('1.1.2')) &&
           !(a as any).isGroup
       );

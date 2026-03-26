@@ -29,7 +29,7 @@ export function ConfirmDialog({
       className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 p-4"
       onKeyDown={(e) => e.key === 'Escape' && onCancel()}
     >
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6">
+      <div className="rounded-xl shadow-xl w-full max-w-sm p-6" style={{ backgroundColor: 'var(--color-bg-primary)' }}>
         <h2 id="confirm-dialog-title" className="text-base font-semibold text-gray-900 mb-2">
           {title}
         </h2>

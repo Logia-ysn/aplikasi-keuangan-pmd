@@ -73,12 +73,12 @@ const JournalEntryModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
 
   return (
     <div role="dialog" aria-modal="true" aria-labelledby="journal-modal-title" className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/30" onKeyDown={(e: React.KeyboardEvent) => e.key === "Escape" && onClose()}>
-      <div className="bg-white border border-gray-200 rounded-xl w-full max-w-[calc(100vw-1rem)] lg:max-w-5xl shadow-xl flex flex-col max-h-[90vh]">
+      <div className="rounded-xl border w-full max-w-[calc(100vw-1rem)] lg:max-w-5xl shadow-xl flex flex-col max-h-[90vh]" style={{ backgroundColor: 'var(--color-bg-primary)', borderColor: 'var(--color-border)' }}>
         {/* Header */}
-        <div className="px-5 py-4 border-b border-gray-100 flex justify-between items-center">
+        <div className="px-5 py-4 border-b flex justify-between items-center" style={{ borderColor: 'var(--color-border)' }}>
           <div>
-            <h3 id="journal-modal-title" className="text-base font-semibold text-gray-900">Buat Jurnal Baru</h3>
-            <p className="text-xs text-gray-500 mt-0.5">Catat transaksi keuangan secara manual</p>
+            <h3 id="journal-modal-title" className="text-base font-semibold" style={{ color: 'var(--color-text-primary)' }}>Buat Jurnal Baru</h3>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>Catat transaksi keuangan secara manual</p>
           </div>
           <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400 transition-colors">
             <X size={18} />
@@ -224,7 +224,7 @@ const JournalEntryModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
         </div>
 
         {/* Footer */}
-        <div className="px-5 py-4 border-t border-gray-100 flex justify-end gap-3">
+        <div className="px-5 py-4 border-t flex justify-end gap-3" style={{ borderColor: 'var(--color-border)' }}>
           <button onClick={onClose} className="btn-secondary">Batal</button>
           <button
             onClick={() => mutation.mutate({ date, narration, items })}
