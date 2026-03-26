@@ -138,7 +138,7 @@ router.post('/generate-dummy', roleMiddleware(['Admin']), async (req, res) => {
       return res.status(400).json({ error: 'Akun dasar (Kas, AR, AP, Sales) belum tersedia. Jalankan seed terlebih dahulu.' });
     }
 
-    const results = { parties: 0, salesInvoices: 0, purchaseInvoices: 0, payments: 0, journals: 0, inventoryItems: 0, movements: 0 };
+    const results = { parties: 0, salesInvoices: 0, purchaseInvoices: 0, payments: 0, journals: 0, inventoryItems: 0, movements: 0, productionRuns: 0 };
 
     await prisma.$transaction(async (tx) => {
       // --- Dummy Parties ---
@@ -330,6 +330,174 @@ router.post('/generate-dummy', roleMiddleware(['Admin']), async (req, res) => {
         ]});
         results.journals++;
       }
+
+      // --- Dummy Stock Movements & Production Runs ---
+      // Reload dummy items (may have been created above or exist already)
+      const dummyItems = await tx.inventoryItem.findMany({ where: { isDummy: true } });
+      const itemByCode = new Map(dummyItems.map(i => [i.code, i]));
+
+      const gkpItem = itemByCode.get('GBH-GKP');
+      const gkgItem = itemByCode.get('GBH-GKG');
+      const berasPrm = itemByCode.get('BRS-PRM');
+      const berasMed = itemByCode.get('BRS-MED');
+      const bekatul = itemByCode.get('BKT-001');
+      const sekam = itemByCode.get('SKM-001');
+      const menir = itemByCode.get('MNR-001');
+
+      if (gkpItem && gkgItem && berasPrm) {
+        const { generateDocumentNumber: genSM } = await import('../utils/documentNumber');
+        const { getOpenFiscalYear: getFY } = await import('../utils/fiscalYear');
+
+        for (let monthOffset = 2; monthOffset >= 0; monthOffset--) {
+          const month = new Date(now.getFullYear(), now.getMonth() - monthOffset, 1);
+
+          // Stock In: Gabah GKP masuk dari pembelian — 2x per bulan
+          for (let i = 0; i < 2; i++) {
+            const date = new Date(month.getFullYear(), month.getMonth(), 6 + i * 12);
+            const fy = await getFY(tx, date);
+            const qty = 3000 + Math.floor(Math.random() * 5000);
+            const unitCost = 4500 + Math.floor(Math.random() * 800);
+            const smNum = await genSM(tx, 'SM', date, fy.id);
+            await tx.stockMovement.create({
+              data: {
+                movementNumber: smNum, date, itemId: gkpItem.id, movementType: 'In',
+                quantity: qty, unitCost, totalValue: qty * unitCost,
+                offsetAccountId: kasId!, notes: 'Pembelian gabah GKP',
+                fiscalYearId: fy.id, createdById: admin.id,
+              },
+            });
+            await tx.inventoryItem.update({ where: { id: gkpItem.id }, data: { currentStock: { increment: qty } } });
+            results.movements++;
+          }
+
+          // Stock Out: GKP keluar untuk proses giling — 1x per bulan
+          const gilingDate = new Date(month.getFullYear(), month.getMonth(), 15);
+          const gilingFy = await getFY(tx, gilingDate);
+          const gilingQty = 4000 + Math.floor(Math.random() * 3000);
+          const smOutNum = await genSM(tx, 'SM', gilingDate, gilingFy.id);
+          await tx.stockMovement.create({
+            data: {
+              movementNumber: smOutNum, date: gilingDate, itemId: gkpItem.id, movementType: 'Out',
+              quantity: gilingQty, unitCost: 0, totalValue: 0,
+              notes: 'Proses giling ke GKG', referenceType: 'ProductionRun',
+              fiscalYearId: gilingFy.id, createdById: admin.id,
+            },
+          });
+          await tx.inventoryItem.update({ where: { id: gkpItem.id }, data: { currentStock: { decrement: gilingQty } } });
+          results.movements++;
+
+          // Stock In: GKG hasil proses giling (rendemen ~85%)
+          const gkgQty = Math.round(gilingQty * 0.85);
+          const smGkgNum = await genSM(tx, 'SM', gilingDate, gilingFy.id);
+          await tx.stockMovement.create({
+            data: {
+              movementNumber: smGkgNum, date: gilingDate, itemId: gkgItem.id, movementType: 'In',
+              quantity: gkgQty, unitCost: 0, totalValue: 0,
+              notes: 'Hasil giling dari GKP', referenceType: 'ProductionRun',
+              fiscalYearId: gilingFy.id, createdById: admin.id,
+            },
+          });
+          await tx.inventoryItem.update({ where: { id: gkgItem.id }, data: { currentStock: { increment: gkgQty } } });
+          results.movements++;
+
+          // Production Run: GKG → Beras Premium + Bekatul + Sekam + Menir
+          const prodDate = new Date(month.getFullYear(), month.getMonth(), 18);
+          const prodFy = await getFY(tx, prodDate);
+          const prodNum = await genSM(tx, 'PR', prodDate, prodFy.id);
+          const inputGkg = 2500 + Math.floor(Math.random() * 2000);
+          const outBeras = Math.round(inputGkg * 0.62);
+          const outBekatul = Math.round(inputGkg * 0.08);
+          const outSekam = Math.round(inputGkg * 0.20);
+          const outMenir = Math.round(inputGkg * 0.05);
+          const rendemen = Math.round((outBeras / inputGkg) * 10000) / 100;
+
+          await tx.productionRun.create({
+            data: {
+              runNumber: prodNum, date: prodDate, rendemenPct: rendemen,
+              notes: 'Produksi beras premium bulan ' + (month.getMonth() + 1),
+              fiscalYearId: prodFy.id, createdById: admin.id,
+              items: {
+                create: [
+                  { itemId: gkgItem.id, lineType: 'Input', quantity: inputGkg },
+                  { itemId: berasPrm.id, lineType: 'Output', quantity: outBeras, rendemenPct: rendemen },
+                  ...(bekatul ? [{ itemId: bekatul.id, lineType: 'Output' as const, quantity: outBekatul }] : []),
+                  ...(sekam ? [{ itemId: sekam.id, lineType: 'Output' as const, quantity: outSekam }] : []),
+                  ...(menir ? [{ itemId: menir.id, lineType: 'Output' as const, quantity: outMenir }] : []),
+                ],
+              },
+            },
+          });
+
+          // Update stock for production
+          await tx.inventoryItem.update({ where: { id: gkgItem.id }, data: { currentStock: { decrement: inputGkg } } });
+          await tx.inventoryItem.update({ where: { id: berasPrm.id }, data: { currentStock: { increment: outBeras } } });
+          if (bekatul) await tx.inventoryItem.update({ where: { id: bekatul.id }, data: { currentStock: { increment: outBekatul } } });
+          if (sekam) await tx.inventoryItem.update({ where: { id: sekam.id }, data: { currentStock: { increment: outSekam } } });
+          if (menir) await tx.inventoryItem.update({ where: { id: menir.id }, data: { currentStock: { increment: outMenir } } });
+          results.productionRuns++;
+
+          // Stock Out: Beras keluar (terjual) — 2x per bulan
+          for (let i = 0; i < 2; i++) {
+            const sellDate = new Date(month.getFullYear(), month.getMonth(), 20 + i * 4);
+            const sellFy = await getFY(tx, sellDate);
+            const sellQty = 300 + Math.floor(Math.random() * 500);
+            const smSellNum = await genSM(tx, 'SM', sellDate, sellFy.id);
+            await tx.stockMovement.create({
+              data: {
+                movementNumber: smSellNum, date: sellDate, itemId: berasPrm.id, movementType: 'Out',
+                quantity: sellQty, unitCost: 12000, totalValue: sellQty * 12000,
+                offsetAccountId: kasId!, notes: 'Penjualan beras premium',
+                fiscalYearId: sellFy.id, createdById: admin.id,
+              },
+            });
+            await tx.inventoryItem.update({ where: { id: berasPrm.id }, data: { currentStock: { decrement: sellQty } } });
+            results.movements++;
+          }
+
+          // Adjustment: Stok opname (kecil) — 1x per bulan pada bekatul
+          if (bekatul) {
+            const adjDate = new Date(month.getFullYear(), month.getMonth(), 28);
+            const adjFy = await getFY(tx, adjDate);
+            const adjQty = 10 + Math.floor(Math.random() * 30);
+            const smAdjNum = await genSM(tx, 'SM', adjDate, adjFy.id);
+            await tx.stockMovement.create({
+              data: {
+                movementNumber: smAdjNum, date: adjDate, itemId: bekatul.id, movementType: 'AdjustmentOut',
+                quantity: adjQty, unitCost: 0, totalValue: 0,
+                notes: 'Stok opname — selisih bekatul', fiscalYearId: adjFy.id, createdById: admin.id,
+              },
+            });
+            await tx.inventoryItem.update({ where: { id: bekatul.id }, data: { currentStock: { decrement: adjQty } } });
+            results.movements++;
+          }
+        }
+
+        // Second production run type: GKG → Beras Medium (lower rendemen)
+        if (berasMed) {
+          const prodDate2 = new Date(now.getFullYear(), now.getMonth(), 10);
+          const prodFy2 = await getFY(tx, prodDate2);
+          const prodNum2 = await genSM(tx, 'PR', prodDate2, prodFy2.id);
+          const inputQty2 = 2000;
+          const outBeras2 = Math.round(inputQty2 * 0.58);
+          const rendemen2 = Math.round((outBeras2 / inputQty2) * 10000) / 100;
+
+          await tx.productionRun.create({
+            data: {
+              runNumber: prodNum2, date: prodDate2, rendemenPct: rendemen2,
+              notes: 'Produksi beras medium', fiscalYearId: prodFy2.id, createdById: admin.id,
+              items: {
+                create: [
+                  { itemId: gkgItem.id, lineType: 'Input', quantity: inputQty2 },
+                  { itemId: berasMed.id, lineType: 'Output', quantity: outBeras2, rendemenPct: rendemen2 },
+                ],
+              },
+            },
+          });
+          await tx.inventoryItem.update({ where: { id: gkgItem.id }, data: { currentStock: { decrement: inputQty2 } } });
+          await tx.inventoryItem.update({ where: { id: berasMed.id }, data: { currentStock: { increment: outBeras2 } } });
+          results.productionRuns++;
+        }
+      }
     }, { timeout: 120000 });
 
     logger.info({ results }, 'Dummy data generated');
@@ -343,7 +511,7 @@ router.post('/generate-dummy', roleMiddleware(['Admin']), async (req, res) => {
 // POST /api/settings/delete-dummy — Delete only dummy data (Admin only)
 router.post('/delete-dummy', roleMiddleware(['Admin']), async (_req, res) => {
   try {
-    const results = { parties: 0, salesInvoices: 0, purchaseInvoices: 0, inventoryItems: 0 };
+    const results = { parties: 0, salesInvoices: 0, purchaseInvoices: 0, inventoryItems: 0, movements: 0, productionRuns: 0 };
 
     await prisma.$transaction(async (tx) => {
       // Delete dummy invoice items, ledger entries, journals linked to dummy invoices
@@ -378,11 +546,24 @@ router.post('/delete-dummy', roleMiddleware(['Admin']), async (_req, res) => {
         results.purchaseInvoices = (await tx.purchaseInvoice.deleteMany({ where: { isDummy: true } })).count;
       }
 
-      // Delete dummy inventory items (and their movements)
+      // Delete production runs linked to dummy inventory items
       const dummyItems = await tx.inventoryItem.findMany({ where: { isDummy: true }, select: { id: true } });
       if (dummyItems.length > 0) {
         const itemIds = dummyItems.map(i => i.id);
-        await tx.stockMovement.deleteMany({ where: { itemId: { in: itemIds } } });
+
+        // Find production runs that use dummy items
+        const dummyProdItems = await tx.productionRunItem.findMany({
+          where: { itemId: { in: itemIds } },
+          select: { productionRunId: true },
+        });
+        const prodRunIds = [...new Set(dummyProdItems.map(p => p.productionRunId))];
+        if (prodRunIds.length > 0) {
+          await tx.productionRunItem.deleteMany({ where: { productionRunId: { in: prodRunIds } } });
+          results.productionRuns = (await tx.productionRun.deleteMany({ where: { id: { in: prodRunIds } } })).count;
+        }
+
+        // Delete stock movements and inventory items
+        results.movements = (await tx.stockMovement.deleteMany({ where: { itemId: { in: itemIds } } })).count;
         results.inventoryItems = (await tx.inventoryItem.deleteMany({ where: { isDummy: true } })).count;
       }
 
