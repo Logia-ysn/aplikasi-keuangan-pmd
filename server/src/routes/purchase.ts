@@ -70,7 +70,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // POST /api/purchase/invoices — create purchase invoice
-router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthRequest, res) => {
+router.post('/', roleMiddleware(['Admin', 'Accountant', 'StaffProduksi']), async (req: AuthRequest, res) => {
   const body = validateBody(CreatePurchaseInvoiceSchema, req.body, res);
   if (!body) return;
 

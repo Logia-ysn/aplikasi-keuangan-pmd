@@ -26,24 +26,23 @@ import { cn } from '../lib/utils';
 import { useCompanySettings } from '../contexts/CompanySettingsContext';
 import { useTheme } from '../contexts/ThemeContext';
 
-const baseNavItems = [
-  { icon: LayoutDashboard, label: 'Dashboard', href: '/' },
-  { icon: Network, label: 'Bagan Akun', href: '/coa' },
-  { icon: Receipt, label: 'Buku Besar', href: '/gl' },
-  { icon: ShoppingCart, label: 'Penjualan', href: '/sales' },
-  { icon: Package, label: 'Pembelian', href: '/purchase' },
-  { icon: Warehouse, label: 'Stok & Gudang', href: '/inventory' },
-  { icon: CreditCard, label: 'Bank & Kas', href: '/payments' },
-  { icon: Scale, label: 'Rekonsiliasi Bank', href: '/reconciliation' },
-  { icon: Users, label: 'Pelanggan & Vendor', href: '/parties' },
-  { icon: Repeat, label: 'Transaksi Berulang', href: '/recurring' },
-  { icon: FileBarChart, label: 'Laporan Keuangan', href: '/reports' },
-  { icon: Settings, label: 'Pengaturan', href: '/settings' },
-];
+type NavItem = { icon: React.FC<any>; label: string; href: string; roles?: string[] };
 
-const adminNavItems = [
-  { icon: Shield, label: 'Manajemen User', href: '/users' },
-  { icon: ScrollText, label: 'Jejak Audit', href: '/audit' },
+const allNavItems: NavItem[] = [
+  { icon: LayoutDashboard, label: 'Dashboard', href: '/' },
+  { icon: Network, label: 'Bagan Akun', href: '/coa', roles: ['Admin', 'Accountant', 'Viewer'] },
+  { icon: Receipt, label: 'Buku Besar', href: '/gl', roles: ['Admin', 'Accountant', 'Viewer'] },
+  { icon: ShoppingCart, label: 'Penjualan', href: '/sales', roles: ['Admin', 'Accountant', 'Viewer'] },
+  { icon: Package, label: 'Pembelian', href: '/purchase', roles: ['Admin', 'Accountant', 'StaffProduksi'] },
+  { icon: Warehouse, label: 'Stok & Gudang', href: '/inventory' },
+  { icon: CreditCard, label: 'Bank & Kas', href: '/payments', roles: ['Admin', 'Accountant', 'Viewer'] },
+  { icon: Scale, label: 'Rekonsiliasi Bank', href: '/reconciliation', roles: ['Admin', 'Accountant'] },
+  { icon: Users, label: 'Pelanggan & Vendor', href: '/parties', roles: ['Admin', 'Accountant', 'StaffProduksi'] },
+  { icon: Repeat, label: 'Transaksi Berulang', href: '/recurring', roles: ['Admin', 'Accountant'] },
+  { icon: FileBarChart, label: 'Laporan Keuangan', href: '/reports', roles: ['Admin', 'Accountant', 'Viewer'] },
+  { icon: Settings, label: 'Pengaturan', href: '/settings', roles: ['Admin'] },
+  { icon: Shield, label: 'Manajemen User', href: '/users', roles: ['Admin'] },
+  { icon: ScrollText, label: 'Jejak Audit', href: '/audit', roles: ['Admin'] },
 ];
 
 interface SidebarProps {
@@ -74,11 +73,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen = false, onMobileCl
   }, []);
 
   const navItems = useMemo(() => {
-    const items = [...baseNavItems];
-    if (user?.role === 'Admin') {
-      items.push(...adminNavItems);
-    }
-    return items;
+    const role = user?.role;
+    return allNavItems.filter((item) => !item.roles || item.roles.includes(role));
   }, [user?.role]);
 
   const handleNavClick = () => {

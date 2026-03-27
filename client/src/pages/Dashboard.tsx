@@ -20,6 +20,12 @@ import RecentMovements from '../components/widgets/RecentMovements';
 import ProductionStatsWidget from '../components/widgets/ProductionStatsWidget';
 import DashboardSettings, { DEFAULT_WIDGETS, type WidgetConfig } from '../components/DashboardSettings';
 
+// Widget IDs only visible to finance roles (not StaffProduksi)
+const FINANCE_WIDGET_IDS = new Set([
+  'revenue-chart', 'recent-activities', 'top-customers',
+  'overdue-invoices', 'expense-breakdown',
+]);
+
 const STORAGE_KEY = 'dashboard-widgets';
 
 function loadWidgetPrefs(): Record<string, boolean> {
@@ -39,13 +45,26 @@ export const Dashboard = () => {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [widgetPrefs, setWidgetPrefs] = useState<Record<string, boolean>>(loadWidgetPrefs);
 
+  const userRole = useMemo(() => {
+    try { return JSON.parse(localStorage.getItem('user') || 'null')?.role; }
+    catch { return null; }
+  }, []);
+  const isStaffProduksi = userRole === 'StaffProduksi';
+
+  const availableWidgets = useMemo(
+    () => isStaffProduksi
+      ? DEFAULT_WIDGETS.filter((w) => !FINANCE_WIDGET_IDS.has(w.id))
+      : DEFAULT_WIDGETS,
+    [isStaffProduksi]
+  );
+
   const widgets: WidgetConfig[] = useMemo(
     () =>
-      DEFAULT_WIDGETS.map((w) => ({
+      availableWidgets.map((w) => ({
         ...w,
         enabled: widgetPrefs[w.id] !== undefined ? widgetPrefs[w.id] : w.enabled,
       })),
-    [widgetPrefs]
+    [availableWidgets, widgetPrefs]
   );
 
   const isEnabled = useCallback(
@@ -99,10 +118,12 @@ export const Dashboard = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-semibold" style={{ color: 'var(--color-text-primary)' }}>
-            Dashboard
+            {isStaffProduksi ? 'Dashboard Gudang & Produksi' : 'Dashboard'}
           </h1>
           <p className="text-sm mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
-            Ringkasan keuangan {company?.companyName || 'perusahaan Anda'}
+            {isStaffProduksi
+              ? `Ringkasan stok, gudang & produksi ${company?.companyName || 'perusahaan Anda'}`
+              : `Ringkasan keuangan ${company?.companyName || 'perusahaan Anda'}`}
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -120,29 +141,34 @@ export const Dashboard = () => {
         </div>
       </div>
 
-      {/* KPI Cards (always shown) */}
-      <KPICards data={metrics} loading={isMetricsLoading} />
+      {/* ── Finance Dashboard (non-StaffProduksi) ── */}
+      {!isStaffProduksi && (
+        <>
+          {/* KPI Cards (always shown) */}
+          <KPICards data={metrics} loading={isMetricsLoading} />
 
-      {/* Widget Grid: Revenue Chart + Recent Activities / Top Customers */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {isEnabled('revenue-chart') && (
-          <div className="lg:col-span-2">
-            <RevenueChart data={chartData} loading={isChartsLoading} />
+          {/* Widget Grid: Revenue Chart + Recent Activities / Top Customers */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            {isEnabled('revenue-chart') && (
+              <div className="lg:col-span-2">
+                <RevenueChart data={chartData} loading={isChartsLoading} />
+              </div>
+            )}
+            {isEnabled('recent-activities') && (
+              <RecentActivities data={recentActivities || null} />
+            )}
           </div>
-        )}
-        {isEnabled('recent-activities') && (
-          <RecentActivities data={recentActivities || null} />
-        )}
-      </div>
 
-      {/* Second row of widgets */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {isEnabled('top-customers') && <TopCustomers />}
-        {isEnabled('overdue-invoices') && <OverdueInvoices />}
-        {isEnabled('expense-breakdown') && <ExpenseBreakdown />}
-      </div>
+          {/* Second row of widgets */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {isEnabled('top-customers') && <TopCustomers />}
+            {isEnabled('overdue-invoices') && <OverdueInvoices />}
+            {isEnabled('expense-breakdown') && <ExpenseBreakdown />}
+          </div>
+        </>
+      )}
 
-      {/* Third row */}
+      {/* Stock Alert */}
       {isEnabled('stock-alert') && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <StockAlert />
@@ -152,14 +178,16 @@ export const Dashboard = () => {
       {/* ── Warehouse Section ── */}
       {(isEnabled('warehouse-kpi') || isEnabled('movement-trend') || isEnabled('category-distribution') || isEnabled('top-items') || isEnabled('recent-movements') || isEnabled('production-stats')) && (
         <>
-          {/* Section Divider */}
-          <div className="flex items-center gap-3 pt-2">
-            <div className="h-px flex-1" style={{ backgroundColor: 'var(--color-border)' }} />
-            <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
-              Gudang & Inventori
-            </span>
-            <div className="h-px flex-1" style={{ backgroundColor: 'var(--color-border)' }} />
-          </div>
+          {/* Section Divider (only for non-StaffProduksi since it's the main content for them) */}
+          {!isStaffProduksi && (
+            <div className="flex items-center gap-3 pt-2">
+              <div className="h-px flex-1" style={{ backgroundColor: 'var(--color-border)' }} />
+              <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
+                Gudang & Inventori
+              </span>
+              <div className="h-px flex-1" style={{ backgroundColor: 'var(--color-border)' }} />
+            </div>
+          )}
 
           {isEnabled('warehouse-kpi') && <WarehouseKPICards />}
 

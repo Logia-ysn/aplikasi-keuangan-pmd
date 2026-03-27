@@ -415,6 +415,7 @@ enum PaymentType {
 enum UserRole {
   Admin
   Accountant
+  StaffProduksi
   Viewer
 }
 

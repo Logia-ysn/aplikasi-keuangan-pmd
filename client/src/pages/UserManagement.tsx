@@ -88,6 +88,8 @@ export const UserManagement = () => {
         return <span className="badge badge-blue gap-1 rounded-full text-[10px] font-semibold"><ShieldCheck size={10} /> Admin</span>;
       case 'Accountant':
         return <span className="badge badge-green gap-1 rounded-full text-[10px] font-semibold"><Shield size={10} /> Accountant</span>;
+      case 'StaffProduksi':
+        return <span className="badge badge-orange gap-1 rounded-full text-[10px] font-semibold"><Shield size={10} /> Staff Produksi</span>;
       default:
         return <span className="badge badge-gray gap-1 rounded-full text-[10px] font-semibold"><Eye size={10} /> Viewer</span>;
     }

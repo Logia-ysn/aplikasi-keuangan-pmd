@@ -158,8 +158,8 @@ export const CreateStockMovementSchema = z.object({
 });
 
 // ─── User Management ─────────────────────────────────────────────────────────
-const UserRoleEnum = z.enum(['Admin', 'Accountant', 'Viewer'], {
-  message: "Role harus salah satu dari: Admin, Accountant, Viewer",
+const UserRoleEnum = z.enum(['Admin', 'Accountant', 'StaffProduksi', 'Viewer'], {
+  message: "Role harus salah satu dari: Admin, Accountant, StaffProduksi, Viewer",
 });
 
 export const CreateUserSchema = z.object({

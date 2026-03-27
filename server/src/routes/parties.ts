@@ -35,7 +35,7 @@ router.get('/', async (req, res) => {
 });
 
 // POST /api/parties
-router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req, res) => {
+router.post('/', roleMiddleware(['Admin', 'Accountant', 'StaffProduksi']), async (req, res) => {
   const body = validateBody(CreatePartySchema, req.body, res);
   if (!body) return;
 
@@ -58,7 +58,7 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req, res) => {
 });
 
 // PUT /api/parties/:id
-router.put('/:id', roleMiddleware(['Admin', 'Accountant']), async (req, res) => {
+router.put('/:id', roleMiddleware(['Admin', 'Accountant', 'StaffProduksi']), async (req, res) => {
   const id = req.params.id as string;
   const body = validateBody(UpdatePartySchema, req.body, res);
   if (!body) return;

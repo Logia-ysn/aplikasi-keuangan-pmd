@@ -34,6 +34,27 @@ const ProtectedRoute = () => {
   return <Outlet />;
 };
 
+function getUserRole(): string | null {
+  try { return JSON.parse(localStorage.getItem('user') || 'null')?.role ?? null; }
+  catch { return null; }
+}
+
+const RoleRoute = ({ allowed, children }: { allowed: string[]; children: React.ReactNode }) => {
+  const role = getUserRole();
+  if (role && !allowed.includes(role)) {
+    return <Navigate to="/" replace />;
+  }
+  return <>{children}</>;
+};
+
+// Shorthand: routes only accessible to finance roles (not StaffProduksi)
+const FinanceRoute = ({ children }: { children: React.ReactNode }) => (
+  <RoleRoute allowed={['Admin', 'Accountant', 'Viewer']}>{children}</RoleRoute>
+);
+const AdminRoute = ({ children }: { children: React.ReactNode }) => (
+  <RoleRoute allowed={['Admin']}>{children}</RoleRoute>
+);
+
 function App() {
   return (
     <Router>
@@ -43,30 +64,30 @@ function App() {
         <Route element={<ProtectedRoute />}>
           <Route element={<CompanySettingsProvider><MainLayout /></CompanySettingsProvider>}>
             <Route path="/" element={<Dashboard />} />
-            <Route path="/coa" element={<COAPage />} />
-            <Route path="/gl" element={<GeneralLedger />} />
-            <Route path="/sales" element={<SalesInvoices />} />
-            <Route path="/purchase" element={<PurchaseInvoices />} />
-            <Route path="/payments" element={<Payments />} />
-            <Route path="/parties" element={<PartiesPage />} />
+            <Route path="/coa" element={<FinanceRoute><COAPage /></FinanceRoute>} />
+            <Route path="/gl" element={<FinanceRoute><GeneralLedger /></FinanceRoute>} />
+            <Route path="/sales" element={<FinanceRoute><SalesInvoices /></FinanceRoute>} />
+            <Route path="/purchase" element={<RoleRoute allowed={['Admin', 'Accountant', 'StaffProduksi']}><PurchaseInvoices /></RoleRoute>} />
+            <Route path="/payments" element={<FinanceRoute><Payments /></FinanceRoute>} />
+            <Route path="/parties" element={<RoleRoute allowed={['Admin', 'Accountant', 'StaffProduksi']}><PartiesPage /></RoleRoute>} />
             <Route path="/inventory" element={<InventoryPage />} />
 
             {/* Report Routes */}
-            <Route path="/reports" element={<Reports />} />
-            <Route path="/reports/trial-balance" element={<TrialBalance />} />
-            <Route path="/reports/profit-loss" element={<ProfitLoss />} />
-            <Route path="/reports/balance-sheet" element={<BalanceSheet />} />
-            <Route path="/reports/cash-flow" element={<CashFlow />} />
-            <Route path="/reports/aging-ar" element={<AgingAnalysis type="Customer" />} />
-            <Route path="/reports/aging-ap" element={<AgingAnalysis type="Supplier" />} />
-            <Route path="/reports/tax" element={<TaxReport />} />
+            <Route path="/reports" element={<FinanceRoute><Reports /></FinanceRoute>} />
+            <Route path="/reports/trial-balance" element={<FinanceRoute><TrialBalance /></FinanceRoute>} />
+            <Route path="/reports/profit-loss" element={<FinanceRoute><ProfitLoss /></FinanceRoute>} />
+            <Route path="/reports/balance-sheet" element={<FinanceRoute><BalanceSheet /></FinanceRoute>} />
+            <Route path="/reports/cash-flow" element={<FinanceRoute><CashFlow /></FinanceRoute>} />
+            <Route path="/reports/aging-ar" element={<FinanceRoute><AgingAnalysis type="Customer" /></FinanceRoute>} />
+            <Route path="/reports/aging-ap" element={<FinanceRoute><AgingAnalysis type="Supplier" /></FinanceRoute>} />
+            <Route path="/reports/tax" element={<FinanceRoute><TaxReport /></FinanceRoute>} />
 
-            <Route path="/reconciliation" element={<BankReconciliation />} />
-            <Route path="/settings" element={<SettingsPage />} />
-            <Route path="/users" element={<UserManagement />} />
-            <Route path="/audit" element={<AuditTrail />} />
+            <Route path="/reconciliation" element={<FinanceRoute><BankReconciliation /></FinanceRoute>} />
+            <Route path="/settings" element={<AdminRoute><SettingsPage /></AdminRoute>} />
+            <Route path="/users" element={<AdminRoute><UserManagement /></AdminRoute>} />
+            <Route path="/audit" element={<AdminRoute><AuditTrail /></AdminRoute>} />
             <Route path="/notifications" element={<Notifications />} />
-            <Route path="/recurring" element={<RecurringTransactions />} />
+            <Route path="/recurring" element={<FinanceRoute><RecurringTransactions /></FinanceRoute>} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Route>

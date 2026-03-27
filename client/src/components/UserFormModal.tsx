@@ -4,7 +4,7 @@ import api from '../lib/api';
 import { X, Loader2, AlertCircle, User, Mail, Lock, Shield } from 'lucide-react';
 import { cn } from '../lib/utils';
 
-type UserRole = 'Admin' | 'Accountant' | 'Viewer';
+type UserRole = 'Admin' | 'Accountant' | 'StaffProduksi' | 'Viewer';
 
 interface UserFormData {
   username: string;
@@ -203,6 +203,7 @@ const UserFormModal: React.FC<UserFormModalProps> = ({ isOpen, onClose, editUser
               >
                 <option value="Admin">Admin</option>
                 <option value="Accountant">Accountant</option>
+                <option value="StaffProduksi">Staff Produksi</option>
                 <option value="Viewer">Viewer</option>
               </select>
             </div>

@@ -27,9 +27,10 @@ async function main() {
   const hashedPassword = await bcrypt.hash('Admin123!', 12);
 
   const users = [
-    { username: 'admin',    fullName: 'Administrator',   email: 'admin@keuangan.local',  role: UserRole.Admin },
-    { username: 'staff',    fullName: 'Staff Keuangan',  email: 'staff@keuangan.local',  role: UserRole.Accountant },
-    { username: 'viewer',   fullName: 'Viewer',          email: 'viewer@keuangan.local', role: UserRole.Viewer },
+    { username: 'admin',    fullName: 'Administrator',   email: 'admin@keuangan.local',    role: UserRole.Admin },
+    { username: 'staff',    fullName: 'Staff Keuangan',  email: 'staff@keuangan.local',    role: UserRole.Accountant },
+    { username: 'produksi', fullName: 'Staff Produksi',  email: 'produksi@keuangan.local', role: UserRole.StaffProduksi },
+    { username: 'viewer',   fullName: 'Viewer',          email: 'viewer@keuangan.local',   role: UserRole.Viewer },
   ];
 
   for (const u of users) {

@@ -48,7 +48,7 @@ router.get('/items', async (req, res) => {
 });
 
 // POST /api/inventory/items
-router.post('/items', roleMiddleware(['Admin', 'Accountant']), async (req: AuthRequest, res) => {
+router.post('/items', roleMiddleware(['Admin', 'Accountant', 'StaffProduksi']), async (req: AuthRequest, res) => {
   const body = validateBody(CreateInventoryItemSchema, req.body, res);
   if (!body) return;
 
@@ -77,7 +77,7 @@ router.post('/items', roleMiddleware(['Admin', 'Accountant']), async (req: AuthR
 });
 
 // PUT /api/inventory/items/:id
-router.put('/items/:id', roleMiddleware(['Admin', 'Accountant']), async (req: AuthRequest, res) => {
+router.put('/items/:id', roleMiddleware(['Admin', 'Accountant', 'StaffProduksi']), async (req: AuthRequest, res) => {
   const id = req.params.id as string;
   const body = validateBody(UpdateInventoryItemSchema, req.body, res);
   if (!body) return;
@@ -146,7 +146,7 @@ router.get('/movements', async (req, res) => {
 });
 
 // POST /api/inventory/movements
-router.post('/movements', roleMiddleware(['Admin', 'Accountant']), async (req: AuthRequest, res) => {
+router.post('/movements', roleMiddleware(['Admin', 'Accountant', 'StaffProduksi']), async (req: AuthRequest, res) => {
   const body = validateBody(CreateStockMovementSchema, req.body, res);
   if (!body) return;
 
@@ -409,7 +409,7 @@ router.get('/production-runs', async (req, res) => {
 });
 
 // POST /api/inventory/production-runs
-router.post('/production-runs', roleMiddleware(['Admin', 'Accountant']), async (req: AuthRequest, res) => {
+router.post('/production-runs', roleMiddleware(['Admin', 'Accountant', 'StaffProduksi']), async (req: AuthRequest, res) => {
   const body = validateBody(CreateProductionRunSchema, req.body, res);
   if (!body) return;
 
