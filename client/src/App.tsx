@@ -82,12 +82,12 @@ function App() {
             <Route path="/reports/aging-ap" element={<FinanceRoute><AgingAnalysis type="Supplier" /></FinanceRoute>} />
             <Route path="/reports/tax" element={<FinanceRoute><TaxReport /></FinanceRoute>} />
 
-            <Route path="/reconciliation" element={<FinanceRoute><BankReconciliation /></FinanceRoute>} />
+            <Route path="/reconciliation" element={<RoleRoute allowed={['Admin', 'Accountant']}><BankReconciliation /></RoleRoute>} />
             <Route path="/settings" element={<AdminRoute><SettingsPage /></AdminRoute>} />
             <Route path="/users" element={<AdminRoute><UserManagement /></AdminRoute>} />
             <Route path="/audit" element={<AdminRoute><AuditTrail /></AdminRoute>} />
             <Route path="/notifications" element={<Notifications />} />
-            <Route path="/recurring" element={<FinanceRoute><RecurringTransactions /></FinanceRoute>} />
+            <Route path="/recurring" element={<RoleRoute allowed={['Admin', 'Accountant']}><RecurringTransactions /></RoleRoute>} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Route>

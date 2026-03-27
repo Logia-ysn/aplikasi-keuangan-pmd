@@ -79,15 +79,23 @@ const DashboardSettings: React.FC<DashboardSettingsProps> = ({ isOpen, onClose, 
                   {w.description}
                 </p>
               </div>
-              <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
-                <input
-                  type="checkbox"
-                  checked={w.enabled}
-                  onChange={() => onToggle(w.id)}
-                  className="sr-only peer"
+              <button
+                type="button"
+                role="switch"
+                aria-checked={w.enabled}
+                aria-label={`Toggle ${w.name}`}
+                onClick={() => onToggle(w.id)}
+                className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-300 ${
+                  w.enabled ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-700'
+                }`}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white border border-gray-300 shadow-sm transition-transform ${
+                    w.enabled ? 'translate-x-4' : 'translate-x-0.5'
+                  }`}
+                  style={{ marginTop: '2px' }}
                 />
-                <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600 dark:bg-gray-700 dark:peer-checked:bg-blue-600" />
-              </label>
+              </button>
             </div>
           ))}
         </div>
