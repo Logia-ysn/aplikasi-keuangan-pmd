@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import Decimal from 'decimal.js';
 import { prisma } from '../lib/prisma';
 import { AuthRequest, roleMiddleware } from '../middleware/auth';
 import { validateBody } from '../utils/validate';
@@ -505,12 +506,15 @@ router.post('/production-runs', roleMiddleware(['Admin', 'Accountant']), async (
         });
       }
 
-      // 8. Process outputs: increase stock + create StockMovement In
+      // 8. Process outputs: increase stock + create StockMovement In (with unitPrice if provided)
       for (const output of body.outputs) {
         await tx.inventoryItem.update({
           where: { id: output.itemId },
           data: { currentStock: { increment: output.quantity } },
         });
+
+        const unitCost = output.unitPrice ?? 0;
+        const totalValue = new Decimal(output.quantity).mul(new Decimal(unitCost)).toDecimalPlaces(2).toNumber();
 
         const movNumber = await generateDocumentNumber(tx, 'SM', runDate, fiscalYear.id);
         await tx.stockMovement.create({
@@ -520,8 +524,8 @@ router.post('/production-runs', roleMiddleware(['Admin', 'Accountant']), async (
             itemId: output.itemId,
             movementType: 'In',
             quantity: output.quantity,
-            unitCost: 0,
-            totalValue: 0,
+            unitCost,
+            totalValue,
             referenceType: 'ProductionRun',
             referenceId: run.id,
             referenceNumber: runNumber,
@@ -539,6 +543,7 @@ router.post('/production-runs', roleMiddleware(['Admin', 'Accountant']), async (
           itemId: i.itemId,
           lineType: 'Input',
           quantity: i.quantity,
+          unitPrice: null as number | null,
           rendemenPct: null as number | null,
         })),
         ...body.outputs.map((o) => {
@@ -551,6 +556,7 @@ router.post('/production-runs', roleMiddleware(['Admin', 'Accountant']), async (
             itemId: o.itemId,
             lineType: 'Output',
             quantity: o.quantity,
+            unitPrice: o.unitPrice ?? null,
             rendemenPct: rPct,
           };
         }),

@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Loader2, Warehouse, PackageSearch, Edit2, XCircle, Plus } from 'lucide-react';
 import { cn } from '../lib/utils';
 import api from '../lib/api';
-import { formatDate } from '../lib/formatters';
+import { formatDate, formatRupiah } from '../lib/formatters';
 import { toast } from 'sonner';
 import { InventoryItemModal } from '../components/InventoryItemModal';
 import { StockMovementModal } from '../components/StockMovementModal';
@@ -549,6 +549,11 @@ export function InventoryPage() {
                               <span className="text-gray-400 ml-1">
                                 {formatNumber(Number(line.quantity))} {line.item?.unit}
                               </span>
+                              {line.unitPrice != null && Number(line.unitPrice) > 0 && (
+                                <span className="text-blue-500 ml-1 font-mono">
+                                  @{formatRupiah(Number(line.unitPrice))}
+                                </span>
+                              )}
                             </div>
                           ))}
                         </td>

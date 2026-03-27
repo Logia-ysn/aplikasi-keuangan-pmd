@@ -256,9 +256,15 @@ export const UpdateRecurringSchema = z.object({
 });
 
 // ─── Production Run ───────────────────────────────────────────────────────────
-const ProductionLineSchema = z.object({
+const ProductionInputLineSchema = z.object({
   itemId: z.string().min(1, 'Item wajib dipilih.'),
   quantity: z.coerce.number().positive('Kuantitas harus lebih dari 0.'),
+});
+
+const ProductionOutputLineSchema = z.object({
+  itemId: z.string().min(1, 'Item wajib dipilih.'),
+  quantity: z.coerce.number().positive('Kuantitas harus lebih dari 0.'),
+  unitPrice: z.coerce.number().nonnegative('Harga tidak boleh negatif.').optional().nullable(),
 });
 
 export const CreateProductionRunSchema = z.object({
@@ -267,8 +273,8 @@ export const CreateProductionRunSchema = z.object({
   referenceType: z.string().nullable().optional(),
   referenceId: z.string().nullable().optional(),
   referenceNumber: z.string().nullable().optional(),
-  inputs: z.array(ProductionLineSchema).min(1, 'Minimal satu item input.'),
-  outputs: z.array(ProductionLineSchema).min(1, 'Minimal satu item output.'),
+  inputs: z.array(ProductionInputLineSchema).min(1, 'Minimal satu item input.'),
+  outputs: z.array(ProductionOutputLineSchema).min(1, 'Minimal satu item output.'),
 });
 
 // ─── Bank Reconciliation ────────────────────────────────────────────────────

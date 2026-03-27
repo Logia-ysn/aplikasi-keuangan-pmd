@@ -9,6 +9,12 @@ interface LineItem {
   quantity: string;
 }
 
+interface OutputLineItem {
+  itemId: string;
+  quantity: string;
+  unitPrice: string;
+}
+
 interface Props {
   isOpen: boolean;
   onClose: () => void;
@@ -23,7 +29,7 @@ export function ProductionRunModal({ isOpen, onClose, items }: Props) {
   const [referenceNumber, setReferenceNumber] = useState('');
   const [notes, setNotes] = useState('');
   const [inputs, setInputs] = useState<LineItem[]>([{ itemId: '', quantity: '' }]);
-  const [outputs, setOutputs] = useState<LineItem[]>([{ itemId: '', quantity: '' }]);
+  const [outputs, setOutputs] = useState<OutputLineItem[]>([{ itemId: '', quantity: '', unitPrice: '' }]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
 
@@ -34,7 +40,7 @@ export function ProductionRunModal({ isOpen, onClose, items }: Props) {
       setReferenceNumber('');
       setNotes('');
       setInputs([{ itemId: '', quantity: '' }]);
-      setOutputs([{ itemId: '', quantity: '' }]);
+      setOutputs([{ itemId: '', quantity: '', unitPrice: '' }]);
       setErrors([]);
       setIsSubmitting(false);
     }
@@ -60,12 +66,12 @@ export function ProductionRunModal({ isOpen, onClose, items }: Props) {
   const updateInput = (idx: number, field: keyof LineItem, value: string) => {
     setInputs(prev => prev.map((row, i) => i === idx ? { ...row, [field]: value } : row));
   };
-  const updateOutput = (idx: number, field: keyof LineItem, value: string) => {
+  const updateOutput = (idx: number, field: keyof OutputLineItem, value: string) => {
     setOutputs(prev => prev.map((row, i) => i === idx ? { ...row, [field]: value } : row));
   };
   const addInput = () => setInputs(prev => [...prev, { itemId: '', quantity: '' }]);
   const removeInput = (idx: number) => setInputs(prev => prev.filter((_, i) => i !== idx));
-  const addOutput = () => setOutputs(prev => [...prev, { itemId: '', quantity: '' }]);
+  const addOutput = () => setOutputs(prev => [...prev, { itemId: '', quantity: '', unitPrice: '' }]);
   const removeOutput = (idx: number) => setOutputs(prev => prev.filter((_, i) => i !== idx));
 
   // Rendemen calculation
@@ -100,7 +106,11 @@ export function ProductionRunModal({ isOpen, onClose, items }: Props) {
         notes: notes || null,
         referenceNumber: referenceNumber || null,
         inputs: validInputs.map(i => ({ itemId: i.itemId, quantity: parseFloat(i.quantity) })),
-        outputs: validOutputs.map(o => ({ itemId: o.itemId, quantity: parseFloat(o.quantity) })),
+        outputs: validOutputs.map(o => ({
+          itemId: o.itemId,
+          quantity: parseFloat(o.quantity),
+          unitPrice: o.unitPrice ? parseFloat(o.unitPrice) : null,
+        })),
       });
       queryClient.invalidateQueries({ queryKey: ['production-runs'] });
       queryClient.invalidateQueries({ queryKey: ['inventory-items'] });
@@ -263,55 +273,75 @@ export function ProductionRunModal({ isOpen, onClose, items }: Props) {
                   <Plus size={13} /> Tambah Output
                 </button>
               </div>
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {outputs.map((row, idx) => {
                   const item = getItemById(row.itemId);
                   const qty = parseFloat(row.quantity) || 0;
+                  const price = parseFloat(row.unitPrice) || 0;
                   const rPct = totalInputQty > 0 && qty > 0
                     ? ((qty / totalInputQty) * 100).toFixed(1)
                     : null;
                   return (
-                    <div key={idx} className="flex gap-2 items-start">
-                      <div className="flex-1">
-                        <select
-                          value={row.itemId}
-                          onChange={e => updateOutput(idx, 'itemId', e.target.value)}
-                          className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        >
-                          <option value="">— Pilih Item —</option>
-                          {items.filter(i => i.isActive !== false).map((i: any) => (
-                            <option key={i.id} value={i.id}>
-                              {i.code} — {i.name}
-                            </option>
-                          ))}
-                        </select>
+                    <div key={idx} className="border border-gray-100 rounded-lg p-2.5 space-y-2 bg-gray-50/50">
+                      <div className="flex gap-2 items-start">
+                        <div className="flex-1">
+                          <select
+                            value={row.itemId}
+                            onChange={e => updateOutput(idx, 'itemId', e.target.value)}
+                            className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          >
+                            <option value="">— Pilih Item —</option>
+                            {items.filter(i => i.isActive !== false).map((i: any) => (
+                              <option key={i.id} value={i.id}>
+                                {i.code} — {i.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="w-28 flex gap-1 items-center">
+                          <input
+                            type="number"
+                            value={row.quantity}
+                            onChange={e => updateOutput(idx, 'quantity', e.target.value)}
+                            placeholder="Qty"
+                            min="0.001"
+                            step="0.001"
+                            className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                          {item && <span className="text-xs text-gray-400 whitespace-nowrap">{item.unit}</span>}
+                        </div>
+                        {rPct !== null && (
+                          <div className="flex items-center px-2 py-2 bg-green-50 rounded-lg min-w-[46px] text-center">
+                            <span className="text-xs font-semibold text-green-700">{rPct}%</span>
+                          </div>
+                        )}
+                        {outputs.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => removeOutput(idx)}
+                            className="p-2 text-gray-300 hover:text-red-500 transition-colors"
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        )}
                       </div>
-                      <div className="w-36 flex gap-1 items-center">
+                      {/* HPP / Unit Price row */}
+                      <div className="flex items-center gap-2 pl-0.5">
+                        <label className="text-[10px] text-gray-400 font-medium whitespace-nowrap">HPP/kg (Rp)</label>
                         <input
                           type="number"
-                          value={row.quantity}
-                          onChange={e => updateOutput(idx, 'quantity', e.target.value)}
-                          placeholder="Qty"
-                          min="0.001"
-                          step="0.001"
-                          className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          value={row.unitPrice}
+                          onChange={e => updateOutput(idx, 'unitPrice', e.target.value)}
+                          placeholder="Harga per unit"
+                          min="0"
+                          className="w-36 border border-gray-200 rounded-lg py-1.5 px-2.5 text-sm font-mono bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                         />
-                        {item && <span className="text-xs text-gray-400 whitespace-nowrap">{item.unit}</span>}
+                        {price > 0 && qty > 0 && (
+                          <span className="text-[10px] text-gray-400 font-mono">
+                            = Rp {(price * qty).toLocaleString('id-ID')}
+                          </span>
+                        )}
                       </div>
-                      {rPct !== null && (
-                        <div className="flex items-center px-2 py-2 bg-green-50 rounded-lg min-w-[52px] text-center">
-                          <span className="text-xs font-semibold text-green-700">{rPct}%</span>
-                        </div>
-                      )}
-                      {outputs.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => removeOutput(idx)}
-                          className="p-2 text-gray-300 hover:text-red-500 transition-colors"
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                      )}
                     </div>
                   );
                 })}
