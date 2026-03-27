@@ -4,6 +4,7 @@ export const ACCOUNT_NUMBERS = {
   INVENTORY: '1.1.4',
   AP: '2.1.1',
   SALES: '4.1.1',
+  COGS: '5.1.1',
   RETAINED_EARNINGS: '3.2.1',
   CURRENT_PROFIT: '3.3.1',
 } as const;

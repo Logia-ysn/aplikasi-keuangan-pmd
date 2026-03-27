@@ -89,6 +89,9 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
       const salesAccount = await tx.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.SALES } });
       if (!arAccount || !salesAccount) throw new BusinessError('Konfigurasi akun AR/Penjualan tidak ditemukan.');
 
+      const inventoryAccount = await tx.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.INVENTORY } });
+      const cogsAccount = await tx.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.COGS } });
+
       const subtotal = body.items.reduce((sum, item) => {
         const base = new Decimal(item.quantity).mul(new Decimal(item.rate));
         const disc = base.mul(new Decimal(item.discount ?? 0).div(100));
@@ -131,6 +134,7 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
                 .toNumber();
               return {
                 itemName: item.itemName,
+                inventoryItemId: item.inventoryItemId || null,
                 quantity: item.quantity,
                 unit: item.unit || 'pcs',
                 rate: item.rate,
@@ -175,6 +179,81 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
       await updateAccountBalance(tx, arAccount.id, grandTotalNum, 0);       // ASSET: debit → +balance
       await updateAccountBalance(tx, salesAccount.id, 0, grandTotalNum);    // REVENUE: credit → +balance
       await tx.party.update({ where: { id: body.partyId }, data: { outstandingAmount: { increment: grandTotalNum } } });
+
+      // Auto-deduct inventory for items linked to InventoryItem
+      let totalCogs = new Decimal(0);
+      for (const item of invoice.items) {
+        const invItemId = item.inventoryItemId;
+        if (!invItemId) continue;
+
+        const inventoryItem = await tx.inventoryItem.findUnique({ where: { id: invItemId } });
+        if (!inventoryItem || !inventoryItem.isActive) continue;
+
+        const qty = Number(item.quantity);
+        const lineAmount = Number(item.amount);
+
+        // Reduce stock
+        await tx.inventoryItem.update({
+          where: { id: inventoryItem.id },
+          data: { currentStock: { decrement: qty } },
+        });
+
+        // Create stock movement Out
+        const movementNumber = await generateDocumentNumber(tx, 'SM', parsedDate, fiscalYear.id);
+        const unitCost = new Decimal(item.amount.toString()).div(new Decimal(item.quantity.toString())).toDecimalPlaces(2).toNumber();
+        await tx.stockMovement.create({
+          data: {
+            movementNumber,
+            date: parsedDate,
+            itemId: inventoryItem.id,
+            movementType: 'Out',
+            quantity: qty,
+            unitCost,
+            totalValue: lineAmount,
+            referenceType: 'SalesInvoice',
+            referenceId: invoice.id,
+            notes: `Auto dari ${invoice.invoiceNumber}`,
+            createdById: req.user!.userId,
+            fiscalYearId: fiscalYear.id,
+          },
+        });
+
+        totalCogs = totalCogs.plus(new Decimal(lineAmount));
+        logger.info({ invoiceId: invoice.id, itemId: inventoryItem.id, qty }, 'Auto stock deduction from sales');
+      }
+
+      // Post COGS journal if any inventory items were sold
+      const totalCogsNum = totalCogs.toDecimalPlaces(2).toNumber();
+      if (totalCogsNum > 0 && inventoryAccount && cogsAccount) {
+        const cogsJvNumber = `JV-COGS-${invoice.invoiceNumber}`;
+        const cogsJournal = await tx.journalEntry.create({
+          data: {
+            entryNumber: cogsJvNumber,
+            date: parsedDate,
+            narration: `HPP Penjualan: ${invoice.invoiceNumber} - ${invoice.customer.name}`,
+            status: 'Submitted',
+            fiscalYearId: fiscalYear.id,
+            createdBy: req.user!.userId,
+            submittedAt: new Date(),
+            items: {
+              create: [
+                { accountId: cogsAccount.id, debit: totalCogsNum, credit: 0, description: `HPP: ${invoice.invoiceNumber}` },
+                { accountId: inventoryAccount.id, debit: 0, credit: totalCogsNum, description: `Persediaan keluar: ${invoice.invoiceNumber}` },
+              ],
+            },
+          },
+        });
+
+        await tx.accountingLedgerEntry.createMany({
+          data: [
+            { date: parsedDate, accountId: cogsAccount.id, debit: totalCogsNum, credit: 0, referenceType: 'JournalEntry', referenceId: cogsJournal.id, description: `HPP: ${invoice.invoiceNumber}`, fiscalYearId: fiscalYear.id },
+            { date: parsedDate, accountId: inventoryAccount.id, debit: 0, credit: totalCogsNum, referenceType: 'JournalEntry', referenceId: cogsJournal.id, description: `Persediaan keluar: ${invoice.invoiceNumber}`, fiscalYearId: fiscalYear.id },
+          ],
+        });
+
+        await updateAccountBalance(tx, cogsAccount.id, totalCogsNum, 0);        // EXPENSE: debit → +balance
+        await updateAccountBalance(tx, inventoryAccount.id, 0, totalCogsNum);    // ASSET: credit → -balance
+      }
 
       return invoice;
     }, { timeout: 15000 });
@@ -230,6 +309,44 @@ router.post('/:id/cancel', roleMiddleware(['Admin']), async (req: AuthRequest, r
       const salesAccount = await tx.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.SALES } });
       if (arAccount) await updateAccountBalance(tx, arAccount.id, 0, Number(invoice.grandTotal));
       if (salesAccount) await updateAccountBalance(tx, salesAccount.id, Number(invoice.grandTotal), 0);
+
+      // Reverse COGS journal if exists
+      const cogsJvNumber = `JV-COGS-${invoice.invoiceNumber}`;
+      const cogsJournal = await tx.journalEntry.findUnique({ where: { entryNumber: cogsJvNumber } });
+      if (cogsJournal) {
+        await tx.journalEntry.update({
+          where: { id: cogsJournal.id },
+          data: { status: 'Cancelled', cancelledAt: new Date() },
+        });
+        await tx.accountingLedgerEntry.updateMany({
+          where: { referenceId: cogsJournal.id },
+          data: { isCancelled: true },
+        });
+
+        // Reverse COGS and inventory balances
+        const cogsAccount = await tx.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.COGS } });
+        const inventoryAccount = await tx.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.INVENTORY } });
+        // Sum the COGS amount from journal items
+        const cogsItems = await tx.journalItem.findMany({ where: { journalEntryId: cogsJournal.id } });
+        const cogsDebitTotal = cogsItems.reduce((sum, ji) => sum + Number(ji.debit), 0);
+        if (cogsAccount && cogsDebitTotal > 0) await updateAccountBalance(tx, cogsAccount.id, 0, cogsDebitTotal);
+        if (inventoryAccount && cogsDebitTotal > 0) await updateAccountBalance(tx, inventoryAccount.id, cogsDebitTotal, 0);
+      }
+
+      // Reverse stock movements created from this invoice
+      const stockMovements = await tx.stockMovement.findMany({
+        where: { referenceType: 'SalesInvoice', referenceId: invoice.id, isCancelled: false },
+      });
+      for (const sm of stockMovements) {
+        await tx.inventoryItem.update({
+          where: { id: sm.itemId },
+          data: { currentStock: { increment: Number(sm.quantity) } },
+        });
+        await tx.stockMovement.update({
+          where: { id: sm.id },
+          data: { isCancelled: true },
+        });
+      }
 
       // Reverse party outstanding
       await tx.party.update({

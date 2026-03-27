@@ -181,20 +181,23 @@ model SalesInvoice {
 }
 
 model SalesInvoiceItem {
-  id             String       @id @default(uuid())
-  salesInvoiceId String       @map("sales_invoice_id")
-  salesInvoice   SalesInvoice @relation(fields: [salesInvoiceId], references: [id], onDelete: Cascade)
-  itemName       String       @map("item_name")
-  quantity       Decimal      @db.Decimal(15, 3)
-  unit           String
-  rate           Decimal      @db.Decimal(15, 2)
-  discount       Decimal      @default(0) @db.Decimal(5, 2)
-  amount         Decimal      @db.Decimal(15, 2)
-  accountId      String       @map("account_id")
-  account        Account      @relation(fields: [accountId], references: [id])
-  description    String?
+  id               String         @id @default(uuid())
+  salesInvoiceId   String         @map("sales_invoice_id")
+  salesInvoice     SalesInvoice   @relation(fields: [salesInvoiceId], references: [id], onDelete: Cascade)
+  inventoryItemId  String?        @map("inventory_item_id")
+  inventoryItem    InventoryItem? @relation("SalesInvoiceInventory", fields: [inventoryItemId], references: [id])
+  itemName         String         @map("item_name")
+  quantity         Decimal        @db.Decimal(15, 3)
+  unit             String
+  rate             Decimal        @db.Decimal(15, 2)
+  discount         Decimal        @default(0) @db.Decimal(5, 2)
+  amount           Decimal        @db.Decimal(15, 2)
+  accountId        String         @map("account_id")
+  account          Account        @relation(fields: [accountId], references: [id])
+  description      String?
 
   @@index([salesInvoiceId])
+  @@index([inventoryItemId])
   @@map("sales_invoice_items")
 }
 
@@ -234,6 +237,8 @@ model PurchaseInvoiceItem {
   id                String          @id @default(uuid())
   purchaseInvoiceId String          @map("purchase_invoice_id")
   purchaseInvoice   PurchaseInvoice @relation(fields: [purchaseInvoiceId], references: [id], onDelete: Cascade)
+  inventoryItemId   String?         @map("inventory_item_id")
+  inventoryItem     InventoryItem?  @relation("PurchaseInvoiceInventory", fields: [inventoryItemId], references: [id])
   itemName          String          @map("item_name")
   quantity          Decimal         @db.Decimal(15, 3)
   unit              String
@@ -245,6 +250,7 @@ model PurchaseInvoiceItem {
   description       String?
 
   @@index([purchaseInvoiceId])
+  @@index([inventoryItemId])
   @@map("purchase_invoice_items")
 }
 
@@ -432,8 +438,10 @@ model InventoryItem {
   isDummy      Boolean         @default(false) @map("is_dummy")
   accountId    String?         @map("account_id")
   account      Account?        @relation("ItemAccount", fields: [accountId], references: [id])
-  movements        StockMovement[]
-  productionLines  ProductionRunItem[] @relation("ProductionLines")
+  movements             StockMovement[]
+  productionLines       ProductionRunItem[]    @relation("ProductionLines")
+  salesInvoiceItems     SalesInvoiceItem[]     @relation("SalesInvoiceInventory")
+  purchaseInvoiceItems  PurchaseInvoiceItem[]  @relation("PurchaseInvoiceInventory")
   createdAt    DateTime        @default(now()) @map("created_at")
   updatedAt    DateTime        @updatedAt @map("updated_at")
 

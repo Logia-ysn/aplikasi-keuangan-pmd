@@ -37,6 +37,7 @@ export const CreateJournalSchema = z.object({
 // ─── Sales Invoice ────────────────────────────────────────────────────────────
 const InvoiceItemSchema = z.object({
   itemName: z.string().min(1, 'Nama item wajib diisi.'),
+  inventoryItemId: z.string().uuid().nullable().optional(),
   quantity: z.coerce.number().positive('Jumlah harus lebih dari 0.'),
   unit: z.string().optional(),
   rate: z.coerce.number().positive('Harga harus lebih dari 0.'),

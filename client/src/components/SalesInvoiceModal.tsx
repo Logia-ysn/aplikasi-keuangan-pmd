@@ -8,6 +8,7 @@ import { formatRupiah } from '../lib/formatters';
 interface InvoiceItem {
   id: string;
   itemName: string;
+  inventoryItemId: string;
   description: string;
   quantity: number;
   unit: string;
@@ -18,7 +19,7 @@ interface InvoiceItem {
 const UNITS = ['Kg', 'Ton', 'Sak', 'Liter', 'Pcs', 'Box', 'Unit', 'Set', 'Meter', 'Jasa'];
 
 const defaultItem = (): InvoiceItem => ({
-  id: crypto.randomUUID(), itemName: '', description: '', quantity: 1, unit: 'Kg', rate: 0, discount: 0
+  id: crypto.randomUUID(), itemName: '', inventoryItemId: '', description: '', quantity: 1, unit: 'Kg', rate: 0, discount: 0
 });
 
 const SalesInvoiceModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, onClose }) => {
@@ -45,6 +46,15 @@ const SalesInvoiceModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
     }
   });
 
+  const { data: inventoryItems } = useQuery({
+    queryKey: ['inventory-items-active'],
+    queryFn: async () => {
+      const res = await api.get('/inventory/items');
+      const all: any[] = res.data.data ?? res.data;
+      return all.filter((i: any) => i.isActive !== false);
+    },
+  });
+
   const selectedParty = parties?.find((p: any) => p.id === partyId);
 
   const mutation = useMutation({
@@ -53,6 +63,9 @@ const SalesInvoiceModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
       queryClient.invalidateQueries({ queryKey: ['sales-invoices'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-metrics'] });
       queryClient.invalidateQueries({ queryKey: ['parties'] });
+      queryClient.invalidateQueries({ queryKey: ['inventory-items'] });
+      queryClient.invalidateQueries({ queryKey: ['stock-movements'] });
+      queryClient.invalidateQueries({ queryKey: ['coa'] });
       setInvoiceDate(new Date().toISOString().split('T')[0]);
       setDueDate(new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0]);
       setPartyId('');
@@ -75,6 +88,16 @@ const SalesInvoiceModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
   const updateItem = (i: number, field: keyof InvoiceItem, value: any) => {
     const next = [...items];
     next[i] = { ...next[i], [field]: value };
+    setItems(next);
+  };
+  const selectInventoryItem = (idx: number, inventoryId: string) => {
+    const inv = inventoryItems?.find((i: any) => i.id === inventoryId);
+    const next = [...items];
+    if (inv) {
+      next[idx] = { ...next[idx], inventoryItemId: inventoryId, itemName: inv.name, unit: inv.unit || 'Kg' };
+    } else {
+      next[idx] = { ...next[idx], inventoryItemId: '', itemName: '' };
+    }
     setItems(next);
   };
 
@@ -198,13 +221,27 @@ const SalesInvoiceModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
                     <tr key={item.id} className="group border-b border-gray-50 last:border-0 hover:bg-gray-50/50 transition-colors">
                       <td className="px-4 py-3 text-center text-xs text-gray-300 font-medium">{idx + 1}</td>
                       <td className="px-4 py-3">
-                        <input
-                          type="text"
-                          value={item.itemName}
-                          onChange={e => updateItem(idx, 'itemName', e.target.value)}
-                          placeholder="Nama barang atau jasa..."
-                          className="w-full bg-transparent text-sm text-gray-800 border-none focus:ring-0 focus:outline-none p-0 placeholder:text-gray-300"
-                        />
+                        <select
+                          value={item.inventoryItemId}
+                          onChange={e => selectInventoryItem(idx, e.target.value)}
+                          className="w-full bg-transparent text-sm text-gray-800 border-none focus:ring-0 focus:outline-none p-0 cursor-pointer mb-0.5"
+                        >
+                          <option value="">— Pilih dari Stok Gudang —</option>
+                          {inventoryItems?.map((inv: any) => (
+                            <option key={inv.id} value={inv.id}>
+                              {inv.code} — {inv.name} ({inv.currentStock} {inv.unit})
+                            </option>
+                          ))}
+                        </select>
+                        {!item.inventoryItemId && (
+                          <input
+                            type="text"
+                            value={item.itemName}
+                            onChange={e => updateItem(idx, 'itemName', e.target.value)}
+                            placeholder="Atau ketik nama barang/jasa manual..."
+                            className="w-full bg-transparent text-xs text-gray-500 border-none focus:ring-0 focus:outline-none p-0 placeholder:text-gray-300"
+                          />
+                        )}
                       </td>
                       <td className="px-3 py-3">
                         <input
@@ -364,7 +401,10 @@ const SalesInvoiceModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
           <div className="flex gap-3">
             <button onClick={onClose} className="btn-secondary">Batal</button>
             <button
-              onClick={() => mutation.mutate({ date: invoiceDate, dueDate, partyId, items, notes, taxPct, terms, potongan, biayaLain, labelPotongan, labelBiaya })}
+              onClick={() => mutation.mutate({
+                date: invoiceDate, dueDate, partyId, notes, taxPct, terms, potongan, biayaLain, labelPotongan, labelBiaya,
+                items: items.map(i => ({ ...i, inventoryItemId: i.inventoryItemId || null })),
+              })}
               disabled={!canSubmit}
               className="btn-primary disabled:opacity-40 disabled:cursor-not-allowed"
             >
