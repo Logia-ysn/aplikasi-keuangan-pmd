@@ -12,7 +12,7 @@ import { formatRupiah } from '../../lib/formatters';
 interface RecentMovement {
   id: string;
   date: string;
-  itemName: string;
+  item: { name: string; unit: string; code: string };
   movementType: 'In' | 'Out' | 'AdjustmentIn' | 'AdjustmentOut';
   quantity: number;
   totalValue: number | null;
@@ -92,7 +92,7 @@ export default function RecentMovements() {
                       {format(new Date(mov.date), 'dd MMM', { locale: idLocale })}
                     </td>
                     <td className="py-2 font-medium truncate max-w-[120px]" style={{ color: 'var(--color-text-primary)' }}>
-                      {mov.itemName}
+                      {mov.item?.name ?? '-'}
                     </td>
                     <td className="py-2 text-center">
                       <span className={badge.className}>{badge.label}</span>

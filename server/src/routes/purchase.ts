@@ -172,6 +172,42 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
       await updateAccountBalance(tx, apAccount.id, 0, grandTotalNum);          // LIABILITY: credit → +balance
       await tx.party.update({ where: { id: body.partyId }, data: { outstandingAmount: { increment: grandTotalNum } } });
 
+      // Auto-create stock movements for items that match existing inventory items (by name)
+      for (const item of invoice.items) {
+        const inventoryItem = await tx.inventoryItem.findFirst({
+          where: { name: { equals: item.itemName, mode: 'insensitive' }, isActive: true },
+        });
+        if (inventoryItem) {
+          const movementNumber = await generateDocumentNumber(tx, 'SM', parsedDate, fiscalYear.id);
+          const unitCost = new Decimal(item.amount.toString()).div(new Decimal(item.quantity.toString())).toDecimalPlaces(2).toNumber();
+          const totalValue = Number(item.amount);
+
+          await tx.inventoryItem.update({
+            where: { id: inventoryItem.id },
+            data: { currentStock: { increment: Number(item.quantity) } },
+          });
+
+          await tx.stockMovement.create({
+            data: {
+              movementNumber,
+              date: parsedDate,
+              itemId: inventoryItem.id,
+              movementType: 'In',
+              quantity: Number(item.quantity),
+              unitCost,
+              totalValue,
+              referenceType: 'PurchaseInvoice',
+              referenceId: invoice.id,
+              notes: `Auto dari ${invoice.invoiceNumber}`,
+              createdById: req.user!.userId,
+              fiscalYearId: fiscalYear.id,
+            },
+          });
+
+          logger.info({ invoiceId: invoice.id, itemId: inventoryItem.id, qty: Number(item.quantity) }, 'Auto stock movement from purchase');
+        }
+      }
+
       return invoice;
     }, { timeout: 15000 });
 

@@ -17,6 +17,15 @@ import api from '../../lib/api';
 // Types
 // ---------------------------------------------------------------------------
 
+interface MovementTrendRaw {
+  month: string;
+  inQty: number;
+  outQty: number;
+  adjInQty: number;
+  adjOutQty: number;
+  netChange: number;
+}
+
 interface MovementTrendItem {
   month: string;
   masuk: number;
@@ -36,11 +45,21 @@ const formatNumber = (val: number | string, decimals = 0) =>
 // ---------------------------------------------------------------------------
 
 export default function MovementTrendChart() {
+  const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+
   const { data, isLoading } = useQuery<MovementTrendItem[]>({
     queryKey: ['warehouse-movement-trend'],
     queryFn: async () => {
-      const r = await api.get('/inventory/dashboard/movement-trend');
-      return r.data;
+      const r = await api.get<MovementTrendRaw[]>('/inventory/dashboard/movement-trend');
+      return r.data.map((d) => {
+        const [, m] = d.month.split('-');
+        return {
+          month: MONTH_NAMES[parseInt(m, 10) - 1] ?? d.month,
+          masuk: d.inQty + d.adjInQty,
+          keluar: d.outQty + d.adjOutQty,
+          net: d.netChange,
+        };
+      });
     },
   });
 

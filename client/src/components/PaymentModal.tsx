@@ -136,7 +136,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, defaultTyp
             </div>
             <div>
               <h2 id="payment-modal-title" className="text-base font-semibold" style={{ color: 'var(--color-text-primary)' }}>
-                {isReceive ? 'Terima Pembayaran' : 'Catat Pengeluaran'}
+                {isReceive ? 'Terima Pembayaran' : 'Bayar Hutang'}
               </h2>
               <p className="text-xs text-gray-400 mt-0.5">Draft • belum disimpan</p>
             </div>

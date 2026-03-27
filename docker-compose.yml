@@ -42,7 +42,7 @@ services:
       DATABASE_URL: "postgresql://${POSTGRES_USER:-keuangan}:${POSTGRES_PASSWORD:-keuangan_secret_2026}@db:5432/${POSTGRES_DB:-keuangan_db}?schema=public"
       PORT: "3001"
       JWT_SECRET: "${JWT_SECRET:-ganti-dengan-secret-yang-aman}"
-      ALLOWED_ORIGINS: "${ALLOWED_ORIGINS:-http://localhost:3001}"
+      ALLOWED_ORIGINS: "${ALLOWED_ORIGINS:-http://localhost:3001,http://localhost:5173}"
       NODE_ENV: "production"
     depends_on:
       db:

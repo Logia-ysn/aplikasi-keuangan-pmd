@@ -7,9 +7,9 @@ import api from '../../lib/api';
 // ---------------------------------------------------------------------------
 
 interface ProductionStats {
-  totalProduction: number;
-  productionThisMonth: number;
-  averageRendemen: number;
+  totalRuns: number;
+  thisMonthRuns: number;
+  avgRendemen: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -58,7 +58,7 @@ export default function ProductionStatsWidget() {
               Total Produksi
             </span>
             <p className="text-lg font-semibold tabular-nums mt-0.5" style={{ color: 'var(--color-text-primary)' }}>
-              {formatNumber(data.totalProduction)}
+              {formatNumber(data.totalRuns)}
             </p>
           </div>
           <div>
@@ -66,7 +66,7 @@ export default function ProductionStatsWidget() {
               Produksi Bulan Ini
             </span>
             <p className="text-lg font-semibold tabular-nums mt-0.5" style={{ color: 'var(--color-text-primary)' }}>
-              {formatNumber(data.productionThisMonth)}
+              {formatNumber(data.thisMonthRuns)}
             </p>
           </div>
           <div>
@@ -74,7 +74,7 @@ export default function ProductionStatsWidget() {
               Rata-rata Rendemen
             </span>
             <p className="text-lg font-semibold tabular-nums mt-0.5" style={{ color: 'var(--color-text-primary)' }}>
-              {Number(data.averageRendemen).toFixed(1)}%
+              {Number(data.avgRendemen).toFixed(1)}%
             </p>
           </div>
         </div>

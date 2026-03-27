@@ -38,6 +38,53 @@ router.get('/', async (req, res) => {
   }
 });
 
+// GET /api/payments/cash-journals — journal entries affecting cash/bank accounts (not already linked to payments)
+router.get('/cash-journals', async (_req, res) => {
+  try {
+    // Find journal items that touch cash accounts (1.1.x) and aren't linked to payments
+    const cashItems = await prisma.journalItem.findMany({
+      where: {
+        account: { accountNumber: { startsWith: '1.1' }, isGroup: false },
+        journalEntry: {
+          status: { not: 'Cancelled' },
+          // Exclude journals linked to payments (they start with JV-PAY)
+          entryNumber: { not: { startsWith: 'JV-PAY' } },
+        },
+      },
+      include: {
+        journalEntry: true,
+        account: true,
+      },
+      orderBy: { journalEntry: { date: 'desc' } },
+      take: 100,
+    });
+
+    // Resolve party names for items with partyId
+    const partyIds = [...new Set(cashItems.map((i) => i.partyId).filter((id): id is string => id != null))];
+    const parties = partyIds.length > 0
+      ? await prisma.party.findMany({ where: { id: { in: partyIds } }, select: { id: true, name: true } })
+      : [];
+    const partyMap = new Map(parties.map((p) => [p.id, p.name]));
+
+    const data = cashItems.map((item) => ({
+      id: item.id,
+      journalEntryId: item.journalEntryId,
+      date: item.journalEntry.date,
+      entryNumber: item.journalEntry.entryNumber,
+      narration: item.journalEntry.narration,
+      partyName: item.partyId ? partyMap.get(item.partyId) ?? null : null,
+      amount: Number(item.credit) > 0 ? Number(item.credit) : Number(item.debit),
+      isCredit: Number(item.credit) > 0,
+      status: item.journalEntry.status,
+    }));
+
+    return res.json({ data });
+  } catch (error) {
+    logger.error({ error }, 'GET /payments/cash-journals error');
+    return res.status(500).json({ error: 'Gagal mengambil data jurnal kas.' });
+  }
+});
+
 // POST /api/payments — record payment/receipt
 router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthRequest, res) => {
   const body = validateBody(CreatePaymentSchema, req.body, res);

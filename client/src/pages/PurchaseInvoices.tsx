@@ -9,6 +9,7 @@ import api from '../lib/api';
 import { formatRupiah, formatDate } from '../lib/formatters';
 import PurchaseInvoiceModal from '../components/PurchaseInvoiceModal';
 import InvoiceDetailDrawer from '../components/InvoiceDetailDrawer';
+import PaymentModal from '../components/PaymentModal';
 
 const STATUS_OPTIONS = [
   { value: '', label: 'Semua Status' },
@@ -26,6 +27,7 @@ export const PurchaseInvoices = () => {
   const [dateTo, setDateTo] = useState('');
   const [page, setPage] = useState(1);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isPayOpen, setIsPayOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const { data: raw, isLoading } = useQuery({
@@ -80,9 +82,17 @@ export const PurchaseInvoices = () => {
           <h1 className="text-xl font-semibold text-gray-900">Invoice Pembelian</h1>
           <p className="text-sm text-gray-500 mt-0.5">Kelola faktur pembelian dari vendor/supplier.</p>
         </div>
-        <button className="btn-primary self-start" onClick={() => setIsModalOpen(true)}>
-          <Plus size={15} /> Buat Invoice Pembelian
-        </button>
+        <div className="flex flex-wrap gap-2 self-start">
+          <button
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-medium bg-red-500 hover:bg-red-600 text-white transition-colors"
+            onClick={() => setIsPayOpen(true)}
+          >
+            <DollarSign size={15} /> Bayar Hutang
+          </button>
+          <button className="btn-primary" onClick={() => setIsModalOpen(true)}>
+            <Plus size={15} /> Buat Invoice
+          </button>
+        </div>
       </div>
 
       {/* Summary Cards */}
@@ -310,6 +320,12 @@ export const PurchaseInvoices = () => {
         type="purchase"
         invoiceId={selectedId}
         onClose={() => setSelectedId(null)}
+      />
+
+      <PaymentModal
+        isOpen={isPayOpen}
+        onClose={() => setIsPayOpen(false)}
+        defaultType="Pay"
       />
     </div>
   );

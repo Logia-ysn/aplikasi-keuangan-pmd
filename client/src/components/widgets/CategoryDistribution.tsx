@@ -8,7 +8,8 @@ import api from '../../lib/api';
 
 interface CategoryItem {
   category: string;
-  quantity: number;
+  itemCount: number;
+  totalQuantity: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -31,7 +32,7 @@ export default function CategoryDistribution() {
     },
   });
 
-  const maxQty = data ? Math.max(...data.map((c) => c.quantity), 1) : 1;
+  const maxQty = data ? Math.max(...data.map((c) => c.totalQuantity), 1) : 1;
 
   return (
     <div
@@ -61,13 +62,13 @@ export default function CategoryDistribution() {
                   {cat.category || 'Tanpa Kategori'}
                 </span>
                 <span className="text-xs tabular-nums" style={{ color: 'var(--color-text-muted)' }}>
-                  {formatNumber(cat.quantity)}
+                  {formatNumber(cat.totalQuantity)}
                 </span>
               </div>
               <div className="w-full h-2 rounded-full bg-gray-100 dark:bg-gray-700">
                 <div
                   className="h-2 rounded-full bg-blue-500 transition-all"
-                  style={{ width: `${Math.round((cat.quantity / maxQty) * 100)}%` }}
+                  style={{ width: `${Math.round((cat.totalQuantity / maxQty) * 100)}%` }}
                 />
               </div>
             </div>

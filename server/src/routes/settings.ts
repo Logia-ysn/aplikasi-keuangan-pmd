@@ -664,32 +664,77 @@ router.post('/generate-dummy', roleMiddleware(['Admin']), async (req, res) => {
 // POST /api/settings/delete-dummy — Delete only dummy data (Admin only)
 router.post('/delete-dummy', roleMiddleware(['Admin']), async (_req, res) => {
   try {
-    const results = { parties: 0, salesInvoices: 0, purchaseInvoices: 0, inventoryItems: 0, movements: 0, productionRuns: 0 };
+    const results = { parties: 0, salesInvoices: 0, purchaseInvoices: 0, payments: 0, journals: 0, inventoryItems: 0, movements: 0, productionRuns: 0 };
 
     await prisma.$transaction(async (tx) => {
-      // Delete dummy invoice items, ledger entries, journals linked to dummy invoices
+      // 1. Collect all dummy entity IDs
       const dummySI = await tx.salesInvoice.findMany({ where: { isDummy: true }, select: { id: true } });
       const dummyPI = await tx.purchaseInvoice.findMany({ where: { isDummy: true }, select: { id: true } });
+      const dummyParties = await tx.party.findMany({ where: { isDummy: true }, select: { id: true } });
+      const dummyItems = await tx.inventoryItem.findMany({ where: { isDummy: true }, select: { id: true } });
       const siIds = dummySI.map(s => s.id);
       const piIds = dummyPI.map(p => p.id);
+      const partyIds = dummyParties.map(p => p.id);
+      const itemIds = dummyItems.map(i => i.id);
 
-      // Delete related payment allocations and payments
-      if (siIds.length > 0) {
-        await tx.paymentAllocation.deleteMany({ where: { invoiceType: 'SalesInvoice', invoiceId: { in: siIds } } });
-      }
-      if (piIds.length > 0) {
-        await tx.paymentAllocation.deleteMany({ where: { invoiceType: 'PurchaseInvoice', invoiceId: { in: piIds } } });
+      // 2. Find payments linked to dummy parties
+      const dummyPayments = await tx.payment.findMany({
+        where: { partyId: { in: partyIds } },
+        select: { id: true, journalEntryId: true },
+      });
+      const paymentIds = dummyPayments.map(p => p.id);
+      const paymentJeIds = dummyPayments.map(p => p.journalEntryId).filter((id): id is string => id != null);
+
+      // 3. Delete payment allocations
+      if (paymentIds.length > 0) {
+        await tx.paymentAllocation.deleteMany({ where: { paymentId: { in: paymentIds } } });
       }
 
-      // Delete ledger entries linked to dummy invoices
-      if (siIds.length > 0) {
-        await tx.accountingLedgerEntry.deleteMany({ where: { referenceId: { in: siIds } } });
-      }
-      if (piIds.length > 0) {
-        await tx.accountingLedgerEntry.deleteMany({ where: { referenceId: { in: piIds } } });
+      // 4. Delete payments (must come before journal entries and parties)
+      if (paymentIds.length > 0) {
+        results.payments = (await tx.payment.deleteMany({ where: { id: { in: paymentIds } } })).count;
       }
 
-      // Delete invoice items then invoices
+      // 5. Delete ledger entries referencing dummy invoices, payments, and dummy journal markers
+      const dummyRefIds = [
+        ...siIds, ...piIds, ...paymentIds,
+        'dummy-modal-init', 'dummy-gaji', 'dummy-listrik', 'dummy-pay-pi',
+      ];
+      if (dummyRefIds.length > 0) {
+        await tx.accountingLedgerEntry.deleteMany({ where: { referenceId: { in: dummyRefIds } } });
+      }
+      // Also delete ledger entries linked to dummy parties directly
+      if (partyIds.length > 0) {
+        await tx.accountingLedgerEntry.deleteMany({ where: { partyId: { in: partyIds } } });
+      }
+
+      // 6. Delete journal entries linked to payments
+      if (paymentJeIds.length > 0) {
+        await tx.journalItem.deleteMany({ where: { journalEntryId: { in: paymentJeIds } } });
+        await tx.journalEntry.deleteMany({ where: { id: { in: paymentJeIds } } });
+      }
+
+      // 7. Find and delete all dummy-created journal entries by narration patterns
+      const dummyJournals = await tx.journalEntry.findMany({
+        where: {
+          OR: [
+            { narration: { startsWith: 'Setoran modal awal' } },
+            { narration: { startsWith: 'Pembelian gabah' } },
+            { narration: { startsWith: 'Penjualan beras' } },
+            { narration: { startsWith: 'Pembayaran ' } },
+            { narration: { startsWith: 'Gaji karyawan bulan' } },
+            { narration: { startsWith: 'Listrik & air bulan' } },
+          ],
+        },
+        select: { id: true },
+      });
+      const journalIds = dummyJournals.map(j => j.id);
+      if (journalIds.length > 0) {
+        await tx.journalItem.deleteMany({ where: { journalEntryId: { in: journalIds } } });
+        results.journals = (await tx.journalEntry.deleteMany({ where: { id: { in: journalIds } } })).count;
+      }
+
+      // 8. Delete invoice items then invoices
       if (siIds.length > 0) {
         await tx.salesInvoiceItem.deleteMany({ where: { salesInvoiceId: { in: siIds } } });
         results.salesInvoices = (await tx.salesInvoice.deleteMany({ where: { isDummy: true } })).count;
@@ -699,12 +744,8 @@ router.post('/delete-dummy', roleMiddleware(['Admin']), async (_req, res) => {
         results.purchaseInvoices = (await tx.purchaseInvoice.deleteMany({ where: { isDummy: true } })).count;
       }
 
-      // Delete production runs linked to dummy inventory items
-      const dummyItems = await tx.inventoryItem.findMany({ where: { isDummy: true }, select: { id: true } });
-      if (dummyItems.length > 0) {
-        const itemIds = dummyItems.map(i => i.id);
-
-        // Find production runs that use dummy items
+      // 9. Delete production runs linked to dummy inventory items
+      if (itemIds.length > 0) {
         const dummyProdItems = await tx.productionRunItem.findMany({
           where: { itemId: { in: itemIds } },
           select: { productionRunId: true },
@@ -720,9 +761,44 @@ router.post('/delete-dummy', roleMiddleware(['Admin']), async (_req, res) => {
         results.inventoryItems = (await tx.inventoryItem.deleteMany({ where: { isDummy: true } })).count;
       }
 
-      // Delete dummy parties
+      // 10. Delete dummy parties (now safe — no FK references remain)
       results.parties = (await tx.party.deleteMany({ where: { isDummy: true } })).count;
-    }, { timeout: 60000 });
+
+      // 11. Recalculate all account balances from ledger entries
+      const allAccounts = await tx.account.findMany({ where: { isGroup: false }, select: { id: true, rootType: true } });
+      for (const acct of allAccounts) {
+        const sums = await tx.accountingLedgerEntry.aggregate({
+          where: { accountId: acct.id, isCancelled: false },
+          _sum: { debit: true, credit: true },
+        });
+        const totalDebit = Number(sums._sum.debit || 0);
+        const totalCredit = Number(sums._sum.credit || 0);
+        const isDebitNormal = acct.rootType === 'ASSET' || acct.rootType === 'EXPENSE';
+        const balance = isDebitNormal ? totalDebit - totalCredit : totalCredit - totalDebit;
+        await tx.account.update({ where: { id: acct.id }, data: { balance } });
+      }
+
+      // 12. Recalculate party outstanding amounts
+      const remainingParties = await tx.party.findMany({ select: { id: true, partyType: true } });
+      for (const party of remainingParties) {
+        let outstanding = 0;
+        if (party.partyType === 'Customer' || party.partyType === 'Both') {
+          const siSum = await tx.salesInvoice.aggregate({
+            where: { partyId: party.id, status: { in: ['Submitted', 'PartiallyPaid', 'Overdue'] } },
+            _sum: { outstanding: true },
+          });
+          outstanding += Number(siSum._sum.outstanding || 0);
+        }
+        if (party.partyType === 'Supplier' || party.partyType === 'Both') {
+          const piSum = await tx.purchaseInvoice.aggregate({
+            where: { partyId: party.id, status: { in: ['Submitted', 'PartiallyPaid', 'Overdue'] } },
+            _sum: { outstanding: true },
+          });
+          outstanding += Number(piSum._sum.outstanding || 0);
+        }
+        await tx.party.update({ where: { id: party.id }, data: { outstandingAmount: outstanding } });
+      }
+    }, { timeout: 120000 });
 
     logger.info({ results }, 'Dummy data deleted');
     return res.json({ message: 'Data dummy berhasil dihapus.', results });

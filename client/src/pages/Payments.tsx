@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Search, MoreHorizontal, CreditCard, Loader2, TrendingDown, TrendingUp, ArrowRightLeft } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { Search, MoreHorizontal, CreditCard, Loader2, TrendingDown, TrendingUp, ArrowRightLeft, FileText } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useQuery } from '@tanstack/react-query';
 import api from '../lib/api';
@@ -8,19 +8,86 @@ import PaymentModal from '../components/PaymentModal';
 import TransferModal from '../components/TransferModal';
 import ExpenseModal from '../components/ExpenseModal';
 
+interface CashTransaction {
+  id: string;
+  date: string;
+  number: string;
+  partyName: string | null;
+  partyType: string | null;
+  type: 'Receive' | 'Pay' | 'Expense' | 'Transfer';
+  amount: number;
+  status: string;
+  source: 'payment' | 'journal';
+}
+
 export const Payments = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isReceiveOpen, setIsReceiveOpen] = useState(false);
+  const [isPayOpen, setIsPayOpen] = useState(false);
   const [isExpenseOpen, setIsExpenseOpen] = useState(false);
   const [isTransferOpen, setIsTransferOpen] = useState(false);
 
-  const { data: payments, isLoading } = useQuery({
+  const { data: payments, isLoading: loadingPayments } = useQuery({
     queryKey: ['payments'],
     queryFn: async () => {
       const response = await api.get('/payments');
       return response.data.data ?? response.data;
-    }
+    },
   });
+
+  const { data: cashJournals, isLoading: loadingJournals } = useQuery({
+    queryKey: ['cash-journals'],
+    queryFn: async () => {
+      const response = await api.get('/payments/cash-journals');
+      return response.data.data ?? response.data;
+    },
+  });
+
+  const isLoading = loadingPayments || loadingJournals;
+
+  // Merge payments + cash-affecting journals into unified list
+  const allTransactions: CashTransaction[] = useMemo(() => {
+    const txns: CashTransaction[] = [];
+    const paymentJournalIds = new Set<string>();
+
+    if (payments) {
+      for (const p of payments) {
+        txns.push({
+          id: p.id,
+          date: p.date,
+          number: p.paymentNumber,
+          partyName: p.party?.name ?? null,
+          partyType: p.party?.partyType ?? null,
+          type: p.paymentType,
+          amount: Number(p.amount),
+          status: p.status,
+          source: 'payment',
+        });
+        // Track journal IDs linked to payments to avoid duplicates
+        if (p.journalEntryId) paymentJournalIds.add(p.journalEntryId);
+      }
+    }
+
+    if (cashJournals) {
+      for (const j of cashJournals) {
+        if (paymentJournalIds.has(j.journalEntryId)) continue;
+        txns.push({
+          id: j.id,
+          date: j.date,
+          number: j.entryNumber,
+          partyName: j.partyName ?? null,
+          partyType: null,
+          type: j.isCredit ? 'Expense' : 'Transfer',
+          amount: j.amount,
+          status: j.status,
+          source: 'journal',
+        });
+      }
+    }
+
+    txns.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    return txns;
+  }, [payments, cashJournals]);
 
   return (
     <div className="space-y-5 pb-8">
@@ -41,10 +108,16 @@ export const Payments = () => {
             <TrendingDown size={15} /> Terima Pembayaran
           </button>
           <button
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-medium bg-red-500 hover:bg-red-600 text-white transition-colors"
+            onClick={() => setIsPayOpen(true)}
+          >
+            <TrendingUp size={15} /> Bayar Hutang
+          </button>
+          <button
             className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-medium bg-orange-500 hover:bg-orange-600 text-white transition-colors"
             onClick={() => setIsExpenseOpen(true)}
           >
-            <TrendingUp size={15} /> Catat Pengeluaran
+            <FileText size={15} /> Catat Pengeluaran
           </button>
         </div>
       </div>
@@ -84,7 +157,7 @@ export const Payments = () => {
                   Memuat data transaksi...
                 </td>
               </tr>
-            ) : payments?.length === 0 ? (
+            ) : allTransactions.length === 0 ? (
               <tr>
                 <td colSpan={7} className="py-16 text-center">
                   <CreditCard className="w-10 h-10 text-gray-200 mx-auto mb-2" />
@@ -92,47 +165,51 @@ export const Payments = () => {
                 </td>
               </tr>
             ) : (
-              payments?.filter((p: any) =>
+              allTransactions.filter((t) =>
                 !searchTerm ||
-                p.paymentNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                p.party?.name?.toLowerCase().includes(searchTerm.toLowerCase())
-              ).map((payment: any) => (
-                <tr key={payment.id}>
-                  <td className="text-gray-500 whitespace-nowrap">{formatDate(payment.date)}</td>
-                  <td className="whitespace-nowrap">
-                    <span className="font-mono text-xs text-gray-800 bg-gray-50 px-1.5 py-0.5 rounded">{payment.paymentNumber}</span>
-                  </td>
-                  <td>
-                    <span className="font-medium text-gray-800">{payment.party?.name ?? '—'}</span>
-                    <span className="text-[10px] text-gray-400 uppercase ml-1.5">{payment.party?.partyType}</span>
-                  </td>
-                  <td className="text-center">
-                    <span className={cn(
-                      'badge',
-                      payment.paymentType === 'Receive' ? 'badge-green' : 'badge-red'
-                    )}>
-                      {payment.paymentType === 'Receive' ? <TrendingDown size={10} /> : <TrendingUp size={10} />}
-                      {payment.paymentType === 'Receive' ? 'Masuk' : 'Keluar'}
-                    </span>
-                  </td>
-                  <td className="text-right">
-                    <span className={cn(
-                      'font-mono font-medium tabular-nums',
-                      payment.paymentType === 'Receive' ? 'text-green-600' : 'text-red-500'
-                    )}>
-                      {payment.paymentType === 'Receive' ? '+' : '-'} {formatRupiah(Number(payment.amount))}
-                    </span>
-                  </td>
-                  <td className="text-center">
-                    <span className="badge badge-blue">{payment.status}</span>
-                  </td>
-                  <td>
-                    <button className="p-1.5 hover:bg-gray-100 rounded text-gray-400 hover:text-gray-600 transition-colors">
-                      <MoreHorizontal size={16} />
-                    </button>
-                  </td>
-                </tr>
-              ))
+                t.number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                t.partyName?.toLowerCase().includes(searchTerm.toLowerCase())
+              ).map((txn) => {
+                const isIncoming = txn.type === 'Receive';
+                const typeLabel = txn.type === 'Receive' ? 'Masuk' : txn.type === 'Expense' ? 'Beban' : txn.type === 'Transfer' ? 'Pinbuk' : 'Keluar';
+                const badgeClass = isIncoming ? 'badge-green' : txn.type === 'Expense' ? 'badge-yellow' : txn.type === 'Transfer' ? 'badge-blue' : 'badge-red';
+                const icon = isIncoming ? <TrendingDown size={10} /> : txn.type === 'Transfer' ? <ArrowRightLeft size={10} /> : <TrendingUp size={10} />;
+
+                return (
+                  <tr key={`${txn.source}-${txn.id}`}>
+                    <td className="text-gray-500 whitespace-nowrap">{formatDate(txn.date)}</td>
+                    <td className="whitespace-nowrap">
+                      <span className="font-mono text-xs text-gray-800 bg-gray-50 px-1.5 py-0.5 rounded">{txn.number}</span>
+                    </td>
+                    <td>
+                      <span className="font-medium text-gray-800">{txn.partyName ?? '—'}</span>
+                      {txn.partyType && <span className="text-[10px] text-gray-400 uppercase ml-1.5">{txn.partyType}</span>}
+                    </td>
+                    <td className="text-center">
+                      <span className={cn('badge', badgeClass)}>
+                        {icon}
+                        {typeLabel}
+                      </span>
+                    </td>
+                    <td className="text-right">
+                      <span className={cn(
+                        'font-mono font-medium tabular-nums',
+                        isIncoming ? 'text-green-600' : 'text-red-500'
+                      )}>
+                        {isIncoming ? '+' : '-'} {formatRupiah(txn.amount)}
+                      </span>
+                    </td>
+                    <td className="text-center">
+                      <span className={cn('badge', txn.status === 'Cancelled' ? 'badge-red' : 'badge-blue')}>{txn.status}</span>
+                    </td>
+                    <td>
+                      <button className="p-1.5 hover:bg-gray-100 rounded text-gray-400 hover:text-gray-600 transition-colors">
+                        <MoreHorizontal size={16} />
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>
@@ -142,6 +219,11 @@ export const Payments = () => {
         isOpen={isReceiveOpen}
         onClose={() => setIsReceiveOpen(false)}
         defaultType="Receive"
+      />
+      <PaymentModal
+        isOpen={isPayOpen}
+        onClose={() => setIsPayOpen(false)}
+        defaultType="Pay"
       />
       <ExpenseModal
         isOpen={isExpenseOpen}
