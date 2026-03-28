@@ -38,7 +38,7 @@ const ReconciliationModal: React.FC<Props> = ({ isOpen, onClose }) => {
       const all: Account[] = Array.isArray(res.data) ? res.data : res.data.data || [];
       return all.filter(
         (a) =>
-          (a.accountNumber.startsWith('1.1.1') || a.accountNumber.startsWith('1.1.2')) &&
+          a.accountType === 'ASSET' && a.accountNumber.startsWith('1.1.') &&
           !(a as any).isGroup
       );
     },

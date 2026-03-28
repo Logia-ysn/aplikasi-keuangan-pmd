@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { prisma } from '../lib/prisma';
 import { AuthRequest, roleMiddleware } from '../middleware/auth';
 import { validateBody } from '../utils/validate';
+import { ACCOUNT_NUMBERS } from '../constants/accountNumbers';
 import {
   CreateReconciliationSchema,
   AddStatementItemsSchema,
@@ -48,7 +49,7 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
     if (!account) throw new BusinessError('Akun tidak ditemukan.');
 
     // Check account is cash/bank
-    if (!account.accountNumber.startsWith('1.1.1') && !account.accountNumber.startsWith('1.1.2')) {
+    if (!ACCOUNT_NUMBERS.CASH.some((prefix) => account.accountNumber.startsWith(prefix))) {
       throw new BusinessError('Akun yang dipilih bukan akun kas/bank.');
     }
 

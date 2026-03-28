@@ -323,10 +323,10 @@ router.get('/cash-flow', async (req, res) => {
       if (rootType === 'REVENUE' || rootType === 'EXPENSE' || accNum.startsWith(ACCOUNT_NUMBERS.AR) || accNum.startsWith(ACCOUNT_NUMBERS.AP)) {
         operating += amount;
         operatingDetails.push({ name: ent.account.name, amount });
-      } else if (accNum.startsWith('1.2')) {
+      } else if (accNum.startsWith('1.6') || accNum.startsWith('1.7')) {
         investing += amount;
         investingDetails.push({ name: ent.account.name, amount });
-      } else if (rootType === 'EQUITY' || accNum.startsWith('2.2')) {
+      } else if (rootType === 'EQUITY' || accNum.startsWith('2.3')) {
         financing += amount;
         financingDetails.push({ name: ent.account.name, amount });
       } else {

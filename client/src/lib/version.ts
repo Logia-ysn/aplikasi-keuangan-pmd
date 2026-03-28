@@ -3,7 +3,7 @@
  * Update file ini setiap kali release baru.
  */
 
-export const APP_VERSION = '1.7.0';
+export const APP_VERSION = '1.8.0';
 export const APP_BUILD_DATE = '2026-03-28';
 export const APP_NAME = 'Keuangan';
 
@@ -15,6 +15,21 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.8.0',
+    date: '2026-03-28',
+    title: 'Standarisasi COA & Data Awal',
+    changes: [
+      'Restrukturisasi COA 111 akun sesuai standar akuntansi (dari spreadsheet perusahaan)',
+      'Penomoran baru: 1.1.xx Kas/Bank, 1.2.xx Piutang, 1.4.xx Persediaan, 1.6.xx Aset Tetap, 1.7.xx Akum. Depresiasi',
+      '32 sub-akun persediaan detail (Gabah PW Basah s/d Beras Reject IR)',
+      '26 akun beban operasional (6.01-6.26)',
+      'Pendapatan & Beban Diluar Usaha (7.1.xx, 7.2.xx)',
+      'Seed 18 vendor + 31 customer untuk development',
+      'Fix isGroup pada akun sistem (4.1 Penjualan, 5 COGS) agar GL posting berfungsi',
+      'Fix cash flow report: investing → 1.6/1.7, financing → 2.3',
+    ],
+  },
   {
     version: '1.7.0',
     date: '2026-03-28',

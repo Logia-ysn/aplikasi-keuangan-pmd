@@ -1,4 +1,4 @@
-import { PrismaClient, AccountType, RootType, UserRole } from '@prisma/client';
+import { PrismaClient, AccountType, RootType, UserRole, PartyType } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
 import bcrypt from 'bcrypt';
@@ -48,50 +48,199 @@ async function main() {
     console.log(`- Upserted User: ${u.email} (${u.role})`);
   }
 
-  // 3. Seed COA
-  const coa = [
-    // ASSET
-    { accountNumber: '1', name: 'Aset', accountType: AccountType.ASSET, rootType: RootType.ASSET, isGroup: true },
-    { accountNumber: '1.1', name: 'Aset Lancar', accountType: AccountType.ASSET, rootType: RootType.ASSET, isGroup: true, parentNumber: '1' },
-    { accountNumber: '1.1.1', name: 'Kas Utama', accountType: AccountType.ASSET, rootType: RootType.ASSET, isGroup: false, parentNumber: '1.1' },
-    { accountNumber: '1.1.2', name: 'Bank BCA', accountType: AccountType.ASSET, rootType: RootType.ASSET, isGroup: false, parentNumber: '1.1' },
-    { accountNumber: '1.1.3', name: 'Piutang Usaha', accountType: AccountType.ASSET, rootType: RootType.ASSET, isGroup: false, parentNumber: '1.1' },
-    { accountNumber: '1.1.4', name: 'Persediaan Gabah', accountType: AccountType.ASSET, rootType: RootType.ASSET, isGroup: false, parentNumber: '1.1' },
-    { accountNumber: '1.1.5', name: 'Persediaan Beras', accountType: AccountType.ASSET, rootType: RootType.ASSET, isGroup: false, parentNumber: '1.1' },
-    { accountNumber: '1.2', name: 'Aset Lancar Lainnya', accountType: AccountType.ASSET, rootType: RootType.ASSET, isGroup: true, parentNumber: '1' },
-    { accountNumber: '1.2.1', name: 'Uang Muka Vendor', accountType: AccountType.ASSET, rootType: RootType.ASSET, isGroup: false, parentNumber: '1.2' },
+  // 3. Seed COA — Standard Chart of Accounts for PT Pangan Masa Depan
+  const A = AccountType.ASSET;
+  const L = AccountType.LIABILITY;
+  const E = AccountType.EQUITY;
+  const R = AccountType.REVENUE;
+  const X = AccountType.EXPENSE;
 
-    // LIABILITY
-    { accountNumber: '2', name: 'Liabilitas', accountType: AccountType.LIABILITY, rootType: RootType.LIABILITY, isGroup: true },
-    { accountNumber: '2.1', name: 'Liabilitas Jangka Pendek', accountType: AccountType.LIABILITY, rootType: RootType.LIABILITY, isGroup: true, parentNumber: '2' },
-    { accountNumber: '2.1.1', name: 'Hutang Usaha', accountType: AccountType.LIABILITY, rootType: RootType.LIABILITY, isGroup: false, parentNumber: '2.1' },
-    { accountNumber: '2.1.2', name: 'Hutang Gaji', accountType: AccountType.LIABILITY, rootType: RootType.LIABILITY, isGroup: false, parentNumber: '2.1' },
+  const coa: {
+    accountNumber: string;
+    name: string;
+    accountType: AccountType;
+    rootType: RootType;
+    isGroup: boolean;
+    parentNumber?: string;
+  }[] = [
+    // ═══════════════════════════════════════════
+    // 1. ASET
+    // ═══════════════════════════════════════════
+    { accountNumber: '1', name: 'Aset', accountType: A, rootType: RootType.ASSET, isGroup: true },
 
-    // EQUITY
-    { accountNumber: '3', name: 'Ekuitas', accountType: AccountType.EQUITY, rootType: RootType.EQUITY, isGroup: true },
-    { accountNumber: '3.1', name: 'Modal Disetor', accountType: AccountType.EQUITY, rootType: RootType.EQUITY, isGroup: false, parentNumber: '3' },
-    { accountNumber: '3.2', name: 'Laba Ditahan', accountType: AccountType.EQUITY, rootType: RootType.EQUITY, isGroup: true, parentNumber: '3' },
-    { accountNumber: '3.2.1', name: 'Laba Ditahan Akumulasi', accountType: AccountType.EQUITY, rootType: RootType.EQUITY, isGroup: false, parentNumber: '3.2' },
-    { accountNumber: '3.3', name: 'Laba Periode Berjalan', accountType: AccountType.EQUITY, rootType: RootType.EQUITY, isGroup: true, parentNumber: '3' },
-    { accountNumber: '3.3.1', name: 'Laba Tahun Berjalan', accountType: AccountType.EQUITY, rootType: RootType.EQUITY, isGroup: false, parentNumber: '3.3' },
+    // 1.1 Kas & Bank
+    { accountNumber: '1.1', name: 'Kas & Bank', accountType: A, rootType: RootType.ASSET, isGroup: true, parentNumber: '1' },
+    { accountNumber: '1.1.01', name: 'Petty Cash', accountType: A, rootType: RootType.ASSET, isGroup: false, parentNumber: '1.1' },
+    { accountNumber: '1.1.02', name: 'Bank BRI', accountType: A, rootType: RootType.ASSET, isGroup: false, parentNumber: '1.1' },
+    { accountNumber: '1.1.03', name: 'Bank Mandiri', accountType: A, rootType: RootType.ASSET, isGroup: false, parentNumber: '1.1' },
+    { accountNumber: '1.1.04', name: 'Bank BRI 2', accountType: A, rootType: RootType.ASSET, isGroup: false, parentNumber: '1.1' },
+    { accountNumber: '1.1.05', name: 'Bank BCA', accountType: A, rootType: RootType.ASSET, isGroup: false, parentNumber: '1.1' },
 
-    // REVENUE
-    { accountNumber: '4', name: 'Pendapatan', accountType: AccountType.REVENUE, rootType: RootType.REVENUE, isGroup: true },
-    { accountNumber: '4.1', name: 'Penjualan Beras', accountType: AccountType.REVENUE, rootType: RootType.REVENUE, isGroup: true, parentNumber: '4' },
-    { accountNumber: '4.1.1', name: 'Penjualan Beras Premium', accountType: AccountType.REVENUE, rootType: RootType.REVENUE, isGroup: false, parentNumber: '4.1' },
-    { accountNumber: '4.2', name: 'Penjualan Sekam', accountType: AccountType.REVENUE, rootType: RootType.REVENUE, isGroup: false, parentNumber: '4' },
-    { accountNumber: '4.3', name: 'Penjualan Bekatul', accountType: AccountType.REVENUE, rootType: RootType.REVENUE, isGroup: false, parentNumber: '4' },
-    { accountNumber: '4.4', name: 'Pendapatan Jasa', accountType: AccountType.REVENUE, rootType: RootType.REVENUE, isGroup: true, parentNumber: '4' },
-    { accountNumber: '4.4.1', name: 'Pendapatan Jasa Giling', accountType: AccountType.REVENUE, rootType: RootType.REVENUE, isGroup: false, parentNumber: '4.4' },
-    { accountNumber: '4.4.2', name: 'Pendapatan Jasa Kirim', accountType: AccountType.REVENUE, rootType: RootType.REVENUE, isGroup: false, parentNumber: '4.4' },
+    // 1.2 Piutang Usaha
+    { accountNumber: '1.2', name: 'Piutang Usaha', accountType: A, rootType: RootType.ASSET, isGroup: true, parentNumber: '1' },
+    { accountNumber: '1.2.01', name: 'Piutang Usaha (Dagang)', accountType: A, rootType: RootType.ASSET, isGroup: false, parentNumber: '1.2' },
+    { accountNumber: '1.2.02', name: 'Piutang Karyawan', accountType: A, rootType: RootType.ASSET, isGroup: false, parentNumber: '1.2' },
+    { accountNumber: '1.2.03', name: 'Piutang Owner', accountType: A, rootType: RootType.ASSET, isGroup: false, parentNumber: '1.2' },
+    { accountNumber: '1.2.04', name: 'Piutang Lain-lain', accountType: A, rootType: RootType.ASSET, isGroup: false, parentNumber: '1.2' },
 
-    // EXPENSE
-    { accountNumber: '5', name: 'Beban', accountType: AccountType.EXPENSE, rootType: RootType.EXPENSE, isGroup: true },
-    { accountNumber: '5.1', name: 'Harga Pokok Penjualan', accountType: AccountType.EXPENSE, rootType: RootType.EXPENSE, isGroup: true, parentNumber: '5' },
-    { accountNumber: '5.1.1', name: 'Pembelian Gabah', accountType: AccountType.EXPENSE, rootType: RootType.EXPENSE, isGroup: false, parentNumber: '5.1' },
-    { accountNumber: '5.2', name: 'Beban Operasional', accountType: AccountType.EXPENSE, rootType: RootType.EXPENSE, isGroup: true, parentNumber: '5' },
-    { accountNumber: '5.2.1', name: 'Listrik & Air Pabrik', accountType: AccountType.EXPENSE, rootType: RootType.EXPENSE, isGroup: false, parentNumber: '5.2' },
-    { accountNumber: '5.2.2', name: 'Gaji Karyawan', accountType: AccountType.EXPENSE, rootType: RootType.EXPENSE, isGroup: false, parentNumber: '5.2' },
+    // 1.3 Uang Muka Pembelian
+    { accountNumber: '1.3', name: 'Uang Muka Pembelian', accountType: A, rootType: RootType.ASSET, isGroup: false, parentNumber: '1' },
+
+    // 1.4 Persediaan
+    { accountNumber: '1.4', name: 'Persediaan', accountType: A, rootType: RootType.ASSET, isGroup: true, parentNumber: '1' },
+    { accountNumber: '1.4.00', name: 'Persediaan (Umum)', accountType: A, rootType: RootType.ASSET, isGroup: false, parentNumber: '1.4' },
+    { accountNumber: '1.4.01', name: 'Persediaan Gabah PW Basah', accountType: A, rootType: RootType.ASSET, isGroup: false, parentNumber: '1.4' },
+    { accountNumber: '1.4.02', name: 'Persediaan Gabah Muncul', accountType: A, rootType: RootType.ASSET, isGroup: false, parentNumber: '1.4' },
+    { accountNumber: '1.4.03', name: 'Persediaan Gabah KB Basah', accountType: A, rootType: RootType.ASSET, isGroup: false, parentNumber: '1.4' },
+    { accountNumber: '1.4.04', name: 'Persediaan Gabah KB Kering', accountType: A, rootType: RootType.ASSET, isGroup: false, parentNumber: '1.4' },
+    { accountNumber: '1.4.05', name: 'Persediaan Gabah IR Basah', accountType: A, rootType: RootType.ASSET, isGroup: false, parentNumber: '1.4' },
+    { accountNumber: '1.4.06', name: 'Persediaan Gabah IR Kering', accountType: A, rootType: RootType.ASSET, isGroup: false, parentNumber: '1.4' },
+    { accountNumber: '1.4.07', name: 'Persediaan Beras Kkebo (Batak)', accountType: A, rootType: RootType.ASSET, isGroup: false, parentNumber: '1.4' },
+    { accountNumber: '1.4.08', name: 'Persediaan Beras HGL Gapoktan', accountType: A, rootType: RootType.ASSET, isGroup: false, parentNumber: '1.4' },
+    { accountNumber: '1.4.09', name: 'Persediaan Beras PK Muncul', accountType: A, rootType: RootType.ASSET, isGroup: false, parentNumber: '1.4' },
+    { accountNumber: '1.4.10', name: 'Persediaan Beras IR (Basri)', accountType: A, rootType: RootType.ASSET, isGroup: false, parentNumber: '1.4' },
+    { accountNumber: '1.4.11', name: 'Persediaan Beras PK Kebo', accountType: A, rootType: RootType.ASSET, isGroup: false, parentNumber: '1.4' },
+    { accountNumber: '1.4.12', name: 'Persediaan Beras Glosor IR (Basri)', accountType: A, rootType: RootType.ASSET, isGroup: false, parentNumber: '1.4' },
+    { accountNumber: '1.4.13', name: 'Persediaan Beras Reject', accountType: A, rootType: RootType.ASSET, isGroup: false, parentNumber: '1.4' },
+    { accountNumber: '1.4.14', name: 'Persediaan Menir Jitay', accountType: A, rootType: RootType.ASSET, isGroup: false, parentNumber: '1.4' },
+    { accountNumber: '1.4.15', name: 'Persediaan Menir Gula', accountType: A, rootType: RootType.ASSET, isGroup: false, parentNumber: '1.4' },
+    { accountNumber: '1.4.16', name: 'Persediaan Broken', accountType: A, rootType: RootType.ASSET, isGroup: false, parentNumber: '1.4' },
+    { accountNumber: '1.4.17', name: 'Persediaan Menir Glosor / Bebek', accountType: A, rootType: RootType.ASSET, isGroup: false, parentNumber: '1.4' },
+    { accountNumber: '1.4.18', name: 'Persediaan Saponan', accountType: A, rootType: RootType.ASSET, isGroup: false, parentNumber: '1.4' },
+    { accountNumber: '1.4.19', name: 'Persediaan Reject 2', accountType: A, rootType: RootType.ASSET, isGroup: false, parentNumber: '1.4' },
+    { accountNumber: '1.4.20', name: 'Cruise 25 KG', accountType: A, rootType: RootType.ASSET, isGroup: false, parentNumber: '1.4' },
+    { accountNumber: '1.4.21', name: 'Cruise 50 KG', accountType: A, rootType: RootType.ASSET, isGroup: false, parentNumber: '1.4' },
+    { accountNumber: '1.4.22', name: 'Broken 50 KG', accountType: A, rootType: RootType.ASSET, isGroup: false, parentNumber: '1.4' },
+    { accountNumber: '1.4.23', name: 'Menir Jitay 50 KG', accountType: A, rootType: RootType.ASSET, isGroup: false, parentNumber: '1.4' },
+    { accountNumber: '1.4.24', name: 'Walemu 50 KG', accountType: A, rootType: RootType.ASSET, isGroup: false, parentNumber: '1.4' },
+    { accountNumber: '1.4.25', name: 'Walemu 25 KG', accountType: A, rootType: RootType.ASSET, isGroup: false, parentNumber: '1.4' },
+    { accountNumber: '1.4.26', name: 'Pagi Jaya 5 KG', accountType: A, rootType: RootType.ASSET, isGroup: false, parentNumber: '1.4' },
+    { accountNumber: '1.4.27', name: 'Doa Kyai 50 KG', accountType: A, rootType: RootType.ASSET, isGroup: false, parentNumber: '1.4' },
+    { accountNumber: '1.4.28', name: 'Pagi Jaya 50 KG', accountType: A, rootType: RootType.ASSET, isGroup: false, parentNumber: '1.4' },
+    { accountNumber: '1.4.29', name: 'Beras Muncul Premium 50 KG', accountType: A, rootType: RootType.ASSET, isGroup: false, parentNumber: '1.4' },
+    { accountNumber: '1.4.30', name: 'PW Manis Cantik', accountType: A, rootType: RootType.ASSET, isGroup: false, parentNumber: '1.4' },
+    { accountNumber: '1.4.31', name: 'BPJ 50 KG', accountType: A, rootType: RootType.ASSET, isGroup: false, parentNumber: '1.4' },
+    { accountNumber: '1.4.32', name: 'Beras Reject IR', accountType: A, rootType: RootType.ASSET, isGroup: false, parentNumber: '1.4' },
+
+    // 1.5 Aset Lancar Lainnya
+    { accountNumber: '1.5', name: 'Aset Lancar Lainnya', accountType: A, rootType: RootType.ASSET, isGroup: true, parentNumber: '1' },
+    { accountNumber: '1.5.01', name: 'Sewa Gedung Dibayar Dimuka', accountType: A, rootType: RootType.ASSET, isGroup: false, parentNumber: '1.5' },
+    { accountNumber: '1.5.02', name: 'Asuransi Dibayar Dimuka', accountType: A, rootType: RootType.ASSET, isGroup: false, parentNumber: '1.5' },
+    { accountNumber: '1.5.03', name: 'PPN Masukan', accountType: A, rootType: RootType.ASSET, isGroup: false, parentNumber: '1.5' },
+    { accountNumber: '1.5.04', name: 'PPh 23 Penjualan', accountType: A, rootType: RootType.ASSET, isGroup: false, parentNumber: '1.5' },
+    { accountNumber: '1.5.05', name: 'PPh Ps.4(2) Penjualan', accountType: A, rootType: RootType.ASSET, isGroup: false, parentNumber: '1.5' },
+
+    // 1.6 Aset Tetap
+    { accountNumber: '1.6', name: 'Aset Tetap', accountType: A, rootType: RootType.ASSET, isGroup: true, parentNumber: '1' },
+    { accountNumber: '1.6.01', name: 'Tanah', accountType: A, rootType: RootType.ASSET, isGroup: false, parentNumber: '1.6' },
+    { accountNumber: '1.6.02', name: 'Gedung', accountType: A, rootType: RootType.ASSET, isGroup: false, parentNumber: '1.6' },
+    { accountNumber: '1.6.03', name: 'Kendaraan', accountType: A, rootType: RootType.ASSET, isGroup: false, parentNumber: '1.6' },
+    { accountNumber: '1.6.04', name: 'Mesin', accountType: A, rootType: RootType.ASSET, isGroup: false, parentNumber: '1.6' },
+    { accountNumber: '1.6.05', name: 'Inventaris Kantor', accountType: A, rootType: RootType.ASSET, isGroup: false, parentNumber: '1.6' },
+
+    // 1.7 Akumulasi Depresiasi Aset Tetap
+    { accountNumber: '1.7', name: 'Akumulasi Depresiasi Aset Tetap', accountType: A, rootType: RootType.ASSET, isGroup: true, parentNumber: '1' },
+    { accountNumber: '1.7.01', name: 'Akumulasi Penyusutan Gedung', accountType: A, rootType: RootType.ASSET, isGroup: false, parentNumber: '1.7' },
+    { accountNumber: '1.7.02', name: 'Akumulasi Penyusutan Kendaraan', accountType: A, rootType: RootType.ASSET, isGroup: false, parentNumber: '1.7' },
+    { accountNumber: '1.7.03', name: 'Akumulasi Penyusutan Mesin', accountType: A, rootType: RootType.ASSET, isGroup: false, parentNumber: '1.7' },
+    { accountNumber: '1.7.04', name: 'Akumulasi Penyusutan Inventaris Kantor', accountType: A, rootType: RootType.ASSET, isGroup: false, parentNumber: '1.7' },
+
+    // ═══════════════════════════════════════════
+    // 2. LIABILITAS
+    // ═══════════════════════════════════════════
+    { accountNumber: '2', name: 'Liabilitas', accountType: L, rootType: RootType.LIABILITY, isGroup: true },
+
+    // 2.1 Hutang Usaha
+    { accountNumber: '2.1', name: 'Hutang Usaha', accountType: L, rootType: RootType.LIABILITY, isGroup: true, parentNumber: '2' },
+    { accountNumber: '2.1.01', name: 'Hutang Usaha (Dagang)', accountType: L, rootType: RootType.LIABILITY, isGroup: false, parentNumber: '2.1' },
+    { accountNumber: '2.1.02', name: 'Uang Muka Penjualan', accountType: L, rootType: RootType.LIABILITY, isGroup: false, parentNumber: '2.1' },
+
+    // 2.2 Kewajiban Jangka Pendek Lainnya
+    { accountNumber: '2.2', name: 'Kewajiban Jangka Pendek Lainnya', accountType: L, rootType: RootType.LIABILITY, isGroup: true, parentNumber: '2' },
+    { accountNumber: '2.2.01', name: 'PPN Keluaran', accountType: L, rootType: RootType.LIABILITY, isGroup: false, parentNumber: '2.2' },
+    { accountNumber: '2.2.02', name: 'PPh 23 Pembelian', accountType: L, rootType: RootType.LIABILITY, isGroup: false, parentNumber: '2.2' },
+    { accountNumber: '2.2.03', name: 'Hutang Pembelian Belum Ditagih', accountType: L, rootType: RootType.LIABILITY, isGroup: false, parentNumber: '2.2' },
+    { accountNumber: '2.2.04', name: 'PPh Ps.4(2) Pembelian', accountType: L, rootType: RootType.LIABILITY, isGroup: false, parentNumber: '2.2' },
+    { accountNumber: '2.2.05', name: 'Hutang PPh 21', accountType: L, rootType: RootType.LIABILITY, isGroup: false, parentNumber: '2.2' },
+    { accountNumber: '2.2.06', name: 'Hutang Gaji Karyawan', accountType: L, rootType: RootType.LIABILITY, isGroup: false, parentNumber: '2.2' },
+
+    // 2.3 Hutang Jangka Panjang
+    { accountNumber: '2.3', name: 'Hutang Jangka Panjang', accountType: L, rootType: RootType.LIABILITY, isGroup: true, parentNumber: '2' },
+
+    // ═══════════════════════════════════════════
+    // 3. MODAL / EKUITAS
+    // ═══════════════════════════════════════════
+    { accountNumber: '3', name: 'Modal', accountType: E, rootType: RootType.EQUITY, isGroup: true },
+    { accountNumber: '3.1', name: 'Equitas Saldo Awal', accountType: E, rootType: RootType.EQUITY, isGroup: false, parentNumber: '3' },
+    { accountNumber: '3.2', name: 'Laba Ditahan', accountType: E, rootType: RootType.EQUITY, isGroup: false, parentNumber: '3' },
+    { accountNumber: '3.3', name: 'Modal Saham', accountType: E, rootType: RootType.EQUITY, isGroup: false, parentNumber: '3' },
+    { accountNumber: '3.4', name: 'Laba Tahun Berjalan', accountType: E, rootType: RootType.EQUITY, isGroup: false, parentNumber: '3' },
+
+    // ═══════════════════════════════════════════
+    // 4. PENDAPATAN OPERASIONAL
+    // ═══════════════════════════════════════════
+    { accountNumber: '4', name: 'Pendapatan Operasional', accountType: R, rootType: RootType.REVENUE, isGroup: true },
+    { accountNumber: '4.1', name: 'Penjualan', accountType: R, rootType: RootType.REVENUE, isGroup: false, parentNumber: '4' },
+    { accountNumber: '4.2', name: 'Pendapatan Jasa', accountType: R, rootType: RootType.REVENUE, isGroup: false, parentNumber: '4' },
+    { accountNumber: '4.3', name: 'Retur Penjualan', accountType: R, rootType: RootType.REVENUE, isGroup: false, parentNumber: '4' },
+    { accountNumber: '4.4', name: 'Diskon Penjualan', accountType: R, rootType: RootType.REVENUE, isGroup: false, parentNumber: '4' },
+
+    // ═══════════════════════════════════════════
+    // 5. BEBAN POKOK PENJUALAN
+    // ═══════════════════════════════════════════
+    { accountNumber: '5', name: 'Beban Pokok Penjualan', accountType: X, rootType: RootType.EXPENSE, isGroup: false },
+
+    // ═══════════════════════════════════════════
+    // 6. BEBAN OPERASIONAL
+    // ═══════════════════════════════════════════
+    { accountNumber: '6', name: 'Beban Operasional', accountType: X, rootType: RootType.EXPENSE, isGroup: true },
+    { accountNumber: '6.01', name: 'Beban Internet', accountType: X, rootType: RootType.EXPENSE, isGroup: false, parentNumber: '6' },
+    { accountNumber: '6.02', name: 'Beban Komisi', accountType: X, rootType: RootType.EXPENSE, isGroup: false, parentNumber: '6' },
+    { accountNumber: '6.03', name: 'Beban Bensin, Parkir, Tol Kendaraan', accountType: X, rootType: RootType.EXPENSE, isGroup: false, parentNumber: '6' },
+    { accountNumber: '6.04', name: 'Beban Gaji, Upah & Honorer', accountType: X, rootType: RootType.EXPENSE, isGroup: false, parentNumber: '6' },
+    { accountNumber: '6.05', name: 'Beban Bonus, Pesangon & Kompensasi', accountType: X, rootType: RootType.EXPENSE, isGroup: false, parentNumber: '6' },
+    { accountNumber: '6.06', name: 'Beban Transportasi Karyawan', accountType: X, rootType: RootType.EXPENSE, isGroup: false, parentNumber: '6' },
+    { accountNumber: '6.07', name: 'Beban Pemeliharaan Kendaraan', accountType: X, rootType: RootType.EXPENSE, isGroup: false, parentNumber: '6' },
+    { accountNumber: '6.08', name: 'Beban Tunjangan Kesehatan', accountType: X, rootType: RootType.EXPENSE, isGroup: false, parentNumber: '6' },
+    { accountNumber: '6.09', name: 'Beban Asuransi Karyawan', accountType: X, rootType: RootType.EXPENSE, isGroup: false, parentNumber: '6' },
+    { accountNumber: '6.10', name: 'Beban THR', accountType: X, rootType: RootType.EXPENSE, isGroup: false, parentNumber: '6' },
+    { accountNumber: '6.11', name: 'Beban Listrik', accountType: X, rootType: RootType.EXPENSE, isGroup: false, parentNumber: '6' },
+    { accountNumber: '6.12', name: 'Beban PAM', accountType: X, rootType: RootType.EXPENSE, isGroup: false, parentNumber: '6' },
+    { accountNumber: '6.13', name: 'Beban Telekomunikasi', accountType: X, rootType: RootType.EXPENSE, isGroup: false, parentNumber: '6' },
+    { accountNumber: '6.14', name: 'Beban Ekspedisi, Pos & Materai', accountType: X, rootType: RootType.EXPENSE, isGroup: false, parentNumber: '6' },
+    { accountNumber: '6.15', name: 'Beban Perjalanan Dinas', accountType: X, rootType: RootType.EXPENSE, isGroup: false, parentNumber: '6' },
+    { accountNumber: '6.16', name: 'Beban Perlengkapan Kantor', accountType: X, rootType: RootType.EXPENSE, isGroup: false, parentNumber: '6' },
+    { accountNumber: '6.17', name: 'Beban Pajak Penghasilan', accountType: X, rootType: RootType.EXPENSE, isGroup: false, parentNumber: '6' },
+    { accountNumber: '6.18', name: 'Beban Sumbangan Sosial', accountType: X, rootType: RootType.EXPENSE, isGroup: false, parentNumber: '6' },
+    { accountNumber: '6.19', name: 'Beban Sewa Gedung', accountType: X, rootType: RootType.EXPENSE, isGroup: false, parentNumber: '6' },
+    { accountNumber: '6.20', name: 'Beban Pantry', accountType: X, rootType: RootType.EXPENSE, isGroup: false, parentNumber: '6' },
+    { accountNumber: '6.21', name: 'Beban Penyusutan Gedung', accountType: X, rootType: RootType.EXPENSE, isGroup: false, parentNumber: '6' },
+    { accountNumber: '6.22', name: 'Beban Penyusutan Kendaraan', accountType: X, rootType: RootType.EXPENSE, isGroup: false, parentNumber: '6' },
+    { accountNumber: '6.23', name: 'Beban Penyusutan Mesin', accountType: X, rootType: RootType.EXPENSE, isGroup: false, parentNumber: '6' },
+    { accountNumber: '6.24', name: 'Beban Penyusutan Inventaris Kantor', accountType: X, rootType: RootType.EXPENSE, isGroup: false, parentNumber: '6' },
+    { accountNumber: '6.25', name: 'Beban Pemeliharaan Mesin', accountType: X, rootType: RootType.EXPENSE, isGroup: false, parentNumber: '6' },
+    { accountNumber: '6.26', name: 'Beban Pemeliharaan Gedung', accountType: X, rootType: RootType.EXPENSE, isGroup: false, parentNumber: '6' },
+
+    // ═══════════════════════════════════════════
+    // 7. PENDAPATAN & BEBAN DILUAR USAHA
+    // ═══════════════════════════════════════════
+
+    // 7.1 Pendapatan Diluar Usaha
+    { accountNumber: '7.1', name: 'Pendapatan Diluar Usaha', accountType: R, rootType: RootType.REVENUE, isGroup: true },
+    { accountNumber: '7.1.01', name: 'Pendapatan Bunga Deposito', accountType: R, rootType: RootType.REVENUE, isGroup: false, parentNumber: '7.1' },
+    { accountNumber: '7.1.02', name: 'Penjualan Persediaan / Perlengkapan', accountType: R, rootType: RootType.REVENUE, isGroup: false, parentNumber: '7.1' },
+    { accountNumber: '7.1.03', name: 'Laba/Rugi Revaluasi Aset', accountType: R, rootType: RootType.REVENUE, isGroup: false, parentNumber: '7.1' },
+    { accountNumber: '7.1.04', name: 'Pendapatan Diluar Usaha Lainnya', accountType: R, rootType: RootType.REVENUE, isGroup: false, parentNumber: '7.1' },
+
+    // 7.2 Beban Diluar Usaha
+    { accountNumber: '7.2', name: 'Beban Diluar Usaha', accountType: X, rootType: RootType.EXPENSE, isGroup: true },
+    { accountNumber: '7.2.01', name: 'Beban Bunga Pinjaman', accountType: X, rootType: RootType.EXPENSE, isGroup: false, parentNumber: '7.2' },
+    { accountNumber: '7.2.02', name: 'Beban Adm. Bank & Buku Cek/Giro', accountType: X, rootType: RootType.EXPENSE, isGroup: false, parentNumber: '7.2' },
+    { accountNumber: '7.2.03', name: 'Pajak Jasa Giro', accountType: X, rootType: RootType.EXPENSE, isGroup: false, parentNumber: '7.2' },
+    { accountNumber: '7.2.04', name: 'Laba/Rugi Terealisasi', accountType: X, rootType: RootType.EXPENSE, isGroup: false, parentNumber: '7.2' },
+    { accountNumber: '7.2.05', name: 'Laba/Rugi Belum Terealisasi', accountType: X, rootType: RootType.EXPENSE, isGroup: false, parentNumber: '7.2' },
+    { accountNumber: '7.2.06', name: 'Laba/Rugi Disposisi Aset', accountType: X, rootType: RootType.EXPENSE, isGroup: false, parentNumber: '7.2' },
+    { accountNumber: '7.2.07', name: 'Beban Diluar Usaha Lainnya', accountType: X, rootType: RootType.EXPENSE, isGroup: false, parentNumber: '7.2' },
   ];
 
   const numberToId: Record<string, string> = {};
@@ -101,7 +250,7 @@ async function main() {
 
     const account = await prisma.account.upsert({
       where: { accountNumber: item.accountNumber },
-      update: { isGroup: item.isGroup },
+      update: { name: item.name, isGroup: item.isGroup, accountType: item.accountType, rootType: item.rootType },
       create: {
         accountNumber: item.accountNumber,
         name: item.name,
@@ -113,13 +262,13 @@ async function main() {
     });
 
     numberToId[item.accountNumber] = account.id;
-    console.log(`- Created account: ${account.accountNumber} ${account.name}`);
+    console.log(`- Account: ${account.accountNumber} ${account.name}`);
   }
 
   // 4. Seed Service Items
   const serviceItemsData = [
-    { code: 'JSG-001', name: 'Jasa Giling Padi', unit: 'Ton', defaultRate: 500000, accountNumber: '4.4.1' },
-    { code: 'JSK-001', name: 'Jasa Kirim', unit: 'Trip', defaultRate: 250000, accountNumber: '4.4.2' },
+    { code: 'JSG-001', name: 'Jasa Giling Padi', unit: 'Ton', defaultRate: 500000, accountNumber: '4.2' },
+    { code: 'JSK-001', name: 'Jasa Kirim', unit: 'Trip', defaultRate: 250000, accountNumber: '4.2' },
   ];
 
   for (const si of serviceItemsData) {
@@ -148,7 +297,7 @@ async function main() {
     update: {},
     create: {
       slug: 'default',
-      companyName: 'Perusahaan Anda',
+      companyName: 'PT Pangan Masa Depan',
       address: '',
       phone: '',
       email: '',
@@ -157,6 +306,81 @@ async function main() {
     },
   });
   console.log('- Created default Company Settings');
+
+  // 6. Seed Vendors & Customers (only if no parties exist yet)
+  const partyCount = await prisma.party.count();
+  if (partyCount === 0) {
+    const vendors = [
+      { name: 'Abud', phone: '+62 822-9812-0854' },
+      { name: 'Angga', phone: '+62 852-0022-1415' },
+      { name: 'Bulog', phone: null },
+      { name: 'Dion', phone: '+62 831-3492-2717' },
+      { name: 'Gunawan', phone: null },
+      { name: 'Hj. Ukat', phone: '+62 822-1502-0606' },
+      { name: 'Ibu Sri', phone: null },
+      { name: 'Kiwang', phone: '+62 823-1754-8267' },
+      { name: 'Margini', phone: '+62 812-2850-5282' },
+      { name: 'Nugroho', phone: '+62 822-8274-7444' },
+      { name: 'Pamuji', phone: '+62 852-2677-0777' },
+      { name: 'Pandu', phone: null },
+      { name: 'PT SHS', phone: null },
+      { name: 'PT. BPR', phone: null },
+      { name: 'Sugimun', phone: '+62 852-1241-9383' },
+      { name: 'Supari', phone: '+62 852-2059-4515' },
+      { name: 'Susyati', phone: '+62 852-2671-3345' },
+      { name: 'Wahyu Dhea', phone: '+62 853-2182-3323' },
+    ];
+
+    const customers = [
+      { name: 'AB Chicken' },
+      { name: 'ABS' },
+      { name: 'Baehaqi' },
+      { name: 'Bapak Bambang' },
+      { name: 'Bulog Bogor' },
+      { name: 'Bulog Indramayu' },
+      { name: 'BGN' },
+      { name: 'BGN Fianti' },
+      { name: 'BGN Kemped' },
+      { name: 'BGN Sentul' },
+      { name: 'Bos Bewok' },
+      { name: 'Dartum' },
+      { name: 'Eka Babinsa' },
+      { name: 'Gus Azka' },
+      { name: 'Gus Azmi' },
+      { name: 'Gus Azmi 2' },
+      { name: 'Hermanto' },
+      { name: 'HJ. Bisri' },
+      { name: 'HJ. Urip' },
+      { name: 'Ibu Yenny' },
+      { name: 'Induk' },
+      { name: 'Pak Dion' },
+      { name: 'Pondok' },
+      { name: 'Pondok CDP' },
+      { name: 'Rahmat' },
+      { name: 'Rianto' },
+      { name: 'Rizki' },
+      { name: 'Suparih' },
+      { name: 'Tino' },
+      { name: 'Toko Liga Beras' },
+      { name: 'Toko SR' },
+    ];
+
+    for (const v of vendors) {
+      await prisma.party.create({
+        data: { name: v.name, partyType: PartyType.Supplier, phone: v.phone },
+      });
+    }
+    console.log(`- Seeded ${vendors.length} vendors`);
+
+    for (const c of customers) {
+      await prisma.party.create({
+        data: { name: c.name, partyType: PartyType.Customer },
+      });
+    }
+    console.log(`- Seeded ${customers.length} customers`);
+  } else {
+    console.log(`- Skipped party seeding (${partyCount} parties already exist)`);
+  }
 
   console.log('Seeding completed.');
 }
