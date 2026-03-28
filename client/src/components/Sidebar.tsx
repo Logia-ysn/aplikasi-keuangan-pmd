@@ -26,6 +26,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { cn } from '../lib/utils';
 import { useCompanySettings } from '../contexts/CompanySettingsContext';
 import { useTheme } from '../contexts/ThemeContext';
+import { APP_VERSION } from '../lib/version';
 
 type NavItem = { icon: React.FC<any>; label: string; href: string; roles?: string[] };
 
@@ -200,6 +201,15 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen = false, onMobileCl
           {(mobileOpen || !isCollapsed) && <span className="truncate text-xs font-medium">{themeLabel}</span>}
         </button>
       </div>
+
+      {/* Version */}
+      {(mobileOpen || !isCollapsed) && (
+        <div className="px-4 pb-1">
+          <span className="text-[10px] font-mono tracking-wide" style={{ color: 'var(--color-text-muted)' }}>
+            v{APP_VERSION}
+          </span>
+        </div>
+      )}
 
       {/* User */}
       <div className="border-t p-3" style={{ borderColor: 'var(--color-border-light)' }}>

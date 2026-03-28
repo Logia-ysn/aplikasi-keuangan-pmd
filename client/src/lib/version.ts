@@ -3,8 +3,8 @@
  * Update file ini setiap kali release baru.
  */
 
-export const APP_VERSION = '1.6.3';
-export const APP_BUILD_DATE = '2026-03-26';
+export const APP_VERSION = '1.7.0';
+export const APP_BUILD_DATE = '2026-03-28';
 export const APP_NAME = 'Keuangan';
 
 export interface ChangelogEntry {
@@ -15,6 +15,32 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.7.0',
+    date: '2026-03-28',
+    title: 'Uang Muka Vendor & Item Jasa',
+    changes: [
+      'Fitur Uang Muka Vendor: deposit ke supplier, apply ke invoice pembelian, cancel & reverse GL otomatis',
+      'Halaman khusus /vendor-deposits dengan summary cards dan tabel',
+      'Tombol "Gunakan Uang Muka" di detail invoice pembelian',
+      'Badge "Uang Muka" di halaman Bank & Kas',
+      'Tampilkan saldo uang muka di kartu mitra (Pelanggan & Vendor)',
+      'COA baru: 1.2 Aset Lancar Lainnya, 1.2.1 Uang Muka Vendor',
+      'Support item jasa di invoice penjualan (tanpa stok)',
+      'Perbaikan halaman inventory',
+    ],
+  },
+  {
+    version: '1.6.0',
+    date: '2026-03-27',
+    title: 'Role StaffProduksi & Stok Otomatis',
+    changes: [
+      'Tambah role StaffProduksi untuk akses gudang & pembelian',
+      'Link item invoice ke inventory — stok & COA otomatis sinkron',
+      'Rekonsiliasi & transaksi berulang dibatasi dari Viewer',
+      'Perbaikan aksesibilitas toggle dashboard',
+    ],
+  },
   {
     version: '1.5.0',
     date: '2026-03-20',
