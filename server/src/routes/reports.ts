@@ -5,6 +5,7 @@ import { Prisma } from '@prisma/client';
 import { computeImpact } from '../utils/accountBalance';
 import { ACCOUNT_NUMBERS } from '../constants/accountNumbers';
 import { logger } from '../lib/logger';
+import { compareAccountNumber } from '../utils/accountSort';
 
 const router = Router();
 
@@ -44,10 +45,10 @@ router.get('/trial-balance', async (req, res) => {
       prisma.account.findMany({
         where: { isGroup: false },
         select: { id: true, name: true, accountNumber: true, accountType: true, rootType: true },
-        orderBy: { accountNumber: 'asc' },
       }),
     ]);
 
+    accounts.sort((a, b) => compareAccountNumber(a.accountNumber, b.accountNumber));
     const entryMap = new Map(entries.map((e) => [e.accountId, e]));
 
     const report = accounts
@@ -92,7 +93,6 @@ router.get('/profit-loss', async (req, res) => {
     const [allAccounts, entries] = await Promise.all([
       prisma.account.findMany({
         where: { OR: [{ rootType: 'REVENUE' as any }, { rootType: 'EXPENSE' as any }] },
-        orderBy: { accountNumber: 'asc' },
       }),
       prisma.accountingLedgerEntry.groupBy({
         by: ['accountId'],
@@ -100,6 +100,7 @@ router.get('/profit-loss', async (req, res) => {
         _sum: { debit: true, credit: true },
       }),
     ]);
+    allAccounts.sort((a, b) => compareAccountNumber(a.accountNumber, b.accountNumber));
 
     const summaryMap = new Map(
       entries.map((e) => [
@@ -175,7 +176,6 @@ router.get('/balance-sheet', async (req, res) => {
     const [allAccounts, entries, revAgg, expAgg] = await Promise.all([
       prisma.account.findMany({
         where: { OR: [{ rootType: 'ASSET' as any }, { rootType: 'LIABILITY' as any }, { rootType: 'EQUITY' as any }] },
-        orderBy: { accountNumber: 'asc' },
       }),
       prisma.accountingLedgerEntry.groupBy({
         by: ['accountId'],
@@ -192,6 +192,7 @@ router.get('/balance-sheet', async (req, res) => {
       }),
     ]);
 
+    allAccounts.sort((a, b) => compareAccountNumber(a.accountNumber, b.accountNumber));
     const summaryMap = new Map(
       entries.map((e) => [e.accountId, { debit: Number(e._sum.debit || 0), credit: Number(e._sum.credit || 0) }])
     );

@@ -10,15 +10,15 @@ import { CreateAccountSchema, UpdateAccountSchema, SetBalanceSchema } from '../u
 import { BusinessError, handleRouteError } from '../utils/errors';
 import { ACCOUNT_NUMBERS } from '../constants/accountNumbers';
 import { logger } from '../lib/logger';
+import { compareAccountNumber } from '../utils/accountSort';
 
 const router = Router();
 
 // GET /api/coa — hierarchical account tree
 router.get('/', async (req, res) => {
   try {
-    const allAccounts = await prisma.account.findMany({
-      orderBy: { accountNumber: 'asc' },
-    });
+    const allAccounts = await prisma.account.findMany();
+    allAccounts.sort((a, b) => compareAccountNumber(a.accountNumber, b.accountNumber));
 
     const buildTree = (accounts: typeof allAccounts, parentId: string | null = null): any[] =>
       accounts
@@ -37,7 +37,6 @@ router.get('/flat', async (req, res) => {
   try {
     const accounts = await prisma.account.findMany({
       where: { isActive: true },
-      orderBy: { accountNumber: 'asc' },
       select: {
         id: true,
         accountNumber: true,
@@ -48,6 +47,7 @@ router.get('/flat', async (req, res) => {
         balance: true,
       },
     });
+    accounts.sort((a, b) => compareAccountNumber(a.accountNumber, b.accountNumber));
     return res.json(accounts);
   } catch (error) {
     logger.error({ error }, 'GET /coa/flat error');
