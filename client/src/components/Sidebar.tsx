@@ -19,6 +19,7 @@ import {
   ScrollText,
   Repeat,
   Scale,
+  Wallet,
   X,
 } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
@@ -36,6 +37,7 @@ const allNavItems: NavItem[] = [
   { icon: Package, label: 'Pembelian', href: '/purchase', roles: ['Admin', 'Accountant', 'StaffProduksi'] },
   { icon: Warehouse, label: 'Stok & Gudang', href: '/inventory' },
   { icon: CreditCard, label: 'Bank & Kas', href: '/payments', roles: ['Admin', 'Accountant', 'Viewer'] },
+  { icon: Wallet, label: 'Uang Muka Vendor', href: '/vendor-deposits', roles: ['Admin', 'Accountant'] },
   { icon: Scale, label: 'Rekonsiliasi Bank', href: '/reconciliation', roles: ['Admin', 'Accountant'] },
   { icon: Users, label: 'Pelanggan & Vendor', href: '/parties', roles: ['Admin', 'Accountant', 'StaffProduksi'] },
   { icon: Repeat, label: 'Transaksi Berulang', href: '/recurring', roles: ['Admin', 'Accountant'] },

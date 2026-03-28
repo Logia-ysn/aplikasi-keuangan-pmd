@@ -1,12 +1,13 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { X, FileDown, Clock, CreditCard, Package, User, Calendar, AlertTriangle, CheckCircle2, Loader2 } from 'lucide-react';
+import { X, FileDown, Clock, CreditCard, Package, User, Calendar, AlertTriangle, CheckCircle2, Loader2, Wallet } from 'lucide-react';
 import { cn } from '../lib/utils';
 import api from '../lib/api';
 import { formatRupiah, formatDate } from '../lib/formatters';
 import PDFDownloadButton from './PDFDownloadButton';
 import InvoicePDF from '../lib/pdf/InvoicePDF';
 import { useCompanyPDF } from '../lib/pdf/useCompanyPDF';
+import ApplyDepositModal from './ApplyDepositModal';
 
 interface Props {
   type: 'sales' | 'purchase';
@@ -26,6 +27,7 @@ const statusConfig: Record<string, { label: string; badge: string; icon: React.R
 const InvoiceDetailDrawer: React.FC<Props> = ({ type, invoiceId, onClose }) => {
   const company = useCompanyPDF();
   const isSales = type === 'sales';
+  const [isApplyDepositOpen, setIsApplyDepositOpen] = useState(false);
   const endpoint = isSales ? '/sales/invoices' : '/purchase/invoices';
 
   const { data: invoice, isLoading } = useQuery({
@@ -53,6 +55,7 @@ const InvoiceDetailDrawer: React.FC<Props> = ({ type, invoiceId, onClose }) => {
   const potongan = Number(invoice?.potongan ?? 0);
   const biayaLain = Number(invoice?.biayaLain ?? 0);
   const allocations = invoice?.paymentAllocations ?? [];
+  const depositApplications = invoice?.depositApplications ?? [];
 
   const sc = statusConfig[invoice?.status] ?? statusConfig.Draft;
 
@@ -242,7 +245,12 @@ const InvoiceDetailDrawer: React.FC<Props> = ({ type, invoiceId, onClose }) => {
                         <tr key={item.id || idx} className={cn('border-b border-gray-50 last:border-0', idx % 2 === 1 && 'bg-gray-50/50')}>
                           <td className="px-4 py-2.5 text-center text-xs text-gray-300">{idx + 1}</td>
                           <td className="px-4 py-2.5">
-                            <p className="text-sm font-medium text-gray-800">{item.itemName}</p>
+                            <div className="flex items-center gap-1.5">
+                              <p className="text-sm font-medium text-gray-800">{item.itemName}</p>
+                              {item.itemType === 'service' && (
+                                <span className="inline-flex items-center px-1.5 py-0.5 text-[9px] font-semibold rounded bg-purple-100 text-purple-700">Jasa</span>
+                              )}
+                            </div>
                             {item.description && <p className="text-[10px] text-gray-400">{item.description}</p>}
                           </td>
                           <td className="px-3 py-2.5 text-center font-mono text-xs text-gray-700">
@@ -326,6 +334,45 @@ const InvoiceDetailDrawer: React.FC<Props> = ({ type, invoiceId, onClose }) => {
                 </div>
               )}
 
+              {/* Deposit Applications (Purchase only) */}
+              {!isSales && depositApplications.length > 0 && (
+                <div className="px-6 py-4 border-b border-gray-100">
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-1">
+                    <Wallet size={10} /> Riwayat Uang Muka ({depositApplications.length})
+                  </p>
+                  <div className="space-y-2">
+                    {depositApplications.map((app: any) => (
+                      <div key={app.id} className="flex items-center justify-between p-3 bg-amber-50/50 border border-amber-100 rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <div className="p-1.5 bg-amber-100 rounded">
+                            <Wallet size={13} className="text-amber-600" />
+                          </div>
+                          <div>
+                            <p className="text-xs font-medium text-gray-800">{app.depositPayment?.paymentNumber}</p>
+                            <p className="text-[10px] text-gray-400">{formatDate(app.depositPayment?.date)}</p>
+                          </div>
+                        </div>
+                        <span className="font-mono text-sm font-semibold text-amber-600">
+                          {formatRupiah(Number(app.appliedAmount))}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Apply Deposit Banner (Purchase only, has outstanding) */}
+              {!isSales && outstanding > 0.01 && invoice.status !== 'Cancelled' && (
+                <div className="px-6 py-3 border-b border-gray-100">
+                  <button
+                    onClick={() => setIsApplyDepositOpen(true)}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 transition-colors"
+                  >
+                    <Wallet size={14} /> Gunakan Uang Muka
+                  </button>
+                </div>
+              )}
+
               {/* Notes */}
               {invoice.notes && (
                 <div className="px-6 py-4">
@@ -337,6 +384,17 @@ const InvoiceDetailDrawer: React.FC<Props> = ({ type, invoiceId, onClose }) => {
           )}
         </div>
       </div>
+
+      {/* Apply Deposit Modal */}
+      {!isSales && invoice && (
+        <ApplyDepositModal
+          isOpen={isApplyDepositOpen}
+          onClose={() => setIsApplyDepositOpen(false)}
+          purchaseInvoiceId={invoiceId!}
+          partyId={invoice.partyId ?? invoice.supplier?.id ?? ''}
+          invoiceOutstanding={outstanding}
+        />
+      )}
     </>
   );
 };

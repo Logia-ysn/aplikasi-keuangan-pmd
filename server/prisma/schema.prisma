@@ -44,6 +44,7 @@ model Account {
   inventoryItems      InventoryItem[]          @relation("ItemAccount")
   movementsAsOffset   StockMovement[]          @relation("MovementOffset")
   reconciliations     BankReconciliation[]     @relation("ReconciliationAccount")
+  serviceItems        ServiceItem[]            @relation("ServiceItemAccount")
   createdAt           DateTime                 @default(now())
   updatedAt           DateTime                 @updatedAt
 
@@ -62,6 +63,7 @@ model Party {
   address           String?
   taxId             String?           @map("tax_id")
   outstandingAmount Decimal           @default(0) @db.Decimal(15, 2) @map("outstanding_amount")
+  depositBalance    Decimal           @default(0) @db.Decimal(15, 2) @map("deposit_balance")
   isActive          Boolean           @default(true) @map("is_active")
   isDummy           Boolean           @default(false) @map("is_dummy")
   salesInvoices     SalesInvoice[]
@@ -116,9 +118,10 @@ model JournalEntry {
   fiscalYear   FiscalYear       @relation(fields: [fiscalYearId], references: [id])
   createdBy    String           @map("created_by")
   user         User             @relation(fields: [createdBy], references: [id])
-  items         JournalItem[]
-  stockMovement StockMovement?
-  payment       Payment?
+  items                JournalItem[]
+  stockMovement        StockMovement?
+  payment              Payment?
+  depositApplication   VendorDepositApplication?
   submittedAt   DateTime?        @map("submitted_at")
   cancelledAt   DateTime?        @map("cancelled_at")
   createdAt     DateTime         @default(now()) @map("created_at")
@@ -184,8 +187,11 @@ model SalesInvoiceItem {
   id               String         @id @default(uuid())
   salesInvoiceId   String         @map("sales_invoice_id")
   salesInvoice     SalesInvoice   @relation(fields: [salesInvoiceId], references: [id], onDelete: Cascade)
+  itemType         String         @default("product") @map("item_type")
   inventoryItemId  String?        @map("inventory_item_id")
   inventoryItem    InventoryItem? @relation("SalesInvoiceInventory", fields: [inventoryItemId], references: [id])
+  serviceItemId    String?        @map("service_item_id")
+  serviceItem      ServiceItem?   @relation("SalesInvoiceService", fields: [serviceItemId], references: [id])
   itemName         String         @map("item_name")
   quantity         Decimal        @db.Decimal(15, 3)
   unit             String
@@ -198,6 +204,7 @@ model SalesInvoiceItem {
 
   @@index([salesInvoiceId])
   @@index([inventoryItemId])
+  @@index([serviceItemId])
   @@map("sales_invoice_items")
 }
 
@@ -219,7 +226,8 @@ model PurchaseInvoice {
   fiscalYear     FiscalYear            @relation(fields: [fiscalYearId], references: [id])
   createdBy      String                @map("created_by")
   user           User                  @relation(fields: [createdBy], references: [id])
-  items          PurchaseInvoiceItem[]
+  items               PurchaseInvoiceItem[]
+  depositApplications VendorDepositApplication[] @relation("DepositApplied")
   submittedAt    DateTime?             @map("submitted_at")
   cancelledAt    DateTime?             @map("cancelled_at")
   isDummy        Boolean               @default(false) @map("is_dummy")
@@ -269,9 +277,10 @@ model Payment {
   notes         String?
   createdBy     String              @map("created_by")
   user          User                @relation(fields: [createdBy], references: [id])
-  allocations      PaymentAllocation[]
-  journalEntryId   String?             @unique @map("journal_entry_id")
-  journalEntry     JournalEntry?       @relation(fields: [journalEntryId], references: [id])
+  allocations           PaymentAllocation[]
+  depositApplications   VendorDepositApplication[] @relation("DepositApplications")
+  journalEntryId        String?             @unique @map("journal_entry_id")
+  journalEntry          JournalEntry?       @relation(fields: [journalEntryId], references: [id])
   fiscalYearId     String              @map("fiscal_year_id")
   fiscalYear    FiscalYear          @relation(fields: [fiscalYearId], references: [id])
   submittedAt   DateTime?           @map("submitted_at")
@@ -337,8 +346,9 @@ model User {
   stockMovements       StockMovement[]       @relation("MovementCreatedBy")
   productionRuns       ProductionRun[]       @relation("ProductionCreatedBy")
   notifications        Notification[]        @relation("UserNotifications")
-  recurringTemplates   RecurringTemplate[]   @relation("UserRecurring")
-  tokenBlacklist       TokenBlacklist[]
+  recurringTemplates           RecurringTemplate[]          @relation("UserRecurring")
+  vendorDepositApplications    VendorDepositApplication[]
+  tokenBlacklist               TokenBlacklist[]
   createdAt            DateTime              @default(now()) @map("created_at")
   updatedAt            DateTime              @updatedAt @map("updated_at")
 
@@ -410,6 +420,7 @@ enum InvoiceStatus {
 enum PaymentType {
   Receive
   Pay
+  VendorDeposit
 }
 
 enum UserRole {
@@ -600,4 +611,43 @@ model TaxConfig {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("tax_configs")
+}
+
+model VendorDepositApplication {
+  id                String          @id @default(uuid())
+  depositPaymentId  String          @map("deposit_payment_id")
+  depositPayment    Payment         @relation("DepositApplications", fields: [depositPaymentId], references: [id])
+  purchaseInvoiceId String          @map("purchase_invoice_id")
+  purchaseInvoice   PurchaseInvoice @relation("DepositApplied", fields: [purchaseInvoiceId], references: [id])
+  appliedAmount     Decimal         @db.Decimal(15, 2) @map("applied_amount")
+  journalEntryId    String?         @unique @map("journal_entry_id")
+  journalEntry      JournalEntry?   @relation(fields: [journalEntryId], references: [id])
+  isCancelled       Boolean         @default(false) @map("is_cancelled")
+  appliedAt         DateTime        @default(now()) @map("applied_at")
+  cancelledAt       DateTime?       @map("cancelled_at")
+  createdBy         String          @map("created_by")
+  user              User            @relation(fields: [createdBy], references: [id])
+
+  @@index([depositPaymentId])
+  @@index([purchaseInvoiceId])
+  @@map("vendor_deposit_applications")
+}
+
+model ServiceItem {
+  id                String             @id @default(uuid())
+  code              String             @unique
+  name              String
+  unit              String             @default("Jasa")
+  defaultRate       Decimal?           @db.Decimal(15, 2) @map("default_rate")
+  accountId         String             @map("account_id")
+  account           Account            @relation("ServiceItemAccount", fields: [accountId], references: [id])
+  description       String?
+  isActive          Boolean            @default(true) @map("is_active")
+  isDummy           Boolean            @default(false) @map("is_dummy")
+  salesInvoiceItems SalesInvoiceItem[] @relation("SalesInvoiceService")
+  createdAt         DateTime           @default(now()) @map("created_at")
+  updatedAt         DateTime           @updatedAt @map("updated_at")
+
+  @@index([accountId])
+  @@map("service_items")
 }

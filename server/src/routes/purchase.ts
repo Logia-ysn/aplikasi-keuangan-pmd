@@ -52,6 +52,12 @@ router.get('/:id', async (req, res) => {
         supplier: true,
         items: true,
         user: { select: { id: true, fullName: true } },
+        depositApplications: {
+          where: { isCancelled: false },
+          include: {
+            depositPayment: { select: { id: true, paymentNumber: true, date: true, amount: true } },
+          },
+        },
       },
     });
     if (!invoice) return res.status(404).json({ error: 'Invoice tidak ditemukan.' });
@@ -236,6 +242,13 @@ router.post('/:id/cancel', roleMiddleware(['Admin']), async (req: AuthRequest, r
       });
       if (allocations.length > 0) {
         throw new BusinessError('Invoice memiliki pembayaran teralokasi. Batalkan pembayaran terlebih dahulu.');
+      }
+
+      const activeDepositApps = await tx.vendorDepositApplication.count({
+        where: { purchaseInvoiceId: invoice.id, isCancelled: false },
+      });
+      if (activeDepositApps > 0) {
+        throw new BusinessError('Invoice memiliki alokasi uang muka aktif. Batalkan alokasi terlebih dahulu.');
       }
 
       await tx.purchaseInvoice.update({

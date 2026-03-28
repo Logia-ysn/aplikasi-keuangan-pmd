@@ -37,7 +37,10 @@ export const CreateJournalSchema = z.object({
 // ─── Sales Invoice ────────────────────────────────────────────────────────────
 const InvoiceItemSchema = z.object({
   itemName: z.string().min(1, 'Nama item wajib diisi.'),
+  itemType: z.enum(['product', 'service']).optional().default('product'),
   inventoryItemId: z.string().uuid().nullable().optional(),
+  serviceItemId: z.string().uuid().nullable().optional(),
+  accountId: z.string().uuid().nullable().optional(),
   quantity: z.coerce.number().positive('Jumlah harus lebih dari 0.'),
   unit: z.string().optional(),
   rate: z.coerce.number().positive('Harga harus lebih dari 0.'),
@@ -82,11 +85,18 @@ export const CreatePaymentSchema = z.object({
   date: z.string().min(1, 'Tanggal wajib diisi.'),
   partyId: z.string().min(1, 'Pihak wajib dipilih.'),
   amount: z.coerce.number().positive('Jumlah harus lebih dari 0.'),
-  paymentType: z.enum(['Receive', 'Pay']),
+  paymentType: z.enum(['Receive', 'Pay', 'VendorDeposit']),
   accountId: z.string().min(1, 'Akun kas/bank wajib dipilih.'),
   allocations: z.array(AllocationSchema).optional(),
   referenceNo: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
+});
+
+// ─── Vendor Deposit Application ───────────────────────────────────────────────
+export const ApplyVendorDepositSchema = z.object({
+  depositPaymentId: z.string().uuid('ID deposit harus UUID yang valid.'),
+  purchaseInvoiceId: z.string().uuid('ID invoice harus UUID yang valid.'),
+  amount: z.coerce.number().positive('Jumlah harus lebih dari 0.'),
 });
 
 // ─── Party ────────────────────────────────────────────────────────────────────
@@ -314,5 +324,19 @@ export const CreateTaxConfigSchema = z.object({
 });
 
 export const UpdateTaxConfigSchema = CreateTaxConfigSchema.partial().extend({
+  isActive: z.boolean().optional(),
+});
+
+// ─── Service Item ──────────────────────────────────────────────────────────
+export const CreateServiceItemSchema = z.object({
+  code: z.string().min(1, 'Kode layanan wajib diisi.'),
+  name: z.string().min(1, 'Nama layanan wajib diisi.'),
+  unit: z.string().optional().default('Jasa'),
+  defaultRate: z.coerce.number().min(0).optional(),
+  accountId: z.string().uuid('Akun pendapatan wajib dipilih.'),
+  description: z.string().nullable().optional(),
+});
+
+export const UpdateServiceItemSchema = CreateServiceItemSchema.partial().extend({
   isActive: z.boolean().optional(),
 });

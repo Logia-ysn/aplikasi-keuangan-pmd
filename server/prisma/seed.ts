@@ -58,6 +58,8 @@ async function main() {
     { accountNumber: '1.1.3', name: 'Piutang Usaha', accountType: AccountType.ASSET, rootType: RootType.ASSET, isGroup: false, parentNumber: '1.1' },
     { accountNumber: '1.1.4', name: 'Persediaan Gabah', accountType: AccountType.ASSET, rootType: RootType.ASSET, isGroup: false, parentNumber: '1.1' },
     { accountNumber: '1.1.5', name: 'Persediaan Beras', accountType: AccountType.ASSET, rootType: RootType.ASSET, isGroup: false, parentNumber: '1.1' },
+    { accountNumber: '1.2', name: 'Aset Lancar Lainnya', accountType: AccountType.ASSET, rootType: RootType.ASSET, isGroup: true, parentNumber: '1' },
+    { accountNumber: '1.2.1', name: 'Uang Muka Vendor', accountType: AccountType.ASSET, rootType: RootType.ASSET, isGroup: false, parentNumber: '1.2' },
 
     // LIABILITY
     { accountNumber: '2', name: 'Liabilitas', accountType: AccountType.LIABILITY, rootType: RootType.LIABILITY, isGroup: true },
@@ -79,6 +81,9 @@ async function main() {
     { accountNumber: '4.1.1', name: 'Penjualan Beras Premium', accountType: AccountType.REVENUE, rootType: RootType.REVENUE, isGroup: false, parentNumber: '4.1' },
     { accountNumber: '4.2', name: 'Penjualan Sekam', accountType: AccountType.REVENUE, rootType: RootType.REVENUE, isGroup: false, parentNumber: '4' },
     { accountNumber: '4.3', name: 'Penjualan Bekatul', accountType: AccountType.REVENUE, rootType: RootType.REVENUE, isGroup: false, parentNumber: '4' },
+    { accountNumber: '4.4', name: 'Pendapatan Jasa', accountType: AccountType.REVENUE, rootType: RootType.REVENUE, isGroup: true, parentNumber: '4' },
+    { accountNumber: '4.4.1', name: 'Pendapatan Jasa Giling', accountType: AccountType.REVENUE, rootType: RootType.REVENUE, isGroup: false, parentNumber: '4.4' },
+    { accountNumber: '4.4.2', name: 'Pendapatan Jasa Kirim', accountType: AccountType.REVENUE, rootType: RootType.REVENUE, isGroup: false, parentNumber: '4.4' },
 
     // EXPENSE
     { accountNumber: '5', name: 'Beban', accountType: AccountType.EXPENSE, rootType: RootType.EXPENSE, isGroup: true },
@@ -111,7 +116,33 @@ async function main() {
     console.log(`- Created account: ${account.accountNumber} ${account.name}`);
   }
 
-  // 4. Seed Company Settings
+  // 4. Seed Service Items
+  const serviceItemsData = [
+    { code: 'JSG-001', name: 'Jasa Giling Padi', unit: 'Ton', defaultRate: 500000, accountNumber: '4.4.1' },
+    { code: 'JSK-001', name: 'Jasa Kirim', unit: 'Trip', defaultRate: 250000, accountNumber: '4.4.2' },
+  ];
+
+  for (const si of serviceItemsData) {
+    const accountId = numberToId[si.accountNumber];
+    if (!accountId) {
+      console.log(`- Skipped service item ${si.code}: account ${si.accountNumber} not found`);
+      continue;
+    }
+    await prisma.serviceItem.upsert({
+      where: { code: si.code },
+      update: { name: si.name, unit: si.unit, defaultRate: si.defaultRate, accountId },
+      create: {
+        code: si.code,
+        name: si.name,
+        unit: si.unit,
+        defaultRate: si.defaultRate,
+        accountId,
+      },
+    });
+    console.log(`- Upserted Service Item: ${si.code} ${si.name}`);
+  }
+
+  // 5. Seed Company Settings
   await prisma.companySettings.upsert({
     where: { slug: 'default' },
     update: {},

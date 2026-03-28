@@ -214,20 +214,30 @@ export const PartiesPage = () => {
                 )}
               </div>
 
-              <div className="pt-3 border-t border-gray-100">
-                <p className="text-[10px] text-gray-400 uppercase tracking-wider font-medium mb-0.5">Saldo Terutang</p>
-                <p className={cn(
-                  'text-base font-semibold font-mono tabular-nums',
-                  Number(party.outstandingAmount) > 0 ? 'text-red-500' :
-                  Number(party.outstandingAmount) < 0 ? 'text-green-600' : 'text-gray-400'
-                )}>
-                  {formatRupiah(Math.abs(Number(party.outstandingAmount)))}
-                  {Number(party.outstandingAmount) !== 0 && (
-                    <span className="text-[10px] font-normal ml-1 text-gray-400">
-                      {Number(party.outstandingAmount) > 0 ? '(Tagihan)' : '(Deposit)'}
-                    </span>
-                  )}
-                </p>
+              <div className="pt-3 border-t border-gray-100 space-y-1.5">
+                <div>
+                  <p className="text-[10px] text-gray-400 uppercase tracking-wider font-medium mb-0.5">Saldo Terutang</p>
+                  <p className={cn(
+                    'text-base font-semibold font-mono tabular-nums',
+                    Number(party.outstandingAmount) > 0 ? 'text-red-500' :
+                    Number(party.outstandingAmount) < 0 ? 'text-green-600' : 'text-gray-400'
+                  )}>
+                    {formatRupiah(Math.abs(Number(party.outstandingAmount)))}
+                    {Number(party.outstandingAmount) !== 0 && (
+                      <span className="text-[10px] font-normal ml-1 text-gray-400">
+                        {Number(party.outstandingAmount) > 0 ? '(Tagihan)' : '(Deposit)'}
+                      </span>
+                    )}
+                  </p>
+                </div>
+                {Number(party.depositBalance) > 0 && (
+                  <div>
+                    <p className="text-[10px] text-gray-400 uppercase tracking-wider font-medium mb-0.5">Uang Muka</p>
+                    <p className="text-sm font-semibold font-mono tabular-nums text-amber-600">
+                      {formatRupiah(Number(party.depositBalance))}
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           ))

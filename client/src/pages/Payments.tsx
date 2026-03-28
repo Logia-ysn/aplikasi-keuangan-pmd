@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Search, MoreHorizontal, CreditCard, Loader2, TrendingDown, TrendingUp, ArrowRightLeft, FileText } from 'lucide-react';
+import { Search, MoreHorizontal, CreditCard, Loader2, TrendingDown, TrendingUp, ArrowRightLeft, FileText, Wallet } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useQuery } from '@tanstack/react-query';
 import api from '../lib/api';
@@ -7,6 +7,7 @@ import { formatRupiah, formatDate } from '../lib/formatters';
 import PaymentModal from '../components/PaymentModal';
 import TransferModal from '../components/TransferModal';
 import ExpenseModal from '../components/ExpenseModal';
+import VendorDepositModal from '../components/VendorDepositModal';
 
 interface CashTransaction {
   id: string;
@@ -14,7 +15,7 @@ interface CashTransaction {
   number: string;
   partyName: string | null;
   partyType: string | null;
-  type: 'Receive' | 'Pay' | 'Expense' | 'Transfer';
+  type: 'Receive' | 'Pay' | 'VendorDeposit' | 'Expense' | 'Transfer';
   amount: number;
   status: string;
   source: 'payment' | 'journal';
@@ -26,6 +27,7 @@ export const Payments = () => {
   const [isPayOpen, setIsPayOpen] = useState(false);
   const [isExpenseOpen, setIsExpenseOpen] = useState(false);
   const [isTransferOpen, setIsTransferOpen] = useState(false);
+  const [isDepositOpen, setIsDepositOpen] = useState(false);
 
   const { data: payments, isLoading: loadingPayments } = useQuery({
     queryKey: ['payments'],
@@ -99,6 +101,12 @@ export const Payments = () => {
         </div>
         <div className="flex flex-wrap gap-2">
           <button
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-medium bg-amber-100 hover:bg-amber-200 text-amber-700 transition-colors"
+            onClick={() => setIsDepositOpen(true)}
+          >
+            <Wallet size={15} /> Uang Muka
+          </button>
+          <button
             className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-medium bg-blue-100 hover:bg-blue-200 text-blue-700 transition-colors"
             onClick={() => setIsTransferOpen(true)}
           >
@@ -171,9 +179,10 @@ export const Payments = () => {
                 t.partyName?.toLowerCase().includes(searchTerm.toLowerCase())
               ).map((txn) => {
                 const isIncoming = txn.type === 'Receive';
-                const typeLabel = txn.type === 'Receive' ? 'Masuk' : txn.type === 'Expense' ? 'Beban' : txn.type === 'Transfer' ? 'Pinbuk' : 'Keluar';
-                const badgeClass = isIncoming ? 'badge-green' : txn.type === 'Expense' ? 'badge-yellow' : txn.type === 'Transfer' ? 'badge-blue' : 'badge-red';
-                const icon = isIncoming ? <TrendingDown size={10} /> : txn.type === 'Transfer' ? <ArrowRightLeft size={10} /> : <TrendingUp size={10} />;
+                const isDeposit = txn.type === 'VendorDeposit';
+                const typeLabel = txn.type === 'Receive' ? 'Masuk' : isDeposit ? 'Uang Muka' : txn.type === 'Expense' ? 'Beban' : txn.type === 'Transfer' ? 'Pinbuk' : 'Keluar';
+                const badgeClass = isIncoming ? 'badge-green' : isDeposit ? 'badge-yellow' : txn.type === 'Expense' ? 'badge-yellow' : txn.type === 'Transfer' ? 'badge-blue' : 'badge-red';
+                const icon = isIncoming ? <TrendingDown size={10} /> : isDeposit ? <Wallet size={10} /> : txn.type === 'Transfer' ? <ArrowRightLeft size={10} /> : <TrendingUp size={10} />;
 
                 return (
                   <tr key={`${txn.source}-${txn.id}`}>
@@ -232,6 +241,10 @@ export const Payments = () => {
       <TransferModal
         isOpen={isTransferOpen}
         onClose={() => setIsTransferOpen(false)}
+      />
+      <VendorDepositModal
+        isOpen={isDepositOpen}
+        onClose={() => setIsDepositOpen(false)}
       />
     </div>
   );

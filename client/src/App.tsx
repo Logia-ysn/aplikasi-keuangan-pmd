@@ -23,6 +23,7 @@ import { AuditTrail } from './pages/AuditTrail';
 import { Notifications } from './pages/Notifications';
 import { RecurringTransactions } from './pages/RecurringTransactions';
 import { BankReconciliation } from './pages/BankReconciliation';
+import { VendorDeposits } from './pages/VendorDeposits';
 import TaxReport from './pages/reports/TaxReport';
 
 
@@ -69,6 +70,7 @@ function App() {
             <Route path="/sales" element={<FinanceRoute><SalesInvoices /></FinanceRoute>} />
             <Route path="/purchase" element={<RoleRoute allowed={['Admin', 'Accountant', 'StaffProduksi']}><PurchaseInvoices /></RoleRoute>} />
             <Route path="/payments" element={<FinanceRoute><Payments /></FinanceRoute>} />
+            <Route path="/vendor-deposits" element={<RoleRoute allowed={['Admin', 'Accountant']}><VendorDeposits /></RoleRoute>} />
             <Route path="/parties" element={<RoleRoute allowed={['Admin', 'Accountant', 'StaffProduksi']}><PartiesPage /></RoleRoute>} />
             <Route path="/inventory" element={<InventoryPage />} />
 

@@ -114,10 +114,6 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
       if (!party) throw new BusinessError('Data mitra tidak ditemukan.');
       if (!party.isActive) throw new BusinessError('Mitra sudah tidak aktif.');
 
-      const arAccount = await tx.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.AR } });
-      const apAccount = await tx.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.AP } });
-      if (!arAccount || !apAccount) throw new BusinessError('Konfigurasi akun AR/AP tidak ditemukan.');
-
       const paymentNumber = await generateDocumentNumber(tx, 'PAY', parsedDate, fiscalYear.id);
       const numAmount = body.amount;
 
@@ -137,6 +133,59 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
           submittedAt: new Date(),
         },
       });
+
+      // ── VendorDeposit branch: DR Uang Muka Vendor / CR Kas ──────────────
+      if (body.paymentType === 'VendorDeposit') {
+        if (party.partyType !== 'Supplier' && party.partyType !== 'Both') {
+          throw new BusinessError('Uang muka hanya dapat dibuat untuk Supplier.');
+        }
+        const depositAccount = await tx.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.VENDOR_DEPOSIT } });
+        if (!depositAccount) throw new BusinessError('Akun Uang Muka Vendor (1.2.1) tidak ditemukan.');
+
+        const jvNumber = `JV-${paymentNumber}`;
+        const existingJV = await tx.journalEntry.findUnique({ where: { entryNumber: jvNumber } });
+        if (existingJV) throw new BusinessError(`Nomor jurnal ${jvNumber} sudah ada. Silakan coba lagi.`);
+
+        const journalEntry = await tx.journalEntry.create({
+          data: {
+            entryNumber: jvNumber,
+            date: parsedDate,
+            narration: `Uang Muka Vendor: ${paymentNumber} - ${party.name}`,
+            status: 'Submitted',
+            fiscalYearId: fiscalYear.id,
+            createdBy: req.user!.userId,
+            submittedAt: new Date(),
+            items: {
+              create: [
+                { accountId: depositAccount.id, partyId: body.partyId, debit: numAmount, credit: 0, description: `Uang Muka: ${paymentNumber}` },
+                { accountId: body.accountId, debit: 0, credit: numAmount, description: `Uang Muka: ${paymentNumber}` },
+              ],
+            },
+          },
+        });
+
+        await tx.accountingLedgerEntry.createMany({
+          data: [
+            { date: parsedDate, accountId: depositAccount.id, partyId: body.partyId, debit: numAmount, credit: 0, referenceType: 'JournalEntry', referenceId: journalEntry.id, description: `Uang Muka: ${paymentNumber}`, fiscalYearId: fiscalYear.id },
+            { date: parsedDate, accountId: body.accountId, debit: 0, credit: numAmount, referenceType: 'JournalEntry', referenceId: journalEntry.id, description: `Uang Muka: ${paymentNumber}`, fiscalYearId: fiscalYear.id },
+          ],
+        });
+
+        await updateAccountBalance(tx, depositAccount.id, numAmount, 0);
+        await updateAccountBalance(tx, body.accountId, 0, numAmount);
+
+        await tx.party.update({
+          where: { id: body.partyId },
+          data: { depositBalance: { increment: numAmount } },
+        });
+
+        return { ...payment, party, unallocatedAmount: 0 };
+      }
+
+      // ── Receive / Pay branch ────────────────────────────────────────────
+      const arAccount = await tx.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.AR } });
+      const apAccount = await tx.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.AP } });
+      if (!arAccount || !apAccount) throw new BusinessError('Konfigurasi akun AR/AP tidak ditemukan.');
 
       // Determine GL posting sides
       // Receive (customer paying us): Dr Bank/Kas, Cr AR
@@ -257,6 +306,41 @@ router.post('/:id/cancel', roleMiddleware(['Admin']), async (req: AuthRequest, r
 
       const numAmount = new Decimal(payment.amount.toString());
 
+      // ── VendorDeposit cancel branch ─────────────────────────────────────
+      if (payment.paymentType === 'VendorDeposit') {
+        const activeApps = await tx.vendorDepositApplication.count({
+          where: { depositPaymentId: payment.id, isCancelled: false },
+        });
+        if (activeApps > 0) {
+          throw new BusinessError('Deposit memiliki alokasi aktif. Batalkan alokasi terlebih dahulu.');
+        }
+
+        const jvNumber = `JV-${payment.paymentNumber}`;
+        const journal = await tx.journalEntry.findUnique({ where: { entryNumber: jvNumber } });
+        if (journal) {
+          await tx.journalEntry.update({ where: { id: journal.id }, data: { status: 'Cancelled', cancelledAt: new Date() } });
+          await tx.accountingLedgerEntry.updateMany({ where: { referenceId: journal.id }, data: { isCancelled: true } });
+        }
+
+        const depositAccount = await tx.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.VENDOR_DEPOSIT } });
+        const numAmountVal = numAmount.toNumber();
+        if (depositAccount) await updateAccountBalance(tx, depositAccount.id, 0, numAmountVal);
+        await updateAccountBalance(tx, payment.accountId, numAmountVal, 0);
+
+        await tx.party.update({
+          where: { id: payment.partyId },
+          data: { depositBalance: { decrement: numAmountVal } },
+        });
+
+        await tx.payment.update({
+          where: { id: payment.id },
+          data: { status: 'Cancelled', cancelledAt: new Date() },
+        });
+
+        return { id: payment.id, status: 'Cancelled' };
+      }
+
+      // ── Receive / Pay cancel branch ─────────────────────────────────────
       // Reverse payment allocations
       const allocations = await tx.paymentAllocation.findMany({
         where: { paymentId: payment.id },

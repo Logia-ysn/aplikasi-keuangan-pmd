@@ -31,6 +31,8 @@ import importRoutes from './routes/import';
 import reconciliationRoutes from './routes/reconciliation';
 import taxRoutes from './routes/tax';
 import backupRoutes from './routes/backup';
+import serviceItemRoutes from './routes/serviceItems';
+import vendorDepositRoutes from './routes/vendorDeposits';
 
 const app = express();
 const port = process.env.PORT || 3001;
@@ -119,6 +121,8 @@ app.use('/api/import', importRoutes);
 app.use('/api/reconciliation', reconciliationRoutes);
 app.use('/api/tax', taxRoutes);
 app.use('/api/backup', backupRoutes);
+app.use('/api/service-items', serviceItemRoutes);
+app.use('/api/vendor-deposits', vendorDepositRoutes);
 
 // ─── Serve Frontend (Production) ──────────────────────────────────────────────
 // In production, serve the built React client from ../client/dist
