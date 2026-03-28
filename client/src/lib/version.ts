@@ -21,7 +21,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     title: 'Standarisasi COA & Data Awal',
     changes: [
       'Restrukturisasi COA 111 akun sesuai standar akuntansi (dari spreadsheet perusahaan)',
-      'Penomoran baru: 1.1.xx Kas/Bank, 1.2.xx Piutang, 1.4.xx Persediaan, 1.6.xx Aset Tetap, 1.7.xx Akum. Depresiasi',
+      'Penomoran baru tanpa leading zero: 1.1.x Kas/Bank, 1.2.x Piutang, 1.4.x Persediaan, 1.6.x Aset Tetap, 1.7.x Akum. Depresiasi',
       '32 sub-akun persediaan detail (Gabah PW Basah s/d Beras Reject IR)',
       '26 akun beban operasional (6.01-6.26)',
       'Pendapatan & Beban Diluar Usaha (7.1.xx, 7.2.xx)',

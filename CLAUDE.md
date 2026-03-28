@@ -45,11 +45,11 @@ Akun-akun berikut digunakan untuk auto GL posting. Defined in `server/src/consta
 
 | Code | Nama | Fungsi |
 |------|------|--------|
-| 1.1.01-05 | Petty Cash, Bank BRI/Mandiri/BRI2/BCA | Cash/Bank accounts |
-| 1.2.01 | Piutang Usaha (Dagang) | Auto-debit on sales invoice |
+| 1.1.1-5 | Petty Cash, Bank BRI/Mandiri/BRI2/BCA | Cash/Bank accounts |
+| 1.2.1 | Piutang Usaha (Dagang) | Auto-debit on sales invoice |
 | 1.3 | Uang Muka Pembelian | Vendor deposit account |
-| 1.4.00 | Persediaan (Umum) | Inventory account |
-| 2.1.01 | Hutang Usaha (Dagang) | Auto-credit on purchase invoice |
+| 1.4.0 | Persediaan (Umum) | Inventory account |
+| 2.1.1 | Hutang Usaha (Dagang) | Auto-credit on purchase invoice |
 | 4.1 | Penjualan | Auto-credit on sales revenue |
 | 4.2 | Pendapatan Jasa | Service revenue |
 | 5 | Beban Pokok Penjualan | COGS |
@@ -59,10 +59,10 @@ Akun-akun berikut digunakan untuk auto GL posting. Defined in `server/src/consta
 ## Double-Entry Bookkeeping Rules
 
 Every transaction MUST produce balanced debit/credit GL entries:
-- **Sales Invoice submit**: DR Piutang (1.2.01) / CR Penjualan (4.1)
-- **Purchase Invoice submit**: DR Persediaan (1.4.00) / CR Hutang (2.1.01)
-- **Payment receive**: DR Kas/Bank (1.1.xx) / CR Piutang (1.2.01)
-- **Payment pay**: DR Hutang (2.1.01) / CR Kas/Bank (1.1.xx)
+- **Sales Invoice submit**: DR Piutang (1.2.1) / CR Penjualan (4.1)
+- **Purchase Invoice submit**: DR Persediaan (1.4.0) / CR Hutang (2.1.1)
+- **Payment receive**: DR Kas/Bank (1.1.x) / CR Piutang (1.2.1)
+- **Payment pay**: DR Hutang (2.1.1) / CR Kas/Bank (1.1.x)
 - **Journal Entry**: Manual balanced entries
 
 Never create unbalanced GL entries. Always verify total debit === total credit.

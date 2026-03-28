@@ -1,8 +1,8 @@
 export const ACCOUNT_NUMBERS = {
-  CASH: ['1.1.01', '1.1.02', '1.1.03', '1.1.04', '1.1.05'],
-  AR: '1.2.01',
-  INVENTORY: '1.4.00',
-  AP: '2.1.01',
+  CASH: ['1.1.1', '1.1.2', '1.1.3', '1.1.4', '1.1.5'],
+  AR: '1.2.1',
+  INVENTORY: '1.4.0',
+  AP: '2.1.1',
   SALES: '4.1',
   SERVICE_REVENUE: '4.2',
   VENDOR_DEPOSIT: '1.3',
