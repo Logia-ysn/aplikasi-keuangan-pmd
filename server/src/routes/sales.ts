@@ -50,7 +50,7 @@ router.get('/:id', async (req, res) => {
       where: { id: req.params.id },
       include: {
         customer: true,
-        items: true,
+        items: { include: { serviceItem: { select: { id: true, code: true, name: true } } } },
         user: { select: { id: true, fullName: true } },
       },
     });
@@ -92,11 +92,47 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
       const inventoryAccount = await tx.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.INVENTORY } });
       const cogsAccount = await tx.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.COGS } });
 
-      const subtotal = body.items.reduce((sum, item) => {
-        const base = new Decimal(item.quantity).mul(new Decimal(item.rate));
-        const disc = base.mul(new Decimal(item.discount ?? 0).div(100));
-        return sum.plus(base.minus(disc));
-      }, new Decimal(0));
+      // Resolve per-item accountId (service items may have their own revenue account)
+      const resolvedItems: Array<{
+        itemName: string; itemType: string; inventoryItemId: string | null;
+        serviceItemId: string | null; quantity: number; unit: string;
+        rate: number; discount: number; amount: number; accountId: string;
+        description: string | null;
+      }> = [];
+
+      for (const item of body.items) {
+        const itemAmount = new Decimal(item.quantity)
+          .mul(new Decimal(item.rate))
+          .mul(new Decimal(1).minus(new Decimal(item.discount ?? 0).div(100)))
+          .toDecimalPlaces(2, Decimal.ROUND_HALF_UP)
+          .toNumber();
+
+        // Determine the revenue account for this line
+        let lineAccountId = salesAccount.id;
+        if (item.accountId) {
+          const customAccount = await tx.account.findUnique({ where: { id: item.accountId } });
+          if (customAccount) lineAccountId = customAccount.id;
+        } else if (item.serviceItemId) {
+          const svc = await tx.serviceItem.findUnique({ where: { id: item.serviceItemId } });
+          if (svc) lineAccountId = svc.accountId;
+        }
+
+        resolvedItems.push({
+          itemName: item.itemName,
+          itemType: item.itemType || 'product',
+          inventoryItemId: item.inventoryItemId || null,
+          serviceItemId: item.serviceItemId || null,
+          quantity: item.quantity,
+          unit: item.unit || 'pcs',
+          rate: item.rate,
+          discount: item.discount ?? 0,
+          amount: itemAmount,
+          accountId: lineAccountId,
+          description: item.description || null,
+        });
+      }
+
+      const subtotal = resolvedItems.reduce((sum, item) => sum.plus(new Decimal(item.amount)), new Decimal(0));
       const taxAmount = subtotal.mul(new Decimal(body.taxPct ?? 0).div(100));
       const grandTotal = subtotal
         .plus(taxAmount)
@@ -125,31 +161,42 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
           fiscalYearId: fiscalYear.id,
           createdBy: req.user!.userId,
           submittedAt: new Date(),
-          items: {
-            create: body.items.map((item) => {
-              const itemAmount = new Decimal(item.quantity)
-                .mul(new Decimal(item.rate))
-                .mul(new Decimal(1).minus(new Decimal(item.discount ?? 0).div(100)))
-                .toDecimalPlaces(2, Decimal.ROUND_HALF_UP)
-                .toNumber();
-              return {
-                itemName: item.itemName,
-                inventoryItemId: item.inventoryItemId || null,
-                quantity: item.quantity,
-                unit: item.unit || 'pcs',
-                rate: item.rate,
-                discount: item.discount ?? 0,
-                amount: itemAmount,
-                accountId: salesAccount.id,
-                description: item.description || null,
-              };
-            }),
-          },
+          items: { create: resolvedItems },
         },
         include: { customer: true, items: true },
       });
 
-      // Auto-post journal entry: Dr AR, Cr Sales
+      // Group line items by accountId for multi-account GL posting
+      const revenueByAccount = new Map<string, Decimal>();
+      for (const ri of resolvedItems) {
+        const prev = revenueByAccount.get(ri.accountId) ?? new Decimal(0);
+        revenueByAccount.set(ri.accountId, prev.plus(new Decimal(ri.amount)));
+      }
+
+      // Adjustment for tax/potongan/biayaLain: allocate to the largest revenue account
+      const adjustmentAmount = grandTotal.minus(subtotal);
+      if (!adjustmentAmount.isZero()) {
+        let primaryAccountId = salesAccount.id;
+        let maxAmount = new Decimal(0);
+        for (const [accId, amt] of revenueByAccount) {
+          if (amt.greaterThan(maxAmount)) { maxAmount = amt; primaryAccountId = accId; }
+        }
+        const prev = revenueByAccount.get(primaryAccountId) ?? new Decimal(0);
+        revenueByAccount.set(primaryAccountId, prev.plus(adjustmentAmount));
+      }
+
+      // Build multi-line journal: 1 DR (AR) + N CR (revenue accounts)
+      const creditJournalItems: Array<{ accountId: string; debit: number; credit: number; description: string }> = [];
+      for (const [accId, amt] of revenueByAccount) {
+        const creditNum = amt.toDecimalPlaces(2).toNumber();
+        if (creditNum === 0) continue;
+        const acc = await tx.account.findUnique({ where: { id: accId }, select: { name: true } });
+        creditJournalItems.push({
+          accountId: accId, debit: 0, credit: creditNum,
+          description: `${acc?.name ?? 'Penjualan'}: ${invoice.invoiceNumber}`,
+        });
+      }
+
       const jvNumber = `JV-${invoice.invoiceNumber}`;
       const journalEntry = await tx.journalEntry.create({
         data: {
@@ -163,21 +210,28 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
           items: {
             create: [
               { accountId: arAccount.id, partyId: body.partyId, debit: grandTotalNum, credit: 0, description: `Piutang: ${invoice.invoiceNumber}` },
-              { accountId: salesAccount.id, debit: 0, credit: grandTotalNum, description: `Penjualan: ${invoice.invoiceNumber}` },
+              ...creditJournalItems,
             ],
           },
         },
       });
 
-      await tx.accountingLedgerEntry.createMany({
-        data: [
-          { date: parsedDate, accountId: arAccount.id, partyId: body.partyId, debit: grandTotalNum, credit: 0, referenceType: 'JournalEntry', referenceId: journalEntry.id, description: `Piutang: ${invoice.invoiceNumber}`, fiscalYearId: fiscalYear.id },
-          { date: parsedDate, accountId: salesAccount.id, debit: 0, credit: grandTotalNum, referenceType: 'JournalEntry', referenceId: journalEntry.id, description: `Penjualan: ${invoice.invoiceNumber}`, fiscalYearId: fiscalYear.id },
-        ],
-      });
+      // Ledger entries: 1 DR + N CR
+      const ledgerData = [
+        { date: parsedDate, accountId: arAccount.id, partyId: body.partyId, debit: grandTotalNum, credit: 0, referenceType: 'JournalEntry', referenceId: journalEntry.id, description: `Piutang: ${invoice.invoiceNumber}`, fiscalYearId: fiscalYear.id },
+        ...creditJournalItems.map((ci) => ({
+          date: parsedDate, accountId: ci.accountId, debit: 0, credit: ci.credit,
+          referenceType: 'JournalEntry', referenceId: journalEntry.id,
+          description: ci.description, fiscalYearId: fiscalYear.id,
+        })),
+      ];
+      await tx.accountingLedgerEntry.createMany({ data: ledgerData });
 
-      await updateAccountBalance(tx, arAccount.id, grandTotalNum, 0);       // ASSET: debit → +balance
-      await updateAccountBalance(tx, salesAccount.id, 0, grandTotalNum);    // REVENUE: credit → +balance
+      // Update account balances: DR AR + CR each revenue account
+      await updateAccountBalance(tx, arAccount.id, grandTotalNum, 0);
+      for (const ci of creditJournalItems) {
+        await updateAccountBalance(tx, ci.accountId, 0, ci.credit);
+      }
       await tx.party.update({ where: { id: body.partyId }, data: { outstandingAmount: { increment: grandTotalNum } } });
 
       // Auto-deduct inventory for items linked to InventoryItem
@@ -304,11 +358,13 @@ router.post('/:id/cancel', roleMiddleware(['Admin']), async (req: AuthRequest, r
         });
       }
 
-      // Reverse account balances
-      const arAccount = await tx.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.AR } });
-      const salesAccount = await tx.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.SALES } });
-      if (arAccount) await updateAccountBalance(tx, arAccount.id, 0, Number(invoice.grandTotal));
-      if (salesAccount) await updateAccountBalance(tx, salesAccount.id, Number(invoice.grandTotal), 0);
+      // Reverse account balances using journal items (supports multi-account)
+      if (journal) {
+        const journalItems = await tx.journalItem.findMany({ where: { journalEntryId: journal.id } });
+        for (const ji of journalItems) {
+          await updateAccountBalance(tx, ji.accountId, Number(ji.credit), Number(ji.debit));
+        }
+      }
 
       // Reverse COGS journal if exists
       const cogsJvNumber = `JV-COGS-${invoice.invoiceNumber}`;

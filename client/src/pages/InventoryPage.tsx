@@ -10,7 +10,7 @@ import { StockMovementModal } from '../components/StockMovementModal';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { ProductionRunModal } from '../components/ProductionRunModal';
 
-type TabType = 'items' | 'movements' | 'production';
+type TabType = 'items' | 'movements' | 'production' | 'services';
 
 const formatNumber = (val: number | string, decimals = 3) =>
   Number(val).toLocaleString('id-ID', { maximumFractionDigits: decimals });
@@ -44,6 +44,12 @@ export function InventoryPage() {
   const [filterProdEndDate, setFilterProdEndDate] = useState('');
   const [cancelProdTarget, setCancelProdTarget] = useState<string | null>(null);
   const [isCancellingProd, setIsCancellingProd] = useState(false);
+
+  // --- Services tab state ---
+  const [serviceModalOpen, setServiceModalOpen] = useState(false);
+  const [editService, setEditService] = useState<any | null>(null);
+  const [serviceForm, setServiceForm] = useState({ code: '', name: '', unit: 'Jasa', defaultRate: '', accountId: '', description: '' });
+  const [serviceSaving, setServiceSaving] = useState(false);
 
   const queryClient = useQueryClient();
 
@@ -94,6 +100,23 @@ export function InventoryPage() {
     ? productionRaw
     : (productionRaw?.data ?? []);
 
+  const { data: serviceItemsRaw, isLoading: servicesLoading } = useQuery({
+    queryKey: ['service-items'],
+    queryFn: () => api.get('/service-items').then(r => r.data),
+    enabled: activeTab === 'services',
+  });
+  const serviceItems: any[] = serviceItemsRaw?.data ?? [];
+
+  const { data: revenueAccounts } = useQuery({
+    queryKey: ['revenue-accounts'],
+    queryFn: async () => {
+      const res = await api.get('/coa/flat');
+      const all: any[] = res.data.data ?? res.data;
+      return all.filter((a: any) => a.rootType === 'REVENUE' && !a.isGroup);
+    },
+    enabled: activeTab === 'services',
+  });
+
   // --- Handlers ---
   const handleOpenAdd = () => {
     setEditItem(null);
@@ -138,6 +161,62 @@ export function InventoryPage() {
     }
   };
 
+  const handleOpenServiceAdd = () => {
+    setEditService(null);
+    setServiceForm({ code: '', name: '', unit: 'Jasa', defaultRate: '', accountId: '', description: '' });
+    setServiceModalOpen(true);
+  };
+
+  const handleOpenServiceEdit = (svc: any) => {
+    setEditService(svc);
+    setServiceForm({
+      code: svc.code,
+      name: svc.name,
+      unit: svc.unit || 'Jasa',
+      defaultRate: svc.defaultRate ? String(Number(svc.defaultRate)) : '',
+      accountId: svc.accountId || svc.account?.id || '',
+      description: svc.description || '',
+    });
+    setServiceModalOpen(true);
+  };
+
+  const handleSaveService = async () => {
+    if (!serviceForm.code || !serviceForm.name || !serviceForm.accountId) {
+      toast.error('Kode, nama, dan akun pendapatan wajib diisi.');
+      return;
+    }
+    setServiceSaving(true);
+    try {
+      const payload = {
+        ...serviceForm,
+        defaultRate: serviceForm.defaultRate ? Number(serviceForm.defaultRate) : undefined,
+      };
+      if (editService) {
+        await api.patch(`/service-items/${editService.id}`, payload);
+        toast.success('Layanan berhasil diubah.');
+      } else {
+        await api.post('/service-items', payload);
+        toast.success('Layanan berhasil ditambahkan.');
+      }
+      queryClient.invalidateQueries({ queryKey: ['service-items'] });
+      setServiceModalOpen(false);
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Gagal menyimpan layanan.');
+    } finally {
+      setServiceSaving(false);
+    }
+  };
+
+  const handleDeactivateService = async (id: string) => {
+    try {
+      await api.delete(`/service-items/${id}`);
+      queryClient.invalidateQueries({ queryKey: ['service-items'] });
+      toast.success('Layanan dinonaktifkan.');
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Gagal menonaktifkan layanan.');
+    }
+  };
+
   return (
     <div className="space-y-5 pb-8">
       {/* Header */}
@@ -153,6 +232,10 @@ export function InventoryPage() {
         ) : activeTab === 'movements' ? (
           <button onClick={() => setMovementModalOpen(true)} className="btn-primary">
             <Plus size={15} /> Catat Gerakan
+          </button>
+        ) : activeTab === 'services' ? (
+          <button onClick={handleOpenServiceAdd} className="btn-primary">
+            <Plus size={15} /> Tambah Layanan
           </button>
         ) : (
           <button onClick={() => setProductionModalOpen(true)} className="btn-primary">
@@ -195,6 +278,17 @@ export function InventoryPage() {
           )}
         >
           Proses Produksi
+        </button>
+        <button
+          onClick={() => setActiveTab('services')}
+          className={cn(
+            'px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px',
+            activeTab === 'services'
+              ? 'border-blue-600 text-blue-600'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+          )}
+        >
+          Layanan
         </button>
       </div>
 
@@ -583,6 +677,147 @@ export function InventoryPage() {
               </tbody>
             </table>
            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Tab 4: Layanan ─── */}
+      {activeTab === 'services' && (
+        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+         <div className="table-responsive">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th scope="col">Kode</th>
+                <th scope="col">Nama Layanan</th>
+                <th scope="col">Satuan</th>
+                <th scope="col" className="text-right">Tarif Default</th>
+                <th scope="col">Akun Pendapatan</th>
+                <th scope="col" className="text-center">Status</th>
+                <th scope="col" className="w-20">Aksi</th>
+              </tr>
+            </thead>
+            <tbody>
+              {servicesLoading ? (
+                <tr>
+                  <td colSpan={7} className="py-16 text-center text-gray-400">
+                    <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2 text-gray-300" />
+                    Memuat data layanan...
+                  </td>
+                </tr>
+              ) : serviceItems.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="py-16 text-center">
+                    <Warehouse className="w-10 h-10 text-gray-200 mx-auto mb-2" />
+                    <p className="text-sm text-gray-400">Belum ada layanan terdaftar.</p>
+                  </td>
+                </tr>
+              ) : (
+                serviceItems.map((svc: any) => (
+                  <tr key={svc.id}>
+                    <td>
+                      <span className="font-mono text-xs text-gray-800 bg-gray-50 px-1.5 py-0.5 rounded">
+                        {svc.code}
+                      </span>
+                    </td>
+                    <td>
+                      <span className="font-medium text-gray-800">{svc.name}</span>
+                      {svc.description && <p className="text-xs text-gray-400 truncate max-w-[200px]">{svc.description}</p>}
+                    </td>
+                    <td className="text-gray-500">{svc.unit}</td>
+                    <td className="text-right font-mono tabular-nums text-gray-800">
+                      {svc.defaultRate ? formatRupiah(Number(svc.defaultRate)) : '—'}
+                    </td>
+                    <td className="text-xs text-gray-500">
+                      {svc.account ? `${svc.account.accountNumber} ${svc.account.name}` : '—'}
+                    </td>
+                    <td className="text-center">
+                      <span className={cn('badge', svc.isActive ? 'badge-green' : 'badge-red')}>
+                        {svc.isActive ? 'Aktif' : 'Nonaktif'}
+                      </span>
+                    </td>
+                    <td>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => handleOpenServiceEdit(svc)}
+                          className="p-1.5 hover:bg-gray-100 rounded text-gray-400 hover:text-gray-600 transition-colors"
+                          title="Edit layanan"
+                        >
+                          <Edit2 size={15} />
+                        </button>
+                        {svc.isActive && userRole === 'Admin' && (
+                          <button
+                            onClick={() => handleDeactivateService(svc.id)}
+                            className="p-1.5 hover:bg-red-50 rounded text-gray-300 hover:text-red-500 transition-colors"
+                            title="Nonaktifkan"
+                          >
+                            <XCircle size={15} />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+         </div>
+        </div>
+      )}
+
+      {/* Service Item Modal */}
+      {serviceModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4" onClick={e => e.target === e.currentTarget && setServiceModalOpen(false)}>
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+              <h3 className="text-sm font-semibold text-gray-900">{editService ? 'Edit Layanan' : 'Tambah Layanan'}</h3>
+              <button onClick={() => setServiceModalOpen(false)} className="p-1 rounded hover:bg-gray-100 text-gray-400"><XCircle size={16} /></button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1">Kode</label>
+                  <input type="text" value={serviceForm.code} onChange={e => setServiceForm({ ...serviceForm, code: e.target.value })}
+                    className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="JSG-001" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1">Satuan</label>
+                  <input type="text" value={serviceForm.unit} onChange={e => setServiceForm({ ...serviceForm, unit: e.target.value })}
+                    className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Jasa" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1">Nama Layanan</label>
+                <input type="text" value={serviceForm.name} onChange={e => setServiceForm({ ...serviceForm, name: e.target.value })}
+                  className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Jasa Giling Padi" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1">Tarif Default (Rp)</label>
+                <input type="number" value={serviceForm.defaultRate} onChange={e => setServiceForm({ ...serviceForm, defaultRate: e.target.value })}
+                  className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" placeholder="500000" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1">Akun Pendapatan</label>
+                <select value={serviceForm.accountId} onChange={e => setServiceForm({ ...serviceForm, accountId: e.target.value })}
+                  className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  <option value="">— Pilih Akun —</option>
+                  {revenueAccounts?.map((acc: any) => (
+                    <option key={acc.id} value={acc.id}>{acc.accountNumber} — {acc.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1">Deskripsi</label>
+                <input type="text" value={serviceForm.description} onChange={e => setServiceForm({ ...serviceForm, description: e.target.value })}
+                  className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Opsional" />
+              </div>
+            </div>
+            <div className="px-5 py-4 border-t border-gray-100 flex justify-end gap-3">
+              <button onClick={() => setServiceModalOpen(false)} className="btn-secondary">Batal</button>
+              <button onClick={handleSaveService} disabled={serviceSaving} className="btn-primary disabled:opacity-50">
+                {serviceSaving ? <Loader2 size={15} className="animate-spin" /> : editService ? 'Simpan Perubahan' : 'Tambah Layanan'}
+              </button>
+            </div>
           </div>
         </div>
       )}

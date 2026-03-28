@@ -8,7 +8,10 @@ import { formatRupiah } from '../lib/formatters';
 interface InvoiceItem {
   id: string;
   itemName: string;
+  itemType: 'product' | 'service';
   inventoryItemId: string;
+  serviceItemId: string;
+  accountId: string;
   description: string;
   quantity: number;
   unit: string;
@@ -19,7 +22,7 @@ interface InvoiceItem {
 const UNITS = ['Kg', 'Ton', 'Sak', 'Liter', 'Pcs', 'Box', 'Unit', 'Set', 'Meter', 'Jasa'];
 
 const defaultItem = (): InvoiceItem => ({
-  id: crypto.randomUUID(), itemName: '', inventoryItemId: '', description: '', quantity: 1, unit: 'Kg', rate: 0, discount: 0
+  id: crypto.randomUUID(), itemName: '', itemType: 'product', inventoryItemId: '', serviceItemId: '', accountId: '', description: '', quantity: 1, unit: 'Kg', rate: 0, discount: 0
 });
 
 const SalesInvoiceModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, onClose }) => {
@@ -52,6 +55,14 @@ const SalesInvoiceModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
       const res = await api.get('/inventory/items');
       const all: any[] = res.data.data ?? res.data;
       return all.filter((i: any) => i.isActive !== false);
+    },
+  });
+
+  const { data: serviceItems } = useQuery({
+    queryKey: ['service-items-active'],
+    queryFn: async () => {
+      const res = await api.get('/service-items?isActive=true');
+      return res.data.data ?? res.data;
     },
   });
 
@@ -98,6 +109,37 @@ const SalesInvoiceModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
     } else {
       next[idx] = { ...next[idx], inventoryItemId: '', itemName: '' };
     }
+    setItems(next);
+  };
+  const selectServiceItem = (idx: number, serviceId: string) => {
+    const svc = serviceItems?.find((s: any) => s.id === serviceId);
+    const next = [...items];
+    if (svc) {
+      next[idx] = {
+        ...next[idx],
+        serviceItemId: serviceId,
+        itemName: svc.name,
+        unit: svc.unit || 'Jasa',
+        rate: svc.defaultRate ? Number(svc.defaultRate) : next[idx].rate,
+        accountId: svc.accountId || '',
+      };
+    } else {
+      next[idx] = { ...next[idx], serviceItemId: '', itemName: '', accountId: '' };
+    }
+    setItems(next);
+  };
+  const toggleItemType = (idx: number, newType: 'product' | 'service') => {
+    const next = [...items];
+    next[idx] = {
+      ...next[idx],
+      itemType: newType,
+      inventoryItemId: '',
+      serviceItemId: '',
+      accountId: '',
+      itemName: '',
+      unit: newType === 'service' ? 'Jasa' : 'Kg',
+      rate: 0,
+    };
     setItems(next);
   };
 
@@ -221,26 +263,80 @@ const SalesInvoiceModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
                     <tr key={item.id} className="group border-b border-gray-50 last:border-0 hover:bg-gray-50/50 transition-colors">
                       <td className="px-4 py-3 text-center text-xs text-gray-300 font-medium">{idx + 1}</td>
                       <td className="px-4 py-3">
-                        <select
-                          value={item.inventoryItemId}
-                          onChange={e => selectInventoryItem(idx, e.target.value)}
-                          className="w-full bg-transparent text-sm text-gray-800 border-none focus:ring-0 focus:outline-none p-0 cursor-pointer mb-0.5"
-                        >
-                          <option value="">— Pilih dari Stok Gudang —</option>
-                          {inventoryItems?.map((inv: any) => (
-                            <option key={inv.id} value={inv.id}>
-                              {inv.code} — {inv.name} ({inv.currentStock} {inv.unit})
-                            </option>
-                          ))}
-                        </select>
-                        {!item.inventoryItemId && (
-                          <input
-                            type="text"
-                            value={item.itemName}
-                            onChange={e => updateItem(idx, 'itemName', e.target.value)}
-                            placeholder="Atau ketik nama barang/jasa manual..."
-                            className="w-full bg-transparent text-xs text-gray-500 border-none focus:ring-0 focus:outline-none p-0 placeholder:text-gray-300"
-                          />
+                        {/* Item type toggle */}
+                        <div className="flex items-center gap-1 mb-1.5">
+                          <button
+                            type="button"
+                            onClick={() => item.itemType !== 'product' && toggleItemType(idx, 'product')}
+                            className={`px-2 py-0.5 text-[10px] font-medium rounded-md transition-colors ${
+                              item.itemType === 'product'
+                                ? 'bg-emerald-100 text-emerald-700'
+                                : 'bg-gray-100 text-gray-400 hover:text-gray-600'
+                            }`}
+                          >
+                            Barang
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => item.itemType !== 'service' && toggleItemType(idx, 'service')}
+                            className={`px-2 py-0.5 text-[10px] font-medium rounded-md transition-colors ${
+                              item.itemType === 'service'
+                                ? 'bg-purple-100 text-purple-700'
+                                : 'bg-gray-100 text-gray-400 hover:text-gray-600'
+                            }`}
+                          >
+                            Jasa
+                          </button>
+                        </div>
+
+                        {item.itemType === 'product' ? (
+                          <>
+                            <select
+                              value={item.inventoryItemId}
+                              onChange={e => selectInventoryItem(idx, e.target.value)}
+                              className="w-full bg-transparent text-sm text-gray-800 border-none focus:ring-0 focus:outline-none p-0 cursor-pointer mb-0.5"
+                            >
+                              <option value="">— Pilih dari Stok Gudang —</option>
+                              {inventoryItems?.map((inv: any) => (
+                                <option key={inv.id} value={inv.id}>
+                                  {inv.code} — {inv.name} ({inv.currentStock} {inv.unit})
+                                </option>
+                              ))}
+                            </select>
+                            {!item.inventoryItemId && (
+                              <input
+                                type="text"
+                                value={item.itemName}
+                                onChange={e => updateItem(idx, 'itemName', e.target.value)}
+                                placeholder="Atau ketik nama barang manual..."
+                                className="w-full bg-transparent text-xs text-gray-500 border-none focus:ring-0 focus:outline-none p-0 placeholder:text-gray-300"
+                              />
+                            )}
+                          </>
+                        ) : (
+                          <>
+                            <select
+                              value={item.serviceItemId}
+                              onChange={e => selectServiceItem(idx, e.target.value)}
+                              className="w-full bg-transparent text-sm text-gray-800 border-none focus:ring-0 focus:outline-none p-0 cursor-pointer mb-0.5"
+                            >
+                              <option value="">— Pilih Layanan —</option>
+                              {serviceItems?.map((svc: any) => (
+                                <option key={svc.id} value={svc.id}>
+                                  {svc.code} — {svc.name} ({svc.unit})
+                                </option>
+                              ))}
+                            </select>
+                            {!item.serviceItemId && (
+                              <input
+                                type="text"
+                                value={item.itemName}
+                                onChange={e => updateItem(idx, 'itemName', e.target.value)}
+                                placeholder="Atau ketik nama jasa manual..."
+                                className="w-full bg-transparent text-xs text-gray-500 border-none focus:ring-0 focus:outline-none p-0 placeholder:text-gray-300"
+                              />
+                            )}
+                          </>
                         )}
                       </td>
                       <td className="px-3 py-3">
@@ -403,7 +499,13 @@ const SalesInvoiceModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
             <button
               onClick={() => mutation.mutate({
                 date: invoiceDate, dueDate, partyId, notes, taxPct, terms, potongan, biayaLain, labelPotongan, labelBiaya,
-                items: items.map(i => ({ ...i, inventoryItemId: i.inventoryItemId || null })),
+                items: items.map(i => ({
+                  ...i,
+                  itemType: i.itemType,
+                  inventoryItemId: i.inventoryItemId || null,
+                  serviceItemId: i.serviceItemId || null,
+                  accountId: i.accountId || null,
+                })),
               })}
               disabled={!canSubmit}
               className="btn-primary disabled:opacity-40 disabled:cursor-not-allowed"
