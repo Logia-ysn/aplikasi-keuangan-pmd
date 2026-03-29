@@ -413,4 +413,201 @@ router.post(
   }
 );
 
+// ─── POST /api/import/inventory ──────────────────────────────────────────────
+router.post(
+  '/inventory',
+  roleMiddleware(['Admin', 'Accountant', 'StaffProduksi']),
+  upload.single('file'),
+  async (req: AuthRequest, res) => {
+    if (!req.file) return res.status(400).json({ error: 'File wajib diunggah.' });
+
+    try {
+      const rows = await parseFile(req.file.buffer, req.file.originalname);
+      const isPreview = req.query.preview === 'true';
+      const errors: Array<{ row: number; message: string }> = [];
+      const validRows: Array<{
+        code: string;
+        name: string;
+        unit: string;
+        category?: string;
+        description?: string;
+        minimumStock?: number;
+      }> = [];
+
+      for (let i = 0; i < rows.length; i++) {
+        const r = rows[i];
+        const rowNum = i + 2;
+
+        const code = (r.code || '').trim();
+        const name = (r.name || '').trim();
+        const unit = (r.unit || '').trim();
+
+        if (!code) {
+          errors.push({ row: rowNum, message: 'Kolom "code" wajib diisi.' });
+          continue;
+        }
+        if (!name) {
+          errors.push({ row: rowNum, message: 'Kolom "name" wajib diisi.' });
+          continue;
+        }
+        if (!unit) {
+          errors.push({ row: rowNum, message: 'Kolom "unit" wajib diisi.' });
+          continue;
+        }
+
+        const minStockStr = (r.minimumStock || r.minimum_stock || '').trim();
+        const minimumStock = minStockStr ? parseFloat(minStockStr) : undefined;
+        if (minimumStock !== undefined && isNaN(minimumStock)) {
+          errors.push({ row: rowNum, message: `minimumStock "${minStockStr}" bukan angka valid.` });
+          continue;
+        }
+
+        validRows.push({
+          code: sanitizeCellValue(code),
+          name: sanitizeCellValue(name),
+          unit: sanitizeCellValue(unit),
+          category: r.category?.trim() ? sanitizeCellValue(r.category) : undefined,
+          description: r.description?.trim() ? sanitizeCellValue(r.description) : undefined,
+          minimumStock,
+        });
+      }
+
+      if (isPreview) {
+        return res.json({ data: validRows, errors, total: rows.length });
+      }
+
+      let success = 0;
+      for (const row of validRows) {
+        try {
+          await prisma.inventoryItem.create({ data: row });
+          success++;
+        } catch (err: any) {
+          const msg = err.code === 'P2002'
+            ? `Kode "${row.code}" sudah digunakan.`
+            : err.message;
+          errors.push({ row: 0, message: `Gagal insert "${row.code}": ${msg}` });
+        }
+      }
+
+      return res.json({ success, failed: rows.length - success, errors });
+    } catch (error: any) {
+      logger.error({ error }, 'POST /import/inventory error');
+      return res.status(400).json({ error: error.message || 'Gagal memproses file.' });
+    }
+  }
+);
+
+// ─── GET /api/import/template/:type ─────────────────────────────────────────
+// Download current data as editable Excel template for re-upload
+router.get(
+  '/template/:type',
+  roleMiddleware(['Admin', 'Accountant', 'StaffProduksi']),
+  async (req: AuthRequest, res) => {
+    const { type } = req.params;
+
+    try {
+      const workbook = new ExcelJS.Workbook();
+      const sheet = workbook.addWorksheet('Data');
+
+      if (type === 'coa') {
+        sheet.columns = [
+          { header: 'accountNumber', key: 'accountNumber', width: 15 },
+          { header: 'name', key: 'name', width: 35 },
+          { header: 'rootType', key: 'rootType', width: 12 },
+          { header: 'accountType', key: 'accountType', width: 12 },
+          { header: 'parentNumber', key: 'parentNumber', width: 15 },
+          { header: 'isGroup', key: 'isGroup', width: 10 },
+        ];
+
+        const accounts = await prisma.account.findMany({
+          include: { parent: { select: { accountNumber: true } } },
+          orderBy: { accountNumber: 'asc' },
+        });
+
+        for (const acc of accounts) {
+          sheet.addRow({
+            accountNumber: acc.accountNumber,
+            name: acc.name,
+            rootType: acc.rootType,
+            accountType: acc.accountType,
+            parentNumber: acc.parent?.accountNumber ?? '',
+            isGroup: acc.isGroup ? 'true' : 'false',
+          });
+        }
+      } else if (type === 'parties') {
+        sheet.columns = [
+          { header: 'name', key: 'name', width: 30 },
+          { header: 'partyType', key: 'partyType', width: 12 },
+          { header: 'phone', key: 'phone', width: 18 },
+          { header: 'email', key: 'email', width: 25 },
+          { header: 'address', key: 'address', width: 40 },
+          { header: 'taxId', key: 'taxId', width: 20 },
+        ];
+
+        const parties = await prisma.party.findMany({
+          where: { isActive: true, isDummy: false },
+          orderBy: { name: 'asc' },
+        });
+
+        for (const p of parties) {
+          sheet.addRow({
+            name: p.name,
+            partyType: p.partyType,
+            phone: p.phone ?? '',
+            email: p.email ?? '',
+            address: p.address ?? '',
+            taxId: p.taxId ?? '',
+          });
+        }
+      } else if (type === 'inventory') {
+        sheet.columns = [
+          { header: 'code', key: 'code', width: 15 },
+          { header: 'name', key: 'name', width: 30 },
+          { header: 'unit', key: 'unit', width: 10 },
+          { header: 'category', key: 'category', width: 20 },
+          { header: 'description', key: 'description', width: 35 },
+          { header: 'minimumStock', key: 'minimumStock', width: 15 },
+        ];
+
+        const items = await prisma.inventoryItem.findMany({
+          where: { isActive: true, isDummy: false },
+          orderBy: { code: 'asc' },
+        });
+
+        for (const item of items) {
+          sheet.addRow({
+            code: item.code,
+            name: item.name,
+            unit: item.unit,
+            category: item.category ?? '',
+            description: item.description ?? '',
+            minimumStock: Number(item.minimumStock),
+          });
+        }
+      } else {
+        return res.status(400).json({ error: `Tipe "${type}" tidak didukung. Gunakan: coa, parties, inventory.` });
+      }
+
+      // Style header row
+      const headerRow = sheet.getRow(1);
+      headerRow.font = { bold: true };
+      headerRow.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFE8F0FE' },
+      };
+
+      const safeName = type.replace(/[^a-zA-Z0-9_-]/g, '_');
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="template_${safeName}.xlsx"`);
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      return res.send(Buffer.from(buffer as ArrayBuffer));
+    } catch (error: any) {
+      logger.error({ error }, `GET /import/template/${type} error`);
+      return res.status(500).json({ error: 'Gagal membuat template.' });
+    }
+  }
+);
+
 export default router;

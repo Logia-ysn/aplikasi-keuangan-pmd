@@ -9,7 +9,9 @@ interface Account {
   id: string;
   name: string;
   accountNumber: string;
+  accountType: string;
   balance: number;
+  isGroup?: boolean;
 }
 
 interface StatementItem {
@@ -39,7 +41,7 @@ const ReconciliationModal: React.FC<Props> = ({ isOpen, onClose }) => {
       return all.filter(
         (a) =>
           a.accountType === 'ASSET' && a.accountNumber.startsWith('1.1.') &&
-          !(a as any).isGroup
+          !a.isGroup
       );
     },
     enabled: isOpen,

@@ -25,7 +25,7 @@ interface ImportResult {
 interface Props {
   isOpen: boolean;
   onClose: () => void;
-  importType: 'parties' | 'coa' | 'journals';
+  importType: 'parties' | 'coa' | 'journals' | 'inventory';
 }
 
 const typeConfig = {
@@ -52,6 +52,14 @@ const typeConfig = {
     templateHeaders: 'date,narration,accountNumber,debit,credit,description',
     templateSample: '2026-03-22,Penjualan tunai,1100,1000000,0,Kas masuk',
     queryKeys: ['journals', 'gl'],
+  },
+  inventory: {
+    title: 'Import Master Item',
+    endpoint: '/import/inventory',
+    columns: ['code', 'name', 'unit', 'category', 'description', 'minimumStock'],
+    templateHeaders: 'code,name,unit,category,description,minimumStock',
+    templateSample: 'GKP,Gabah Kering Panen,Kg,Bahan Baku,,1000',
+    queryKeys: ['inventory-items'],
   },
 };
 
@@ -119,15 +127,28 @@ const ImportModal = ({ isOpen, onClose, importType }: Props) => {
     if (selectedFile) importMutation.mutate(selectedFile);
   };
 
-  const downloadTemplate = () => {
-    const csvContent = `${config.templateHeaders}\n${config.templateSample}`;
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `template_${importType}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
+  const downloadTemplate = async () => {
+    try {
+      const res = await api.get(`/import/template/${importType}`, { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `template_${importType}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch {
+      // Fallback to CSV if backend template endpoint not available
+      const csvContent = `${config.templateHeaders}\n${config.templateSample}`;
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `template_${importType}.csv`;
+      link.click();
+      URL.revokeObjectURL(url);
+    }
   };
 
   const handleClose = () => {
@@ -228,7 +249,7 @@ const ImportModal = ({ isOpen, onClose, importType }: Props) => {
                 className="flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-700 font-medium"
               >
                 <Download size={13} />
-                Download Template CSV
+                Download Template Excel
               </button>
             </div>
           )}

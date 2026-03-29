@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Loader2, Warehouse, PackageSearch, Edit2, XCircle, Plus } from 'lucide-react';
+import { Loader2, Warehouse, PackageSearch, Edit2, XCircle, Plus, LayoutDashboard, Upload, Download } from 'lucide-react';
 import { cn } from '../lib/utils';
 import api from '../lib/api';
 import { formatDate, formatRupiah } from '../lib/formatters';
@@ -9,8 +9,11 @@ import { InventoryItemModal } from '../components/InventoryItemModal';
 import { StockMovementModal } from '../components/StockMovementModal';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { ProductionRunModal } from '../components/ProductionRunModal';
+import InventoryDashboardTab from '../components/InventoryDashboardTab';
+import ImportModal from '../components/ImportModal';
+import { exportToExcel } from '../lib/exportExcel';
 
-type TabType = 'items' | 'movements' | 'production' | 'services';
+type TabType = 'dashboard' | 'items' | 'movements' | 'production' | 'services';
 
 const formatNumber = (val: number | string, decimals = 3) =>
   Number(val).toLocaleString('id-ID', { maximumFractionDigits: decimals });
@@ -23,11 +26,12 @@ const movementTypeConfig: Record<string, { label: string; className: string }> =
 };
 
 export function InventoryPage() {
-  const [activeTab, setActiveTab] = useState<TabType>('items');
+  const [activeTab, setActiveTab] = useState<TabType>('dashboard');
 
   // --- Items tab state ---
   const [itemModalOpen, setItemModalOpen] = useState(false);
   const [editItem, setEditItem] = useState<any | null>(null);
+  const [isImportOpen, setIsImportOpen] = useState(false);
 
   // --- Movements tab state ---
   const [movementModalOpen, setMovementModalOpen] = useState(false);
@@ -222,13 +226,37 @@ export function InventoryPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold text-gray-900">Stok &amp; Gudang</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Kelola master item, pantau stok, dan catat gerakan persediaan.</p>
+          <h1 className="text-xl font-semibold" style={{ color: 'var(--color-text-primary)' }}>Stok &amp; Gudang</h1>
+          <p className="text-sm mt-0.5" style={{ color: 'var(--color-text-muted)' }}>Kelola master item, pantau stok, dan catat gerakan persediaan.</p>
         </div>
         {activeTab === 'items' ? (
-          <button onClick={handleOpenAdd} className="btn-primary">
-            <Plus size={15} /> Tambah Item
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              className="btn-secondary flex items-center gap-1.5"
+              onClick={() =>
+                exportToExcel(
+                  items.map((i: any) => ({
+                    code: i.code,
+                    name: i.name,
+                    unit: i.unit,
+                    category: i.category ?? '',
+                    description: i.description ?? '',
+                    currentStock: Number(i.currentStock ?? 0),
+                    minimumStock: Number(i.minimumStock ?? 0),
+                  })),
+                  'master-item'
+                )
+              }
+            >
+              <Download size={14} /> Download
+            </button>
+            <button className="btn-secondary flex items-center gap-1.5" onClick={() => setIsImportOpen(true)}>
+              <Upload size={14} /> Import
+            </button>
+            <button onClick={handleOpenAdd} className="btn-primary">
+              <Plus size={15} /> Tambah Item
+            </button>
+          </div>
         ) : activeTab === 'movements' ? (
           <button onClick={() => setMovementModalOpen(true)} className="btn-primary">
             <Plus size={15} /> Catat Gerakan
@@ -237,15 +265,26 @@ export function InventoryPage() {
           <button onClick={handleOpenServiceAdd} className="btn-primary">
             <Plus size={15} /> Tambah Layanan
           </button>
-        ) : (
+        ) : activeTab === 'production' ? (
           <button onClick={() => setProductionModalOpen(true)} className="btn-primary">
             <Plus size={15} /> Proses Produksi
           </button>
-        )}
+        ) : null}
       </div>
 
       {/* Tabs */}
       <div className="flex gap-1 border-b border-gray-200 overflow-x-auto">
+        <button
+          onClick={() => setActiveTab('dashboard')}
+          className={cn(
+            'px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px flex items-center gap-1.5',
+            activeTab === 'dashboard'
+              ? 'border-blue-600 text-blue-600'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+          )}
+        >
+          <LayoutDashboard size={14} /> Dashboard
+        </button>
         <button
           onClick={() => setActiveTab('items')}
           className={cn(
@@ -291,6 +330,9 @@ export function InventoryPage() {
           Layanan
         </button>
       </div>
+
+      {/* ─── Tab 0: Dashboard ─── */}
+      {activeTab === 'dashboard' && <InventoryDashboardTab />}
 
       {/* ─── Tab 1: Master Item ─── */}
       {activeTab === 'items' && (
@@ -860,6 +902,12 @@ export function InventoryPage() {
         variant="danger"
         onConfirm={handleCancelProduction}
         onCancel={() => setCancelProdTarget(null)}
+      />
+
+      <ImportModal
+        isOpen={isImportOpen}
+        onClose={() => setIsImportOpen(false)}
+        importType="inventory"
       />
     </div>
   );

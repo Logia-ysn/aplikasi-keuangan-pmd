@@ -3,8 +3,8 @@
  * Update file ini setiap kali release baru.
  */
 
-export const APP_VERSION = '1.8.0';
-export const APP_BUILD_DATE = '2026-03-28';
+export const APP_VERSION = '1.9.0';
+export const APP_BUILD_DATE = '2026-03-29';
 export const APP_NAME = 'Keuangan';
 
 export interface ChangelogEntry {
@@ -15,6 +15,20 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.9.0',
+    date: '2026-03-29',
+    title: 'Dashboard Stok & Bulk Import/Export Excel',
+    changes: [
+      'Dashboard Stok Gudang: KPI cards, tabel status stok, chart perbandingan vs minimum 20.000 Kg, tren 6 bulan, statistik produksi',
+      'Reactive dark/light mode untuk semua chart (MutationObserver)',
+      'Download & Import Excel untuk Bagan Akun, Pelanggan/Vendor, dan Master Item',
+      'Template Excel berisi data existing untuk diedit dan di-upload kembali',
+      'Endpoint POST /api/import/inventory untuk bulk import master item',
+      'Endpoint GET /api/import/template/:type untuk download template Excel',
+      'Fix ReconciliationModal type error (accountType, isGroup)',
+    ],
+  },
   {
     version: '1.8.0',
     date: '2026-03-28',

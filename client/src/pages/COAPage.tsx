@@ -3,13 +3,14 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../lib/api';
 import {
   ChevronRight, ChevronDown, Plus, Folder, FileText,
-  Search, PlusCircle, Pencil, X, Loader2, AlertCircle, Trash2, Wallet, Upload
+  Search, PlusCircle, Pencil, X, Loader2, AlertCircle, Trash2, Wallet, Upload, Download
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { formatRupiah } from '../lib/formatters';
 import { toast } from 'sonner';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import ImportModal from '../components/ImportModal';
+import { exportToExcel } from '../lib/exportExcel';
 
 // --- Types ---
 interface Account {
@@ -524,6 +525,25 @@ export const COAPage: React.FC = () => {
           <p className="text-sm text-gray-500 mt-0.5">Kelola struktur Chart of Accounts secara hierarkis.</p>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            className="btn-secondary flex items-center gap-1.5"
+            onClick={() => {
+              const flat = flattenTree(accounts ?? []);
+              exportToExcel(
+                flat.map(a => ({
+                  accountNumber: a.accountNumber,
+                  name: a.name,
+                  rootType: a.rootType,
+                  accountType: a.accountType,
+                  isGroup: a.isGroup ? 'Ya' : 'Tidak',
+                  balance: a.balance,
+                })),
+                'bagan-akun'
+              );
+            }}
+          >
+            <Download size={14} /> Download
+          </button>
           <button className="btn-secondary flex items-center gap-1.5" onClick={() => setIsImportOpen(true)}>
             <Upload size={14} /> Import
           </button>
