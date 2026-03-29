@@ -5,9 +5,10 @@ import { parse } from 'csv-parse/sync';
 import ExcelJS from 'exceljs';
 import { prisma } from '../lib/prisma';
 import { AuthRequest, roleMiddleware } from '../middleware/auth';
-import { updateBalancesForItems } from '../utils/accountBalance';
+import { updateAccountBalance, updateBalancesForItems } from '../utils/accountBalance';
 import { generateDocumentNumber } from '../utils/documentNumber';
 import { getOpenFiscalYear } from '../utils/fiscalYear';
+import { ACCOUNT_NUMBERS } from '../constants/accountNumbers';
 import { logger } from '../lib/logger';
 
 const router = Router();
@@ -106,11 +107,14 @@ router.post(
         email?: string;
         address?: string;
         taxId?: string;
+        openingBalance: number;
+        depositBalance: number;
+        customerDepositBalance: number;
       }> = [];
 
       for (let i = 0; i < rows.length; i++) {
         const r = rows[i];
-        const rowNum = i + 2; // 1-indexed, +1 for header
+        const rowNum = i + 2;
 
         if (!r.name?.trim()) {
           errors.push({ row: rowNum, message: 'Kolom "name" wajib diisi.' });
@@ -123,6 +127,27 @@ router.post(
           continue;
         }
 
+        const openingBalanceStr = (r.openingBalance || r.opening_balance || r.saldoAwal || r.saldo_awal || '').trim();
+        const openingBalance = openingBalanceStr ? parseFloat(openingBalanceStr) : 0;
+        if (isNaN(openingBalance)) {
+          errors.push({ row: rowNum, message: `openingBalance "${openingBalanceStr}" bukan angka valid.` });
+          continue;
+        }
+
+        const depositBalanceStr = (r.depositBalance || r.deposit_balance || r.saldoDeposit || r.saldo_deposit || r.uangMuka || r.uang_muka || '').trim();
+        const depositBalance = depositBalanceStr ? parseFloat(depositBalanceStr) : 0;
+        if (isNaN(depositBalance)) {
+          errors.push({ row: rowNum, message: `depositBalance "${depositBalanceStr}" bukan angka valid.` });
+          continue;
+        }
+
+        const custDepositStr = (r.customerDepositBalance || r.customer_deposit_balance || r.depositPelanggan || r.deposit_pelanggan || '').trim();
+        const customerDepositBalance = custDepositStr ? parseFloat(custDepositStr) : 0;
+        if (isNaN(customerDepositBalance)) {
+          errors.push({ row: rowNum, message: `customerDepositBalance "${custDepositStr}" bukan angka valid.` });
+          continue;
+        }
+
         validRows.push({
           name: sanitizeCellValue(r.name),
           partyType: partyType as 'Customer' | 'Supplier' | 'Both',
@@ -130,6 +155,9 @@ router.post(
           email: r.email?.trim() ? sanitizeCellValue(r.email) : undefined,
           address: r.address?.trim() ? sanitizeCellValue(r.address) : undefined,
           taxId: (r.taxId || r.tax_id || '').trim() ? sanitizeCellValue(r.taxId || r.tax_id) : undefined,
+          openingBalance,
+          depositBalance,
+          customerDepositBalance,
         });
       }
 
@@ -141,7 +169,186 @@ router.post(
       let success = 0;
       for (const row of validRows) {
         try {
-          await prisma.party.create({ data: row });
+          const { openingBalance, depositBalance, customerDepositBalance, ...partyData } = row;
+
+          // Find existing party by name or create new
+          let party = await prisma.party.findFirst({
+            where: { name: row.name, partyType: row.partyType },
+          });
+          const partyFields = {
+            ...partyData,
+            outstandingAmount: openingBalance,
+            depositBalance,
+            customerDepositBalance,
+          };
+          if (party) {
+            party = await prisma.party.update({
+              where: { id: party.id },
+              data: partyFields,
+            });
+          } else {
+            party = await prisma.party.create({
+              data: partyFields,
+            });
+          }
+
+          // Create opening balance journals if needed
+          const needsJournal = openingBalance > 0 || depositBalance > 0 || customerDepositBalance > 0;
+          if (needsJournal) {
+            const isCustomer = row.partyType === 'Customer' || row.partyType === 'Both';
+            const isSupplier = row.partyType === 'Supplier' || row.partyType === 'Both';
+            const arAccount = await prisma.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.AR } });
+            const apAccount = await prisma.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.AP } });
+            const vendorDepositAccount = await prisma.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.VENDOR_DEPOSIT } });
+            const customerDepositAccount = await prisma.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.CUSTOMER_DEPOSIT } });
+            const retainedAccount = await prisma.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.RETAINED_EARNINGS } });
+
+            if (retainedAccount) {
+              const now = new Date();
+              const fiscalYear = await getOpenFiscalYear(prisma as any, now);
+
+              // 1) AR/AP opening balance journal
+              if (openingBalance > 0) {
+                const receivableAccount = isCustomer ? arAccount : apAccount;
+                if (receivableAccount) {
+                  const jvNumber = await generateDocumentNumber(prisma as any, 'JV', now, fiscalYear.id);
+                  await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+                    const journal = await tx.journalEntry.create({
+                      data: {
+                        entryNumber: jvNumber,
+                        date: now,
+                        narration: `Saldo awal ${isCustomer ? 'piutang' : 'hutang'}: ${row.name}`,
+                        status: 'Submitted',
+                        fiscalYearId: fiscalYear.id,
+                        createdBy: req.user!.userId,
+                        submittedAt: now,
+                        items: {
+                          create: isCustomer
+                            ? [
+                                { accountId: receivableAccount.id, partyId: party.id, debit: openingBalance, credit: 0, description: `Saldo awal piutang: ${row.name}` },
+                                { accountId: retainedAccount.id, debit: 0, credit: openingBalance, description: `Saldo awal piutang: ${row.name}` },
+                              ]
+                            : [
+                                { accountId: retainedAccount.id, debit: openingBalance, credit: 0, description: `Saldo awal hutang: ${row.name}` },
+                                { accountId: receivableAccount.id, partyId: party.id, debit: 0, credit: openingBalance, description: `Saldo awal hutang: ${row.name}` },
+                              ],
+                        },
+                      },
+                      include: { items: true },
+                    });
+
+                    await tx.accountingLedgerEntry.createMany({
+                      data: journal.items.map((item) => ({
+                        date: now,
+                        accountId: item.accountId,
+                        partyId: item.partyId,
+                        debit: item.debit,
+                        credit: item.credit,
+                        referenceType: 'JournalEntry' as const,
+                        referenceId: journal.id,
+                        description: item.description || `Saldo awal: ${row.name}`,
+                        fiscalYearId: fiscalYear.id,
+                      })),
+                    });
+
+                    await updateBalancesForItems(
+                      tx,
+                      journal.items.map((i) => ({ accountId: i.accountId, debit: Number(i.debit), credit: Number(i.credit) }))
+                    );
+                  }, { timeout: 15000 });
+                }
+              }
+
+              // 2) Vendor deposit opening balance journal: DR Uang Muka Pembelian (1.3) / CR Retained Earnings
+              if (depositBalance > 0 && isSupplier && vendorDepositAccount) {
+                const jvNumber = await generateDocumentNumber(prisma as any, 'JV', now, fiscalYear.id);
+                await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+                  const journal = await tx.journalEntry.create({
+                    data: {
+                      entryNumber: jvNumber,
+                      date: now,
+                      narration: `Saldo awal uang muka vendor: ${row.name}`,
+                      status: 'Submitted',
+                      fiscalYearId: fiscalYear.id,
+                      createdBy: req.user!.userId,
+                      submittedAt: now,
+                      items: {
+                        create: [
+                          { accountId: vendorDepositAccount.id, partyId: party.id, debit: depositBalance, credit: 0, description: `Saldo awal uang muka vendor: ${row.name}` },
+                          { accountId: retainedAccount.id, debit: 0, credit: depositBalance, description: `Saldo awal uang muka vendor: ${row.name}` },
+                        ],
+                      },
+                    },
+                    include: { items: true },
+                  });
+
+                  await tx.accountingLedgerEntry.createMany({
+                    data: journal.items.map((item) => ({
+                      date: now,
+                      accountId: item.accountId,
+                      partyId: item.partyId,
+                      debit: item.debit,
+                      credit: item.credit,
+                      referenceType: 'JournalEntry' as const,
+                      referenceId: journal.id,
+                      description: item.description || `Saldo awal uang muka vendor: ${row.name}`,
+                      fiscalYearId: fiscalYear.id,
+                    })),
+                  });
+
+                  await updateBalancesForItems(
+                    tx,
+                    journal.items.map((i) => ({ accountId: i.accountId, debit: Number(i.debit), credit: Number(i.credit) }))
+                  );
+                }, { timeout: 15000 });
+              }
+
+              // 3) Customer deposit opening balance journal: DR Retained Earnings / CR Uang Muka Pelanggan (2.1.2)
+              if (customerDepositBalance > 0 && isCustomer && customerDepositAccount) {
+                const jvNumber = await generateDocumentNumber(prisma as any, 'JV', now, fiscalYear.id);
+                await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+                  const journal = await tx.journalEntry.create({
+                    data: {
+                      entryNumber: jvNumber,
+                      date: now,
+                      narration: `Saldo awal uang muka pelanggan: ${row.name}`,
+                      status: 'Submitted',
+                      fiscalYearId: fiscalYear.id,
+                      createdBy: req.user!.userId,
+                      submittedAt: now,
+                      items: {
+                        create: [
+                          { accountId: retainedAccount.id, debit: customerDepositBalance, credit: 0, description: `Saldo awal uang muka pelanggan: ${row.name}` },
+                          { accountId: customerDepositAccount.id, partyId: party.id, debit: 0, credit: customerDepositBalance, description: `Saldo awal uang muka pelanggan: ${row.name}` },
+                        ],
+                      },
+                    },
+                    include: { items: true },
+                  });
+
+                  await tx.accountingLedgerEntry.createMany({
+                    data: journal.items.map((item) => ({
+                      date: now,
+                      accountId: item.accountId,
+                      partyId: item.partyId,
+                      debit: item.debit,
+                      credit: item.credit,
+                      referenceType: 'JournalEntry' as const,
+                      referenceId: journal.id,
+                      description: item.description || `Saldo awal uang muka pelanggan: ${row.name}`,
+                      fiscalYearId: fiscalYear.id,
+                    })),
+                  });
+
+                  await updateBalancesForItems(
+                    tx,
+                    journal.items.map((i) => ({ accountId: i.accountId, debit: Number(i.debit), credit: Number(i.credit) }))
+                  );
+                }, { timeout: 15000 });
+              }
+            }
+          }
+
           success++;
         } catch (err: any) {
           errors.push({ row: 0, message: `Gagal insert "${row.name}": ${err.message}` });
@@ -177,6 +384,7 @@ router.post(
         accountType: string;
         parentNumber?: string;
         isGroup: boolean;
+        openingBalance: number;
       }
 
       const validRows: COARow[] = [];
@@ -192,6 +400,8 @@ router.post(
         const parentNumber = (r.parentNumber || r.parent_number || '').trim();
         const isGroupStr = (r.isGroup || r.is_group || '').toString().trim().toLowerCase();
         const isGroup = ['true', '1', 'yes', 'ya'].includes(isGroupStr);
+        const openingBalanceStr = (r.openingBalance || r.opening_balance || r.saldoAwal || r.saldo_awal || '').trim();
+        const openingBalance = openingBalanceStr ? parseFloat(openingBalanceStr) : 0;
 
         if (!accountNumber) {
           errors.push({ row: rowNum, message: 'Kolom "accountNumber" wajib diisi.' });
@@ -205,6 +415,10 @@ router.post(
           errors.push({ row: rowNum, message: `rootType "${rootType}" tidak valid.` });
           continue;
         }
+        if (isNaN(openingBalance)) {
+          errors.push({ row: rowNum, message: `openingBalance "${openingBalanceStr}" bukan angka valid.` });
+          continue;
+        }
 
         validRows.push({
           accountNumber,
@@ -213,6 +427,7 @@ router.post(
           accountType,
           parentNumber,
           isGroup,
+          openingBalance,
         });
       }
 
@@ -263,24 +478,80 @@ router.post(
             if (parent) parentId = parent.id;
           }
 
-          await prisma.account.upsert({
+          const upsertData = {
+            name: row.name,
+            rootType: row.rootType as any,
+            accountType: row.accountType as any,
+            parentId,
+            isGroup: row.isGroup,
+            ...(row.openingBalance !== 0 ? { balance: row.openingBalance } : {}),
+          };
+
+          const account = await prisma.account.upsert({
             where: { accountNumber: row.accountNumber },
-            update: {
-              name: row.name,
-              rootType: row.rootType as any,
-              accountType: row.accountType as any,
-              parentId,
-              isGroup: row.isGroup,
-            },
-            create: {
-              accountNumber: row.accountNumber,
-              name: row.name,
-              rootType: row.rootType as any,
-              accountType: row.accountType as any,
-              parentId,
-              isGroup: row.isGroup,
-            },
+            update: upsertData,
+            create: { accountNumber: row.accountNumber, ...upsertData },
           });
+
+          // Create opening balance GL journal for non-group accounts with balance
+          if (row.openingBalance !== 0 && !row.isGroup) {
+            const retainedAccount = await prisma.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.RETAINED_EARNINGS } });
+            if (retainedAccount && account.id !== retainedAccount.id) {
+              const now = new Date();
+              const fiscalYear = await getOpenFiscalYear(prisma as any, now);
+              const jvNumber = await generateDocumentNumber(prisma as any, 'JV', now, fiscalYear.id);
+              const absAmount = Math.abs(row.openingBalance);
+
+              // ASSET/EXPENSE normal balance = debit, LIABILITY/EQUITY/REVENUE normal balance = credit
+              const isDebitNormal = ['ASSET', 'EXPENSE'].includes(row.rootType);
+              const isPositive = row.openingBalance > 0;
+
+              // Positive balance on debit-normal account → DR account / CR retained
+              // Positive balance on credit-normal account → CR account / DR retained
+              const accountDebit = (isDebitNormal === isPositive) ? absAmount : 0;
+              const accountCredit = (isDebitNormal === isPositive) ? 0 : absAmount;
+
+              await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+                const journal = await tx.journalEntry.create({
+                  data: {
+                    entryNumber: jvNumber,
+                    date: now,
+                    narration: `Saldo awal akun: ${row.accountNumber} - ${row.name}`,
+                    status: 'Submitted',
+                    fiscalYearId: fiscalYear.id,
+                    createdBy: req.user!.userId,
+                    submittedAt: now,
+                    items: {
+                      create: [
+                        { accountId: account.id, debit: accountDebit, credit: accountCredit, description: `Saldo awal: ${row.accountNumber} - ${row.name}` },
+                        { accountId: retainedAccount.id, debit: accountCredit, credit: accountDebit, description: `Saldo awal: ${row.accountNumber} - ${row.name}` },
+                      ],
+                    },
+                  },
+                  include: { items: true },
+                });
+
+                await tx.accountingLedgerEntry.createMany({
+                  data: journal.items.map((item: any) => ({
+                    date: now,
+                    accountId: item.accountId,
+                    debit: item.debit,
+                    credit: item.credit,
+                    referenceType: 'JournalEntry' as const,
+                    referenceId: journal.id,
+                    description: item.description || `Saldo awal: ${row.accountNumber}`,
+                    fiscalYearId: fiscalYear.id,
+                  })),
+                });
+
+                await updateBalancesForItems(
+                  tx,
+                  journal.items.map((i: any) => ({ accountId: i.accountId, debit: Number(i.debit), credit: Number(i.credit) }))
+                );
+              }, { timeout: 15000 });
+            }
+          }
+
           success++;
         } catch (err: any) {
           errors.push({ row: 0, message: `Gagal insert akun "${row.accountNumber}": ${err.message}` });
@@ -470,6 +741,8 @@ router.post(
         category?: string;
         description?: string;
         minimumStock?: number;
+        openingQty: number;
+        openingPrice: number;
       }> = [];
 
       for (let i = 0; i < rows.length; i++) {
@@ -500,6 +773,20 @@ router.post(
           continue;
         }
 
+        const openingQtyStr = (r.openingQty || r.opening_qty || r.stokAwal || r.stok_awal || '').trim();
+        const openingQty = openingQtyStr ? parseFloat(openingQtyStr) : 0;
+        const openingPriceStr = (r.openingPrice || r.opening_price || r.hargaAwal || r.harga_awal || '').trim();
+        const openingPrice = openingPriceStr ? parseFloat(openingPriceStr) : 0;
+
+        if (isNaN(openingQty)) {
+          errors.push({ row: rowNum, message: `openingQty "${openingQtyStr}" bukan angka valid.` });
+          continue;
+        }
+        if (isNaN(openingPrice)) {
+          errors.push({ row: rowNum, message: `openingPrice "${openingPriceStr}" bukan angka valid.` });
+          continue;
+        }
+
         validRows.push({
           code: sanitizeCellValue(code),
           name: sanitizeCellValue(name),
@@ -507,6 +794,8 @@ router.post(
           category: r.category?.trim() ? sanitizeCellValue(r.category) : undefined,
           description: r.description?.trim() ? sanitizeCellValue(r.description) : undefined,
           minimumStock,
+          openingQty,
+          openingPrice,
         });
       }
 
@@ -517,7 +806,87 @@ router.post(
       let success = 0;
       for (const row of validRows) {
         try {
-          await prisma.inventoryItem.create({ data: row });
+          const { openingQty, openingPrice, ...itemData } = row;
+
+          const item = await prisma.inventoryItem.upsert({
+            where: { code: row.code },
+            update: { name: itemData.name, unit: itemData.unit, category: itemData.category, description: itemData.description, minimumStock: itemData.minimumStock },
+            create: itemData,
+          });
+
+          // Create opening stock movement if qty > 0
+          if (openingQty > 0 && openingPrice > 0) {
+            const totalValue = openingQty * openingPrice;
+
+            await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+              const now = new Date();
+              const fiscalYear = await getOpenFiscalYear(tx, now);
+              const mvNumber = await generateDocumentNumber(tx, 'SM', now, fiscalYear.id);
+
+              await tx.stockMovement.create({
+                data: {
+                  movementNumber: mvNumber,
+                  itemId: item.id,
+                  movementType: 'In',
+                  quantity: openingQty,
+                  unitCost: openingPrice,
+                  totalValue,
+                  date: now,
+                  referenceType: 'OpeningBalance',
+                  notes: `Stok awal dari import: ${row.code} - ${row.name}`,
+                  createdById: req.user!.userId,
+                  fiscalYearId: fiscalYear.id,
+                },
+              });
+
+              // GL: DR Inventory / CR Retained Earnings
+              const invAccount = item.accountId
+                ? await tx.account.findUnique({ where: { id: item.accountId } })
+                : await tx.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.INVENTORY } });
+              const retainedAccount = await tx.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.RETAINED_EARNINGS } });
+
+              if (invAccount && retainedAccount) {
+                const jvNumber = await generateDocumentNumber(tx, 'JV', now, fiscalYear.id);
+                const journal = await tx.journalEntry.create({
+                  data: {
+                    entryNumber: jvNumber,
+                    date: now,
+                    narration: `Saldo awal stok: ${row.code} - ${row.name}`,
+                    status: 'Submitted',
+                    fiscalYearId: fiscalYear.id,
+                    createdBy: req.user!.userId,
+                    submittedAt: now,
+                    items: {
+                      create: [
+                        { accountId: invAccount.id, debit: totalValue, credit: 0, description: `Saldo awal stok: ${row.code}` },
+                        { accountId: retainedAccount.id, debit: 0, credit: totalValue, description: `Saldo awal stok: ${row.code}` },
+                      ],
+                    },
+                  },
+                  include: { items: true },
+                });
+
+                await tx.accountingLedgerEntry.createMany({
+                  data: journal.items.map((ji) => ({
+                    date: now,
+                    accountId: ji.accountId,
+                    debit: ji.debit,
+                    credit: ji.credit,
+                    referenceType: 'JournalEntry' as const,
+                    referenceId: journal.id,
+                    description: ji.description || `Saldo awal stok: ${row.code}`,
+                    fiscalYearId: fiscalYear.id,
+                  })),
+                });
+
+                await updateBalancesForItems(
+                  tx,
+                  journal.items.map((i) => ({ accountId: i.accountId, debit: Number(i.debit), credit: Number(i.credit) }))
+                );
+              }
+            }, { timeout: 15000 });
+          }
+
           success++;
         } catch (err: any) {
           const msg = err.code === 'P2002'
@@ -555,6 +924,7 @@ router.get(
           { header: 'accountType', key: 'accountType', width: 12 },
           { header: 'parentNumber', key: 'parentNumber', width: 15 },
           { header: 'isGroup', key: 'isGroup', width: 10 },
+          { header: 'openingBalance', key: 'openingBalance', width: 18 },
         ];
 
         const accounts = await prisma.account.findMany({
@@ -570,6 +940,7 @@ router.get(
             accountType: acc.accountType,
             parentNumber: acc.parent?.accountNumber ?? '',
             isGroup: acc.isGroup ? 'true' : 'false',
+            openingBalance: Number(acc.balance),
           });
         }
       } else if (type === 'parties') {
@@ -580,6 +951,9 @@ router.get(
           { header: 'email', key: 'email', width: 25 },
           { header: 'address', key: 'address', width: 40 },
           { header: 'taxId', key: 'taxId', width: 20 },
+          { header: 'openingBalance', key: 'openingBalance', width: 18 },
+          { header: 'depositBalance', key: 'depositBalance', width: 18 },
+          { header: 'customerDepositBalance', key: 'customerDepositBalance', width: 22 },
         ];
 
         const parties = await prisma.party.findMany({
@@ -595,6 +969,9 @@ router.get(
             email: p.email ?? '',
             address: p.address ?? '',
             taxId: p.taxId ?? '',
+            openingBalance: Number(p.outstandingAmount),
+            depositBalance: Number(p.depositBalance),
+            customerDepositBalance: Number(p.customerDepositBalance),
           });
         }
       } else if (type === 'inventory') {
@@ -605,6 +982,8 @@ router.get(
           { header: 'category', key: 'category', width: 20 },
           { header: 'description', key: 'description', width: 35 },
           { header: 'minimumStock', key: 'minimumStock', width: 15 },
+          { header: 'openingQty', key: 'openingQty', width: 15 },
+          { header: 'openingPrice', key: 'openingPrice', width: 18 },
         ];
 
         const items = await prisma.inventoryItem.findMany({
@@ -620,6 +999,8 @@ router.get(
             category: item.category ?? '',
             description: item.description ?? '',
             minimumStock: Number(item.minimumStock),
+            openingQty: '',
+            openingPrice: '',
           });
         }
       } else {
