@@ -259,10 +259,13 @@ router.post(
                 }
               }
 
-              // 2) Vendor deposit opening balance journal: DR Uang Muka Pembelian (1.3) / CR Retained Earnings
+              // 2) Vendor deposit: create Payment record + GL journal
               if (depositBalance > 0 && isSupplier && vendorDepositAccount) {
-                const jvNumber = await generateDocumentNumber(prisma as any, 'JV', now, fiscalYear.id);
                 await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+                  const payNumber = await generateDocumentNumber(tx, 'PAY', now, fiscalYear.id);
+                  const jvNumber = await generateDocumentNumber(tx, 'JV', now, fiscalYear.id);
+
+                  // GL journal: DR Uang Muka Pembelian (1.3) / CR Laba Ditahan
                   const journal = await tx.journalEntry.create({
                     data: {
                       entryNumber: jvNumber,
@@ -280,6 +283,24 @@ router.post(
                       },
                     },
                     include: { items: true },
+                  });
+
+                  // Payment record so it appears in vendor deposit module
+                  await tx.payment.create({
+                    data: {
+                      paymentNumber: payNumber,
+                      date: now,
+                      paymentType: 'VendorDeposit',
+                      partyId: party.id,
+                      accountId: vendorDepositAccount.id,
+                      amount: depositBalance,
+                      status: 'Submitted',
+                      notes: `Saldo awal uang muka vendor dari import: ${row.name}`,
+                      createdBy: req.user!.userId,
+                      journalEntryId: journal.id,
+                      fiscalYearId: fiscalYear.id,
+                      submittedAt: now,
+                    },
                   });
 
                   await tx.accountingLedgerEntry.createMany({
@@ -303,10 +324,13 @@ router.post(
                 }, { timeout: 15000 });
               }
 
-              // 3) Customer deposit opening balance journal: DR Retained Earnings / CR Uang Muka Pelanggan (2.1.2)
+              // 3) Customer deposit: create Payment record + GL journal
               if (customerDepositBalance > 0 && isCustomer && customerDepositAccount) {
-                const jvNumber = await generateDocumentNumber(prisma as any, 'JV', now, fiscalYear.id);
                 await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+                  const payNumber = await generateDocumentNumber(tx, 'PAY', now, fiscalYear.id);
+                  const jvNumber = await generateDocumentNumber(tx, 'JV', now, fiscalYear.id);
+
+                  // GL journal: DR Laba Ditahan / CR Uang Muka Pelanggan (2.1.2)
                   const journal = await tx.journalEntry.create({
                     data: {
                       entryNumber: jvNumber,
@@ -324,6 +348,24 @@ router.post(
                       },
                     },
                     include: { items: true },
+                  });
+
+                  // Payment record so it appears in customer deposit module
+                  await tx.payment.create({
+                    data: {
+                      paymentNumber: payNumber,
+                      date: now,
+                      paymentType: 'CustomerDeposit',
+                      partyId: party.id,
+                      accountId: customerDepositAccount.id,
+                      amount: customerDepositBalance,
+                      status: 'Submitted',
+                      notes: `Saldo awal uang muka pelanggan dari import: ${row.name}`,
+                      createdBy: req.user!.userId,
+                      journalEntryId: journal.id,
+                      fiscalYearId: fiscalYear.id,
+                      submittedAt: now,
+                    },
                   });
 
                   await tx.accountingLedgerEntry.createMany({
