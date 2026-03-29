@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Loader2, Warehouse, PackageSearch, Edit2, XCircle, Plus, LayoutDashboard, Upload, Download } from 'lucide-react';
+import { Loader2, Warehouse, PackageSearch, Edit2, Trash2, XCircle, Plus, LayoutDashboard, Upload, Download } from 'lucide-react';
 import { cn } from '../lib/utils';
 import api from '../lib/api';
 import { formatDate, formatRupiah } from '../lib/formatters';
@@ -32,6 +32,8 @@ export function InventoryPage() {
   const [itemModalOpen, setItemModalOpen] = useState(false);
   const [editItem, setEditItem] = useState<any | null>(null);
   const [isImportOpen, setIsImportOpen] = useState(false);
+  const [deleteItemTarget, setDeleteItemTarget] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // --- Movements tab state ---
   const [movementModalOpen, setMovementModalOpen] = useState(false);
@@ -130,6 +132,21 @@ export function InventoryPage() {
   const handleOpenEdit = (item: any) => {
     setEditItem(item);
     setItemModalOpen(true);
+  };
+
+  const handleDeleteItem = async () => {
+    if (!deleteItemTarget) return;
+    setIsDeleting(true);
+    try {
+      await api.delete(`/inventory/items/${deleteItemTarget}`);
+      queryClient.invalidateQueries({ queryKey: ['inventory-items'] });
+      toast.success('Item stok berhasil dihapus.');
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Gagal menghapus item stok.');
+    } finally {
+      setIsDeleting(false);
+      setDeleteItemTarget(null);
+    }
   };
 
   const handleCancelMovement = async () => {
@@ -412,13 +429,22 @@ export function InventoryPage() {
                         </span>
                       </td>
                       <td>
-                        <button
-                          onClick={() => handleOpenEdit(item)}
-                          className="p-1.5 hover:bg-gray-100 rounded text-gray-400 hover:text-gray-600 transition-colors"
-                          title="Edit item"
-                        >
-                          <Edit2 size={15} />
-                        </button>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => handleOpenEdit(item)}
+                            className="p-1.5 hover:bg-gray-100 rounded text-gray-400 hover:text-gray-600 transition-colors"
+                            title="Edit item"
+                          >
+                            <Edit2 size={15} />
+                          </button>
+                          <button
+                            onClick={() => setDeleteItemTarget(item.id)}
+                            className="p-1.5 hover:bg-red-50 rounded text-gray-400 hover:text-red-500 transition-colors"
+                            title="Hapus item"
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -880,6 +906,17 @@ export function InventoryPage() {
         isOpen={productionModalOpen}
         onClose={() => setProductionModalOpen(false)}
         items={items}
+      />
+
+      <ConfirmDialog
+        open={deleteItemTarget !== null}
+        title="Hapus Item Stok"
+        message="Hapus item stok ini? Item yang sudah memiliki mutasi stok atau digunakan di invoice tidak bisa dihapus."
+        confirmLabel={isDeleting ? 'Menghapus...' : 'Ya, Hapus'}
+        cancelLabel="Batal"
+        variant="danger"
+        onConfirm={handleDeleteItem}
+        onCancel={() => setDeleteItemTarget(null)}
       />
 
       <ConfirmDialog

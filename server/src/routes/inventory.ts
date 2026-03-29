@@ -106,6 +106,42 @@ router.put('/items/:id', roleMiddleware(['Admin', 'Accountant', 'StaffProduksi']
   }
 });
 
+// DELETE /api/inventory/items/:id
+router.delete('/items/:id', roleMiddleware(['Admin', 'Accountant']), async (req: AuthRequest, res) => {
+  try {
+    const id = req.params.id as string;
+
+    // Check if item has stock movements
+    const movementCount = await prisma.stockMovement.count({
+      where: { itemId: id, isCancelled: false },
+    });
+    if (movementCount > 0) {
+      return res.status(400).json({
+        error: `Item memiliki ${movementCount} mutasi stok aktif. Batalkan semua mutasi terlebih dahulu atau nonaktifkan item.`,
+      });
+    }
+
+    // Check if item is used in purchase/sales invoice items
+    const purchaseUsage = await prisma.purchaseInvoiceItem.count({ where: { inventoryItemId: id as string } });
+    const salesUsage = await prisma.salesInvoiceItem.count({ where: { inventoryItemId: id as string } });
+    if (purchaseUsage > 0 || salesUsage > 0) {
+      return res.status(400).json({
+        error: 'Item sudah digunakan di invoice. Nonaktifkan item jika tidak ingin dipakai lagi.',
+      });
+    }
+
+    // Safe to delete — also remove cancelled movements
+    await prisma.stockMovement.deleteMany({ where: { itemId: id as string } });
+    await prisma.inventoryItem.delete({ where: { id: id as string } });
+
+    return res.json({ message: 'Item stok berhasil dihapus.' });
+  } catch (error: any) {
+    if (error.code === 'P2025') return res.status(404).json({ error: 'Item stok tidak ditemukan.' });
+    logger.error({ error }, 'DELETE /inventory/items/:id error');
+    return res.status(500).json({ error: 'Gagal menghapus item stok.' });
+  }
+});
+
 // ─── Movements ────────────────────────────────────────────────────────────────
 
 // GET /api/inventory/movements
