@@ -8,6 +8,7 @@ import PDFDownloadButton from './PDFDownloadButton';
 import InvoicePDF from '../lib/pdf/InvoicePDF';
 import { useCompanyPDF } from '../lib/pdf/useCompanyPDF';
 import ApplyDepositModal from './ApplyDepositModal';
+import ApplyCustomerDepositModal from './ApplyCustomerDepositModal';
 
 interface Props {
   type: 'sales' | 'purchase';
@@ -28,6 +29,7 @@ const InvoiceDetailDrawer: React.FC<Props> = ({ type, invoiceId, onClose }) => {
   const company = useCompanyPDF();
   const isSales = type === 'sales';
   const [isApplyDepositOpen, setIsApplyDepositOpen] = useState(false);
+  const [isApplyCustomerDepositOpen, setIsApplyCustomerDepositOpen] = useState(false);
   const endpoint = isSales ? '/sales/invoices' : '/purchase/invoices';
 
   const { data: invoice, isLoading } = useQuery({
@@ -334,25 +336,28 @@ const InvoiceDetailDrawer: React.FC<Props> = ({ type, invoiceId, onClose }) => {
                 </div>
               )}
 
-              {/* Deposit Applications (Purchase only) */}
-              {!isSales && depositApplications.length > 0 && (
+              {/* Deposit Applications */}
+              {depositApplications.length > 0 && (
                 <div className="px-6 py-4 border-b border-gray-100">
                   <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-1">
                     <Wallet size={10} /> Riwayat Uang Muka ({depositApplications.length})
                   </p>
                   <div className="space-y-2">
                     {depositApplications.map((app: any) => (
-                      <div key={app.id} className="flex items-center justify-between p-3 bg-amber-50/50 border border-amber-100 rounded-lg">
+                      <div key={app.id} className={cn(
+                        'flex items-center justify-between p-3 rounded-lg',
+                        isSales ? 'bg-teal-50/50 border border-teal-100' : 'bg-amber-50/50 border border-amber-100'
+                      )}>
                         <div className="flex items-center gap-3">
-                          <div className="p-1.5 bg-amber-100 rounded">
-                            <Wallet size={13} className="text-amber-600" />
+                          <div className={cn('p-1.5 rounded', isSales ? 'bg-teal-100' : 'bg-amber-100')}>
+                            <Wallet size={13} className={isSales ? 'text-teal-600' : 'text-amber-600'} />
                           </div>
                           <div>
                             <p className="text-xs font-medium text-gray-800">{app.depositPayment?.paymentNumber}</p>
-                            <p className="text-[10px] text-gray-400">{formatDate(app.depositPayment?.date)}</p>
+                            <p className="text-[10px] text-gray-400">{formatDate(app.appliedAt ?? app.depositPayment?.date)}</p>
                           </div>
                         </div>
-                        <span className="font-mono text-sm font-semibold text-amber-600">
+                        <span className={cn('font-mono text-sm font-semibold', isSales ? 'text-teal-600' : 'text-amber-600')}>
                           {formatRupiah(Number(app.appliedAmount))}
                         </span>
                       </div>
@@ -361,12 +366,17 @@ const InvoiceDetailDrawer: React.FC<Props> = ({ type, invoiceId, onClose }) => {
                 </div>
               )}
 
-              {/* Apply Deposit Banner (Purchase only, has outstanding) */}
-              {!isSales && outstanding > 0.01 && invoice.status !== 'Cancelled' && (
+              {/* Apply Deposit Banner (has outstanding) */}
+              {outstanding > 0.01 && invoice.status !== 'Cancelled' && (
                 <div className="px-6 py-3 border-b border-gray-100">
                   <button
-                    onClick={() => setIsApplyDepositOpen(true)}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 transition-colors"
+                    onClick={() => isSales ? setIsApplyCustomerDepositOpen(true) : setIsApplyDepositOpen(true)}
+                    className={cn(
+                      'w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium border transition-colors',
+                      isSales
+                        ? 'bg-teal-50 hover:bg-teal-100 text-teal-700 border-teal-200'
+                        : 'bg-amber-50 hover:bg-amber-100 text-amber-700 border-amber-200'
+                    )}
                   >
                     <Wallet size={14} /> Gunakan Uang Muka
                   </button>
@@ -385,13 +395,24 @@ const InvoiceDetailDrawer: React.FC<Props> = ({ type, invoiceId, onClose }) => {
         </div>
       </div>
 
-      {/* Apply Deposit Modal */}
+      {/* Apply Deposit Modal (Purchase) */}
       {!isSales && invoice && (
         <ApplyDepositModal
           isOpen={isApplyDepositOpen}
           onClose={() => setIsApplyDepositOpen(false)}
           purchaseInvoiceId={invoiceId!}
           partyId={invoice.partyId ?? invoice.supplier?.id ?? ''}
+          invoiceOutstanding={outstanding}
+        />
+      )}
+
+      {/* Apply Customer Deposit Modal (Sales) */}
+      {isSales && invoice && (
+        <ApplyCustomerDepositModal
+          isOpen={isApplyCustomerDepositOpen}
+          onClose={() => setIsApplyCustomerDepositOpen(false)}
+          salesInvoiceId={invoiceId!}
+          partyId={invoice.partyId ?? invoice.customer?.id ?? ''}
           invoiceOutstanding={outstanding}
         />
       )}

@@ -63,7 +63,14 @@ router.get('/:id', async (req, res) => {
       orderBy: { payment: { date: 'desc' } },
     });
 
-    return res.json({ ...invoice, paymentAllocations: allocations });
+    // Get customer deposit applications for this invoice
+    const depositApplications = await prisma.customerDepositApplication.findMany({
+      where: { salesInvoiceId: invoice.id, isCancelled: false },
+      include: { depositPayment: { select: { id: true, paymentNumber: true, date: true, amount: true } } },
+      orderBy: { appliedAt: 'desc' },
+    });
+
+    return res.json({ ...invoice, paymentAllocations: allocations, depositApplications });
   } catch (error) {
     logger.error({ error }, 'GET /sales/invoices/:id error');
     return res.status(500).json({ error: 'Gagal mengambil detail invoice.' });
@@ -336,6 +343,14 @@ router.post('/:id/cancel', roleMiddleware(['Admin']), async (req: AuthRequest, r
       });
       if (allocations.length > 0) {
         throw new BusinessError('Invoice memiliki pembayaran teralokasi. Batalkan pembayaran terlebih dahulu.');
+      }
+
+      // Check for active customer deposit applications
+      const activeDepositApps = await tx.customerDepositApplication.count({
+        where: { salesInvoiceId: invoice.id, isCancelled: false },
+      });
+      if (activeDepositApps > 0) {
+        throw new BusinessError('Invoice memiliki alokasi uang muka pelanggan aktif. Batalkan alokasi terlebih dahulu.');
       }
 
       // Cancel the invoice

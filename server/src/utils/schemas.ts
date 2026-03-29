@@ -85,7 +85,7 @@ export const CreatePaymentSchema = z.object({
   date: z.string().min(1, 'Tanggal wajib diisi.'),
   partyId: z.string().min(1, 'Pihak wajib dipilih.'),
   amount: z.coerce.number().positive('Jumlah harus lebih dari 0.'),
-  paymentType: z.enum(['Receive', 'Pay', 'VendorDeposit']),
+  paymentType: z.enum(['Receive', 'Pay', 'VendorDeposit', 'CustomerDeposit']),
   accountId: z.string().min(1, 'Akun kas/bank wajib dipilih.'),
   allocations: z.array(AllocationSchema).optional(),
   referenceNo: z.string().nullable().optional(),
@@ -96,6 +96,13 @@ export const CreatePaymentSchema = z.object({
 export const ApplyVendorDepositSchema = z.object({
   depositPaymentId: z.string().uuid('ID deposit harus UUID yang valid.'),
   purchaseInvoiceId: z.string().uuid('ID invoice harus UUID yang valid.'),
+  amount: z.coerce.number().positive('Jumlah harus lebih dari 0.'),
+});
+
+// ─── Customer Deposit Application ─────────────────────────────────────────────
+export const ApplyCustomerDepositSchema = z.object({
+  depositPaymentId: z.string().uuid('ID deposit harus UUID yang valid.'),
+  salesInvoiceId: z.string().uuid('ID invoice harus UUID yang valid.'),
   amount: z.coerce.number().positive('Jumlah harus lebih dari 0.'),
 });
 

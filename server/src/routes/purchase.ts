@@ -108,6 +108,13 @@ router.post('/', roleMiddleware(['Admin', 'Accountant', 'StaffProduksi']), async
       const grandTotalNum = grandTotal.toNumber();
       const invoiceNumber = await generateDocumentNumber(tx, 'PI', parsedDate, fiscalYear.id);
 
+      // Pre-fetch inventory items to resolve item-specific accounts
+      const invItemIds = body.items.map((i) => i.inventoryItemId).filter(Boolean) as string[];
+      const inventoryItems = invItemIds.length > 0
+        ? await tx.inventoryItem.findMany({ where: { id: { in: invItemIds } } })
+        : [];
+      const invItemMap = new Map(inventoryItems.map((i) => [i.id, i]));
+
       const invoice = await tx.purchaseInvoice.create({
         data: {
           invoiceNumber,
@@ -131,6 +138,9 @@ router.post('/', roleMiddleware(['Admin', 'Accountant', 'StaffProduksi']), async
                 .mul(new Decimal(1).minus(new Decimal(item.discount ?? 0).div(100)))
                 .toDecimalPlaces(2, Decimal.ROUND_HALF_UP)
                 .toNumber();
+              // Use item-specific inventory account if available
+              const linkedItem = item.inventoryItemId ? invItemMap.get(item.inventoryItemId) : null;
+              const itemAccountId = linkedItem?.accountId || inventoryAccount.id;
               return {
                 itemName: item.itemName,
                 inventoryItemId: item.inventoryItemId || null,
@@ -139,7 +149,7 @@ router.post('/', roleMiddleware(['Admin', 'Accountant', 'StaffProduksi']), async
                 rate: item.rate,
                 discount: item.discount ?? 0,
                 amount: itemAmount,
-                accountId: inventoryAccount.id,
+                accountId: itemAccountId,
                 description: item.description || null,
               };
             }),
@@ -148,8 +158,51 @@ router.post('/', roleMiddleware(['Admin', 'Accountant', 'StaffProduksi']), async
         include: { supplier: true, items: true },
       });
 
-      // Auto-post journal entry: Dr Inventory, Cr AP
+      // Auto-post journal entry: Dr Inventory (per item account), Cr AP
+      // Build DR entries using item-specific inventory accounts when available
+      const debitByAccount = new Map<string, { amount: number; names: string[] }>();
+      let itemsTotal = 0;
+
+      for (const invItem of invoice.items) {
+        let drAccountId = inventoryAccount.id; // default: generic 1.4.0
+
+        if (invItem.inventoryItemId) {
+          const linkedItem = await tx.inventoryItem.findUnique({ where: { id: invItem.inventoryItemId } });
+          if (linkedItem?.accountId) {
+            drAccountId = linkedItem.accountId; // use item-specific account (e.g. 1.4.5)
+          }
+        }
+
+        const amt = Number(invItem.amount);
+        itemsTotal += amt;
+        const existing = debitByAccount.get(drAccountId);
+        if (existing) {
+          existing.amount += amt;
+          existing.names.push(invItem.itemName);
+        } else {
+          debitByAccount.set(drAccountId, { amount: amt, names: [invItem.itemName] });
+        }
+      }
+
+      // Allocate remaining amount (tax, biayaLain, potongan) to generic inventory
+      const remainder = new Decimal(grandTotalNum).minus(itemsTotal).toNumber();
+      if (Math.abs(remainder) > 0.001) {
+        const existing = debitByAccount.get(inventoryAccount.id);
+        if (existing) {
+          existing.amount += remainder;
+        } else {
+          debitByAccount.set(inventoryAccount.id, { amount: remainder, names: ['Biaya tambahan'] });
+        }
+      }
+
       const jvNumber = `JV-${invoice.invoiceNumber}`;
+      const debitJournalItems = Array.from(debitByAccount.entries()).map(([accountId, data]) => ({
+        accountId,
+        debit: data.amount,
+        credit: 0,
+        description: `Persediaan ${data.names.join(', ')}: ${invoice.invoiceNumber}`,
+      }));
+
       const journalEntry = await tx.journalEntry.create({
         data: {
           entryNumber: jvNumber,
@@ -161,22 +214,34 @@ router.post('/', roleMiddleware(['Admin', 'Accountant', 'StaffProduksi']), async
           submittedAt: new Date(),
           items: {
             create: [
-              { accountId: inventoryAccount.id, debit: grandTotalNum, credit: 0, description: `Persediaan: ${invoice.invoiceNumber}` },
+              ...debitJournalItems,
               { accountId: apAccount.id, partyId: body.partyId, debit: 0, credit: grandTotalNum, description: `Hutang: ${invoice.invoiceNumber}` },
             ],
           },
         },
       });
 
-      await tx.accountingLedgerEntry.createMany({
-        data: [
-          { date: parsedDate, accountId: inventoryAccount.id, debit: grandTotalNum, credit: 0, referenceType: 'JournalEntry', referenceId: journalEntry.id, description: `Persediaan: ${invoice.invoiceNumber}`, fiscalYearId: fiscalYear.id },
-          { date: parsedDate, accountId: apAccount.id, partyId: body.partyId, debit: 0, credit: grandTotalNum, referenceType: 'JournalEntry', referenceId: journalEntry.id, description: `Hutang: ${invoice.invoiceNumber}`, fiscalYearId: fiscalYear.id },
-        ],
-      });
+      // Post to immutable ledger
+      const ledgerData = [
+        ...debitJournalItems.map((d) => ({
+          date: parsedDate, accountId: d.accountId, debit: d.debit, credit: 0,
+          referenceType: 'JournalEntry', referenceId: journalEntry.id,
+          description: d.description, fiscalYearId: fiscalYear.id,
+        })),
+        {
+          date: parsedDate, accountId: apAccount.id, partyId: body.partyId,
+          debit: 0, credit: grandTotalNum,
+          referenceType: 'JournalEntry', referenceId: journalEntry.id,
+          description: `Hutang: ${invoice.invoiceNumber}`, fiscalYearId: fiscalYear.id,
+        },
+      ];
+      await tx.accountingLedgerEntry.createMany({ data: ledgerData });
 
-      await updateAccountBalance(tx, inventoryAccount.id, grandTotalNum, 0);   // ASSET: debit → +balance
-      await updateAccountBalance(tx, apAccount.id, 0, grandTotalNum);          // LIABILITY: credit → +balance
+      // Update account balances
+      for (const [accountId, data] of debitByAccount.entries()) {
+        await updateAccountBalance(tx, accountId, data.amount, 0); // ASSET: debit → +balance
+      }
+      await updateAccountBalance(tx, apAccount.id, 0, grandTotalNum); // LIABILITY: credit → +balance
       await tx.party.update({ where: { id: body.partyId }, data: { outstandingAmount: { increment: grandTotalNum } } });
 
       // Auto-create stock movements for items linked to inventory
@@ -269,10 +334,20 @@ router.post('/:id/cancel', roleMiddleware(['Admin']), async (req: AuthRequest, r
         });
       }
 
-      const apAccount = await tx.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.AP } });
-      const inventoryAccount = await tx.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.INVENTORY } });
-      if (inventoryAccount) await updateAccountBalance(tx, inventoryAccount.id, 0, Number(invoice.grandTotal));
-      if (apAccount) await updateAccountBalance(tx, apAccount.id, Number(invoice.grandTotal), 0);
+      // Reverse account balances from journal entry items
+      if (journal) {
+        const jeItems = await tx.journalItem.findMany({ where: { journalEntryId: journal.id } });
+        for (const jeItem of jeItems) {
+          // Reverse: swap debit/credit
+          await updateAccountBalance(tx, jeItem.accountId, -Number(jeItem.debit), -Number(jeItem.credit));
+        }
+      } else {
+        // Fallback: reverse generic accounts
+        const apAccount = await tx.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.AP } });
+        const inventoryAccount = await tx.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.INVENTORY } });
+        if (inventoryAccount) await updateAccountBalance(tx, inventoryAccount.id, 0, Number(invoice.grandTotal));
+        if (apAccount) await updateAccountBalance(tx, apAccount.id, Number(invoice.grandTotal), 0);
+      }
 
       await tx.party.update({
         where: { id: invoice.partyId },

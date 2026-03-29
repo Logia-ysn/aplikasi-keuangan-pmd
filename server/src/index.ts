@@ -33,6 +33,7 @@ import taxRoutes from './routes/tax';
 import backupRoutes from './routes/backup';
 import serviceItemRoutes from './routes/serviceItems';
 import vendorDepositRoutes from './routes/vendorDeposits';
+import customerDepositRoutes from './routes/customerDeposits';
 
 const app = express();
 const port = process.env.PORT || 3001;
@@ -130,6 +131,7 @@ app.use('/api/tax', taxRoutes);
 app.use('/api/backup', backupRoutes);
 app.use('/api/service-items', serviceItemRoutes);
 app.use('/api/vendor-deposits', vendorDepositRoutes);
+app.use('/api/customer-deposits', customerDepositRoutes);
 
 // ─── Serve Frontend (Production) ──────────────────────────────────────────────
 // In production, serve the built React client from ../client/dist
