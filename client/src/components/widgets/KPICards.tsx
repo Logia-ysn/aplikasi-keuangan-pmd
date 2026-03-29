@@ -1,5 +1,5 @@
 import React from 'react';
-import { Wallet, TrendingUp, TrendingDown, CreditCard, Loader2 } from 'lucide-react';
+import { Wallet, TrendingUp, TrendingDown, CreditCard, Package, Loader2 } from 'lucide-react';
 
 const formatRupiah = (value: number) =>
   new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(value);
@@ -37,16 +37,18 @@ interface KPICardsProps {
     cashBalance: number;
     accountsReceivable: number;
     accountsPayable: number;
+    inventoryValue: number;
     netProfit: number;
   } | null;
   loading: boolean;
 }
 
 const KPICards: React.FC<KPICardsProps> = ({ data, loading }) => (
-  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
     <MetricCard title="Total Kas & Bank" value={data?.cashBalance || 0} loading={loading} icon={Wallet} />
     <MetricCard title="Piutang Usaha" value={data?.accountsReceivable || 0} loading={loading} icon={TrendingUp} />
     <MetricCard title="Hutang Usaha" value={data?.accountsPayable || 0} loading={loading} icon={TrendingDown} />
+    <MetricCard title="Nilai Persediaan" value={data?.inventoryValue || 0} loading={loading} icon={Package} />
     <MetricCard title="Laba Bersih (Bulan Ini)" value={data?.netProfit || 0} loading={loading} icon={CreditCard} />
   </div>
 );

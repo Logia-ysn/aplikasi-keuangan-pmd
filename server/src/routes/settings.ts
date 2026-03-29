@@ -7,6 +7,7 @@ import { roleMiddleware } from '../middleware/auth';
 import { validateBody } from '../utils/validate';
 import { UpdateCompanySettingsSchema } from '../utils/schemas';
 import { logger } from '../lib/logger';
+import { ACCOUNT_NUMBERS } from '../constants/accountNumbers';
 import { generateDocumentNumber } from '../utils/documentNumber';
 import { getOpenFiscalYear } from '../utils/fiscalYear';
 
@@ -124,15 +125,15 @@ router.post('/generate-dummy', roleMiddleware(['Admin']), async (req, res) => {
     // Get account IDs
     const accounts = await prisma.account.findMany({ where: { isGroup: false } });
     const acctMap = new Map(accounts.map(a => [a.accountNumber, a.id]));
-    const kasId = acctMap.get('1.1.1');
-    const bankId = acctMap.get('1.1.2');
-    const arId = acctMap.get('1.1.3');
-    const invId = acctMap.get('1.1.4');
-    const apId = acctMap.get('2.1.1');
-    const salesId = acctMap.get('4.1.1');
-    const cogsId = acctMap.get('5.1.1');
-    const gajiId = acctMap.get('5.2.2');
-    const listrikId = acctMap.get('5.2.1');
+    const kasId = acctMap.get(ACCOUNT_NUMBERS.CASH[0]);       // 1.1.1 Petty Cash
+    const bankId = acctMap.get(ACCOUNT_NUMBERS.CASH[1]);      // 1.1.2 Bank BRI
+    const arId = acctMap.get(ACCOUNT_NUMBERS.AR);             // 1.2.1 Piutang Usaha
+    const invId = acctMap.get(ACCOUNT_NUMBERS.INVENTORY);     // 1.4.0 Persediaan
+    const apId = acctMap.get(ACCOUNT_NUMBERS.AP);             // 2.1.1 Hutang Usaha
+    const salesId = acctMap.get(ACCOUNT_NUMBERS.SALES);       // 4.1 Penjualan
+    const cogsId = acctMap.get(ACCOUNT_NUMBERS.COGS);         // 5 HPP
+    const gajiId = acctMap.get('6.4');                         // Beban Gaji
+    const listrikId = acctMap.get('6.11');                     // Beban Listrik
 
     if (!kasId || !salesId || !arId || !apId) {
       return res.status(400).json({ error: 'Akun dasar (Kas, AR, AP, Sales) belum tersedia. Jalankan seed terlebih dahulu.' });
@@ -257,18 +258,18 @@ router.post('/generate-dummy', roleMiddleware(['Admin']), async (req, res) => {
               invoiceNumber: invNum, date, partyId: supplier.id, status: 'Submitted',
               grandTotal, outstanding: grandTotal, taxPct: 11, potongan: 0, biayaLain: 0,
               fiscalYearId: fy.id, createdBy: admin.id, submittedAt: date, isDummy: true,
-              items: { create: [{ itemName: 'Gabah GKP', quantity: qty, unit: 'Kg', rate, discount: 0, amount: subtotal.toNumber(), accountId: cogsId || invId!, description: '' }] },
+              items: { create: [{ itemName: 'Gabah GKP', quantity: qty, unit: 'Kg', rate, discount: 0, amount: subtotal.toNumber(), accountId: invId!, description: '' }] },
             },
           });
 
-          // GL posting
+          // GL posting: DR Persediaan / CR AP (matches real purchase route)
           const jvNum = await generateDocumentNumber(tx, 'JV', date, fy.id);
           await tx.journalEntry.create({
             data: {
               entryNumber: jvNum, date, narration: 'Pembelian gabah - ' + supplier.name,
               status: 'Submitted', fiscalYearId: fy.id, createdBy: admin.id, submittedAt: date,
               items: { create: [
-                { accountId: cogsId || invId!, debit: grandTotal, credit: 0 },
+                { accountId: invId!, debit: grandTotal, credit: 0 },
                 { accountId: apId!, debit: 0, credit: grandTotal },
               ]},
             },
@@ -276,7 +277,7 @@ router.post('/generate-dummy', roleMiddleware(['Admin']), async (req, res) => {
 
           // Ledger entries
           await tx.accountingLedgerEntry.createMany({ data: [
-            { accountId: cogsId || invId!, date, debit: grandTotal, credit: 0, referenceId: pi.id, referenceType: 'PurchaseInvoice', fiscalYearId: fy.id },
+            { accountId: invId!, date, debit: grandTotal, credit: 0, referenceId: pi.id, referenceType: 'PurchaseInvoice', fiscalYearId: fy.id },
             { accountId: apId!, date, debit: 0, credit: grandTotal, referenceId: pi.id, referenceType: 'PurchaseInvoice', fiscalYearId: fy.id },
           ]});
 
@@ -324,6 +325,26 @@ router.post('/generate-dummy', roleMiddleware(['Admin']), async (req, res) => {
             { accountId: arId!, date, debit: grandTotal, credit: 0, referenceId: si.id, referenceType: 'SalesInvoice', fiscalYearId: fy.id },
             { accountId: salesId!, date, debit: 0, credit: grandTotal, referenceId: si.id, referenceType: 'SalesInvoice', fiscalYearId: fy.id },
           ]});
+
+          // COGS posting: DR HPP / CR Persediaan (matches real sales route)
+          if (cogsId && invId) {
+            const cogsAmount = subtotal.toNumber(); // COGS at cost (before tax)
+            const cogsJvNum = `JV-COGS-${siInvNum}`;
+            await tx.journalEntry.create({
+              data: {
+                entryNumber: cogsJvNum, date, narration: `HPP: ${siInvNum}`,
+                status: 'Submitted', fiscalYearId: fy.id, createdBy: admin.id, submittedAt: date,
+                items: { create: [
+                  { accountId: cogsId, debit: cogsAmount, credit: 0, description: `HPP: ${siInvNum}` },
+                  { accountId: invId, debit: 0, credit: cogsAmount, description: `Persediaan: ${siInvNum}` },
+                ]},
+              },
+            });
+            await tx.accountingLedgerEntry.createMany({ data: [
+              { accountId: cogsId, date, debit: cogsAmount, credit: 0, referenceId: si.id, referenceType: 'SalesInvoice', fiscalYearId: fy.id, description: `HPP: ${siInvNum}` },
+              { accountId: invId, date, debit: 0, credit: cogsAmount, referenceId: si.id, referenceType: 'SalesInvoice', fiscalYearId: fy.id, description: `Persediaan: ${siInvNum}` },
+            ]});
+          }
 
           // Create payment for first 2 of 5 sales invoices (40% collection rate, leaves AR balance)
           if (i < 2) {

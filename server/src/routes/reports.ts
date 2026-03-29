@@ -143,10 +143,29 @@ router.get('/profit-loss', async (req, res) => {
         .filter((a) => a.balance !== 0 || a.isGroup);
 
     const revenueRoot = allAccounts.find((a) => a.isGroup && a.rootType === 'REVENUE' && !a.parentId);
-    const expenseRoot = allAccounts.find((a) => a.isGroup && a.rootType === 'EXPENSE' && !a.parentId);
-
     const revenueAccounts = buildHierarchy(revenueRoot?.id || null);
-    const expenseAccounts = buildHierarchy(expenseRoot?.id || null);
+
+    // Handle ALL root-level EXPENSE accounts (both group and non-group like HPP account 5)
+    const expenseRoots = allAccounts.filter((a) => a.rootType === 'EXPENSE' && !a.parentId);
+    const expenseAccounts: any[] = [];
+    for (const root of expenseRoots) {
+      if (root.isGroup) {
+        expenseAccounts.push(...buildHierarchy(root.id));
+      } else {
+        const balance = getBalance(root.id);
+        if (balance !== 0) {
+          expenseAccounts.push({
+            id: root.id,
+            name: root.name,
+            accountNumber: root.accountNumber,
+            isGroup: root.isGroup,
+            balance,
+            children: [],
+          });
+        }
+      }
+    }
+    expenseAccounts.sort((a: any, b: any) => compareAccountNumber(a.accountNumber, b.accountNumber));
 
     const totalRevenue = revenueAccounts.reduce((s: number, a: any) => s + Number(a.balance), 0);
     const totalExpense = expenseAccounts.reduce((s: number, a: any) => s + Number(a.balance), 0);
