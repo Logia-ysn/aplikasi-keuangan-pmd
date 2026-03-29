@@ -17,10 +17,18 @@ router.get('/metrics', async (req, res) => {
     });
     const cashBalance = cashAccounts.reduce((sum, acc) => sum + Number(acc.balance), 0);
 
-    const [arAcc, apAcc, invAcc] = await Promise.all([
+    const [arAcc, apAcc, inventoryValueResult] = await Promise.all([
       prisma.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.AR } }),
       prisma.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.AP } }),
-      prisma.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.INVENTORY } }),
+      prisma.$queryRaw<[{ total: bigint }]>`
+        SELECT COALESCE(SUM(
+          CASE WHEN sm.movement_type IN ('In', 'AdjustmentIn') THEN sm.total_value
+               ELSE -sm.total_value END
+        ), 0) AS total
+        FROM stock_movements sm
+        JOIN inventory_items ii ON sm.item_id = ii.id
+        WHERE ii.is_active = true AND sm.is_cancelled = false
+      `,
     ]);
 
     const now = new Date();
@@ -45,7 +53,7 @@ router.get('/metrics', async (req, res) => {
       cashBalance,
       accountsReceivable: Math.max(0, Number(arAcc?.balance || 0)),
       accountsPayable: Math.max(0, Number(apAcc?.balance || 0)),
-      inventoryValue: Math.max(0, Number(invAcc?.balance || 0)),
+      inventoryValue: Math.max(0, Number(inventoryValueResult[0]?.total || 0)),
       netProfit,
     });
   } catch (error) {
