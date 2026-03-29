@@ -45,15 +45,9 @@ app.use(cookieParser());
 
 // ─── Security Headers ─────────────────────────────────────────────────────────
 app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
-      imgSrc: ["'self'", "data:"],
-      connectSrc: ["'self'"],
-    },
-  },
+  contentSecurityPolicy: false,
+  crossOriginEmbedderPolicy: false,
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
 }));
 
 // ─── CORS ──────────────────────────────────────────────────────────────────────
@@ -71,6 +65,19 @@ app.use(
       if (!origin) return callback(null, true);
       // Allow explicitly listed origins
       if (allowedOrigins.includes(origin) || allowedOrigins.includes('*')) return callback(null, true);
+      // Allow private network IPs (LAN access)
+      try {
+        const originHost = new URL(origin).hostname;
+        if (
+          originHost === 'localhost' ||
+          originHost === '127.0.0.1' ||
+          originHost.startsWith('192.168.') ||
+          originHost.startsWith('10.') ||
+          /^172\.(1[6-9]|2\d|3[01])\./.test(originHost)
+        ) {
+          return callback(null, true);
+        }
+      } catch { /* invalid origin URL, fall through */ }
       logger.warn({ origin, allowedOrigins }, 'CORS origin blocked');
       callback(new Error(`CORS: origin ${origin} not allowed`));
     },
