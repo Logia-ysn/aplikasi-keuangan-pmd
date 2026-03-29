@@ -839,48 +839,39 @@ router.post('/reset-data', roleMiddleware(['Admin']), async (req, res) => {
   try {
     // Delete all data in correct order (respect FK constraints)
     await prisma.$transaction(async (tx) => {
-      // Clear token blacklist
-      await tx.tokenBlacklist.deleteMany();
-      // Clear notifications
-      await tx.notification.deleteMany();
-      // Clear audit logs
-      await tx.auditLog.deleteMany();
-      // Clear bank reconciliation items then reconciliations
-      await tx.bankReconciliationItem.deleteMany();
-      await tx.bankReconciliation.deleteMany();
-      // Clear recurring templates
-      await tx.recurringTemplate.deleteMany();
-      // Clear payment allocations then payments
-      await tx.paymentAllocation.deleteMany();
-      await tx.payment.deleteMany();
-      // Clear invoice items then invoices
-      await tx.salesInvoiceItem.deleteMany();
-      await tx.salesInvoice.deleteMany();
-      await tx.purchaseInvoiceItem.deleteMany();
-      await tx.purchaseInvoice.deleteMany();
-      // Clear production run items then runs
-      await tx.productionRunItem.deleteMany();
-      await tx.productionRun.deleteMany();
-      // Clear stock movements
-      await tx.stockMovement.deleteMany();
-      // Clear inventory items
-      await tx.inventoryItem.deleteMany();
-      // Clear journal items, ledger entries, then journals
-      await tx.journalItem.deleteMany();
-      await tx.accountingLedgerEntry.deleteMany();
-      await tx.journalEntry.deleteMany();
-      // Clear parties
-      await tx.party.deleteMany();
-      // Clear accounts
-      await tx.account.deleteMany();
-      // Clear tax config
-      await tx.taxConfig.deleteMany();
-      // Clear fiscal years
-      await tx.fiscalYear.deleteMany();
-      // Clear company settings
-      await tx.companySettings.deleteMany();
-      // Clear users — seed will recreate them
-      await tx.user.deleteMany();
+      // Use raw SQL TRUNCATE CASCADE — deletes all data respecting FKs in one shot
+      await tx.$executeRawUnsafe(`
+        TRUNCATE TABLE
+          token_blacklist,
+          notifications,
+          audit_trail,
+          bank_reconciliation_items,
+          bank_reconciliations,
+          recurring_templates,
+          vendor_deposit_applications,
+          customer_deposit_applications,
+          payment_allocations,
+          payments,
+          sales_invoice_items,
+          sales_invoices,
+          purchase_invoice_items,
+          purchase_invoices,
+          production_run_items,
+          production_runs,
+          stock_movements,
+          inventory_items,
+          service_items,
+          accounting_ledger_entries,
+          journal_entry_accounts,
+          journal_entries,
+          parties,
+          accounts,
+          tax_configs,
+          fiscal_years,
+          company_settings,
+          users
+        CASCADE
+      `);
     }, { timeout: 60000 });
 
     // Re-seed by running the seed script
