@@ -216,6 +216,26 @@ router.post(
         });
       }
 
+      // Auto-detect isGroup: any account that is a parent of another should be a group
+      const allNumbers = new Set(validRows.map((r) => r.accountNumber));
+      for (const row of validRows) {
+        const parts = row.accountNumber.split('.');
+        // Mark all ancestor numbers as groups
+        for (let depth = 1; depth < parts.length; depth++) {
+          const ancestor = parts.slice(0, depth).join('.');
+          const ancestorRow = validRows.find((r) => r.accountNumber === ancestor);
+          if (ancestorRow) ancestorRow.isGroup = true;
+        }
+      }
+
+      // Sort by account number depth so parents are inserted before children
+      validRows.sort((a, b) => {
+        const depthA = a.accountNumber.split('.').length;
+        const depthB = b.accountNumber.split('.').length;
+        if (depthA !== depthB) return depthA - depthB;
+        return a.accountNumber.localeCompare(b.accountNumber, undefined, { numeric: true });
+      });
+
       if (isPreview) {
         return res.json({ data: validRows, errors, total: rows.length });
       }
@@ -224,17 +244,35 @@ router.post(
       let success = 0;
       for (const row of validRows) {
         try {
+          // Auto-derive parentNumber from accountNumber if not provided
+          // e.g. "1.4.5" → parent "1.4", "1.4" → parent "1", "1" → no parent
+          let effectiveParentNumber = row.parentNumber;
+          if (!effectiveParentNumber) {
+            const parts = row.accountNumber.split('.');
+            if (parts.length > 1) {
+              effectiveParentNumber = parts.slice(0, -1).join('.');
+            }
+          }
+
           let parentId: string | null = null;
-          if (row.parentNumber) {
+          if (effectiveParentNumber) {
             const parent = await prisma.account.findUnique({
-              where: { accountNumber: row.parentNumber },
+              where: { accountNumber: effectiveParentNumber },
               select: { id: true },
             });
             if (parent) parentId = parent.id;
           }
 
-          await prisma.account.create({
-            data: {
+          await prisma.account.upsert({
+            where: { accountNumber: row.accountNumber },
+            update: {
+              name: row.name,
+              rootType: row.rootType as any,
+              accountType: row.accountType as any,
+              parentId,
+              isGroup: row.isGroup,
+            },
+            create: {
               accountNumber: row.accountNumber,
               name: row.name,
               rootType: row.rootType as any,
