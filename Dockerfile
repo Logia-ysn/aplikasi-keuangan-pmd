@@ -36,6 +36,9 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 
+# Install pg_dump/psql (for backup/restore) and gzip
+RUN apk add --no-cache postgresql16-client gzip
+
 # Install only production deps + prisma CLI + tsx (for prisma.config.ts)
 COPY server/package.json server/package-lock.json* ./server/
 RUN cd server && npm ci --omit=dev && npm install prisma tsx
