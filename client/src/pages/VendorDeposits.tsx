@@ -2,33 +2,36 @@ import { useState, useMemo } from 'react';
 import { Search, Wallet, Loader2, CheckCircle2, DollarSign, AlertTriangle, XCircle } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { toast } from 'sonner';
 import api from '../lib/api';
 import { formatRupiah, formatDate } from '../lib/formatters';
 import VendorDepositModal from '../components/VendorDepositModal';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { toast } from 'sonner';
 
 export const VendorDeposits = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [cancelId, setCancelId] = useState<string | null>(null);
+  const [cancelTarget, setCancelTarget] = useState<{ id: string; paymentNumber: string } | null>(null);
   const queryClient = useQueryClient();
-
-  const cancelMutation = useMutation({
-    mutationFn: (id: string) => api.post(`/payments/${id}/cancel`),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['vendor-deposits'] });
-      queryClient.invalidateQueries({ queryKey: ['parties'] });
-      toast.success('Deposit berhasil dibatalkan.');
-    },
-    onError: (err: any) => toast.error(err.response?.data?.error || 'Gagal membatalkan deposit.'),
-  });
 
   const { data: deposits, isLoading } = useQuery({
     queryKey: ['vendor-deposits'],
     queryFn: async () => {
       const res = await api.get('/vendor-deposits');
       return res.data.data ?? res.data;
+    },
+  });
+
+  const cancelMutation = useMutation({
+    mutationFn: (id: string) => api.patch(`/vendor-deposits/${id}/cancel`),
+    onSuccess: () => {
+      toast.success('Uang muka vendor berhasil dibatalkan.');
+      queryClient.invalidateQueries({ queryKey: ['vendor-deposits'] });
+      queryClient.invalidateQueries({ queryKey: ['coa'] });
+      queryClient.invalidateQueries({ queryKey: ['parties'] });
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.error || 'Gagal membatalkan uang muka.');
     },
   });
 
@@ -141,7 +144,7 @@ export const VendorDeposits = () => {
                 <th scope="col" className="text-right">Digunakan</th>
                 <th scope="col" className="text-right">Sisa</th>
                 <th scope="col" className="text-center">Status</th>
-                <th scope="col" className="text-center w-20">Aksi</th>
+                <th scope="col" className="w-10"></th>
               </tr>
             </thead>
             <tbody>
@@ -173,7 +176,7 @@ export const VendorDeposits = () => {
                   const isFullyUsed = remaining < 0.01 && !isCancelled;
 
                   return (
-                    <tr key={dep.id}>
+                    <tr key={dep.id} className={isCancelled ? 'opacity-50' : ''}>
                       <td className="text-gray-500 whitespace-nowrap">{formatDate(dep.date)}</td>
                       <td className="whitespace-nowrap">
                         <span className="font-mono text-xs text-gray-800 bg-gray-50 px-1.5 py-0.5 rounded">{dep.paymentNumber}</span>
@@ -200,14 +203,14 @@ export const VendorDeposits = () => {
                            totalApplied > 0 ? 'Sebagian' : 'Aktif'}
                         </span>
                       </td>
-                      <td className="text-center">
+                      <td>
                         {!isCancelled && (
                           <button
-                            onClick={() => setCancelId(dep.id)}
-                            className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors"
-                            title="Batalkan deposit"
+                            onClick={() => setCancelTarget({ id: dep.id, paymentNumber: dep.paymentNumber })}
+                            className="p-1.5 hover:bg-red-50 rounded text-gray-400 hover:text-red-500 transition-colors"
+                            title="Batalkan"
                           >
-                            <XCircle size={15} />
+                            <XCircle size={16} />
                           </button>
                         )}
                       </td>
@@ -226,13 +229,18 @@ export const VendorDeposits = () => {
       />
 
       <ConfirmDialog
-        open={cancelId !== null}
-        title="Batalkan Deposit Vendor"
-        message="Yakin ingin membatalkan deposit ini? Saldo akan dikembalikan ke akun kas/bank asal. Deposit yang sudah dialokasikan ke invoice harus dibatalkan alokasinya terlebih dahulu."
-        confirmLabel="Batalkan Deposit"
+        open={cancelTarget !== null}
+        onCancel={() => setCancelTarget(null)}
+        onConfirm={() => {
+          if (cancelTarget) {
+            cancelMutation.mutate(cancelTarget.id);
+            setCancelTarget(null);
+          }
+        }}
+        title="Batalkan Uang Muka"
+        message={`Apakah Anda yakin ingin membatalkan uang muka ${cancelTarget?.paymentNumber}? Saldo akun dan deposit vendor akan dikembalikan.`}
+        confirmLabel="Ya, Batalkan"
         variant="danger"
-        onConfirm={() => { if (cancelId) cancelMutation.mutate(cancelId); setCancelId(null); }}
-        onCancel={() => setCancelId(null)}
       />
     </div>
   );

@@ -100,6 +100,118 @@ router.get('/balance/:partyId', async (req, res) => {
   }
 });
 
+// PATCH /api/customer-deposits/:id/cancel — cancel a customer deposit payment
+router.patch('/:id/cancel', roleMiddleware(['Admin', 'Accountant']), async (req: AuthRequest, res) => {
+  const id = req.params.id as string;
+
+  try {
+    await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      const deposit = await tx.payment.findUnique({
+        where: { id },
+        include: {
+          customerDepositApplications: { where: { isCancelled: false } },
+          journalEntry: { include: { items: true } },
+        },
+      });
+      if (!deposit) throw new BusinessError('Deposit tidak ditemukan.');
+      if (deposit.paymentType !== 'CustomerDeposit') throw new BusinessError('Bukan tipe uang muka pelanggan.');
+      if (deposit.status === 'Cancelled') throw new BusinessError('Deposit sudah dibatalkan.');
+
+      // Check if any applications exist
+      if (deposit.customerDepositApplications.length > 0) {
+        throw new BusinessError('Deposit sudah digunakan untuk faktur. Batalkan penggunaan terlebih dahulu.');
+      }
+
+      const depositAmount = Number(deposit.amount);
+
+      // Reverse journal entry balances
+      if (deposit.journalEntry) {
+        for (const item of deposit.journalEntry.items) {
+          await updateAccountBalance(tx, item.accountId, Number(item.credit), Number(item.debit));
+        }
+        await tx.journalEntry.update({
+          where: { id: deposit.journalEntry.id },
+          data: { status: 'Cancelled', cancelledAt: new Date() },
+        });
+        await tx.accountingLedgerEntry.createMany({
+          data: deposit.journalEntry.items.map((item) => ({
+            date: new Date(),
+            accountId: item.accountId,
+            partyId: deposit.partyId,
+            debit: item.credit,
+            credit: item.debit,
+            referenceType: 'JournalEntry' as const,
+            referenceId: deposit.journalEntry!.id,
+            description: `[BATAL] ${item.description || 'Pembatalan uang muka pelanggan'}`,
+            fiscalYearId: deposit.fiscalYearId,
+          })),
+        });
+      } else {
+        // No linked journal (legacy imports) — reverse account balances directly
+        const customerDepositAccount = await tx.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.CUSTOMER_DEPOSIT } });
+        const retainedAccount = await tx.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.RETAINED_EARNINGS } });
+
+        if (customerDepositAccount && retainedAccount) {
+          // Reverse: DR Customer Deposit / CR Retained Earnings
+          await updateAccountBalance(tx, customerDepositAccount.id, depositAmount, 0);
+          await updateAccountBalance(tx, retainedAccount.id, 0, depositAmount);
+
+          // Create reversal journal
+          const jvNumber = await generateDocumentNumber(tx, 'JV', new Date(), deposit.fiscalYearId);
+          const journal = await tx.journalEntry.create({
+            data: {
+              entryNumber: jvNumber,
+              date: new Date(),
+              narration: `[BATAL] Pembatalan uang muka pelanggan: ${deposit.paymentNumber}`,
+              status: 'Submitted',
+              fiscalYearId: deposit.fiscalYearId,
+              createdBy: req.user!.userId,
+              submittedAt: new Date(),
+              items: {
+                create: [
+                  { accountId: customerDepositAccount.id, partyId: deposit.partyId, debit: depositAmount, credit: 0, description: `[BATAL] UM Pelanggan: ${deposit.paymentNumber}` },
+                  { accountId: retainedAccount.id, partyId: deposit.partyId, debit: 0, credit: depositAmount, description: `[BATAL] UM Pelanggan: ${deposit.paymentNumber}` },
+                ],
+              },
+            },
+            include: { items: true },
+          });
+
+          await tx.accountingLedgerEntry.createMany({
+            data: journal.items.map((item) => ({
+              date: new Date(),
+              accountId: item.accountId,
+              partyId: item.partyId,
+              debit: item.debit,
+              credit: item.credit,
+              referenceType: 'JournalEntry' as const,
+              referenceId: journal.id,
+              description: item.description || `[BATAL] UM Pelanggan: ${deposit.paymentNumber}`,
+              fiscalYearId: deposit.fiscalYearId,
+            })),
+          });
+        }
+      }
+
+      // Restore party deposit balance
+      await tx.party.update({
+        where: { id: deposit.partyId },
+        data: { customerDepositBalance: { decrement: depositAmount } },
+      });
+
+      // Mark deposit as cancelled
+      await tx.payment.update({
+        where: { id },
+        data: { status: 'Cancelled', cancelledAt: new Date() },
+      });
+    }, { timeout: 15000 });
+
+    return res.json({ message: 'Uang muka pelanggan berhasil dibatalkan.' });
+  } catch (error: any) {
+    return handleRouteError(res, error, 'PATCH /customer-deposits/:id/cancel', 'Gagal membatalkan uang muka pelanggan.');
+  }
+});
+
 // POST /api/customer-deposits/apply — apply deposit to sales invoice
 router.post('/apply', roleMiddleware(['Admin', 'Accountant']), async (req: AuthRequest, res) => {
   const body = validateBody(ApplyCustomerDepositSchema, req.body, res);

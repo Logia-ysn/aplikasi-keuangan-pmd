@@ -100,6 +100,118 @@ router.get('/balance/:partyId', async (req, res) => {
   }
 });
 
+// PATCH /api/vendor-deposits/:id/cancel — cancel a vendor deposit payment
+router.patch('/:id/cancel', roleMiddleware(['Admin', 'Accountant']), async (req: AuthRequest, res) => {
+  const id = req.params.id as string;
+
+  try {
+    await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      const deposit = await tx.payment.findUnique({
+        where: { id },
+        include: {
+          depositApplications: { where: { isCancelled: false } },
+          journalEntry: { include: { items: true } },
+        },
+      });
+      if (!deposit) throw new BusinessError('Deposit tidak ditemukan.');
+      if (deposit.paymentType !== 'VendorDeposit') throw new BusinessError('Bukan tipe uang muka vendor.');
+      if (deposit.status === 'Cancelled') throw new BusinessError('Deposit sudah dibatalkan.');
+
+      // Check if any applications exist
+      if (deposit.depositApplications.length > 0) {
+        throw new BusinessError('Deposit sudah digunakan untuk faktur. Batalkan penggunaan terlebih dahulu.');
+      }
+
+      const depositAmount = Number(deposit.amount);
+
+      // Reverse journal entry balances
+      if (deposit.journalEntry) {
+        for (const item of deposit.journalEntry.items) {
+          await updateAccountBalance(tx, item.accountId, Number(item.credit), Number(item.debit));
+        }
+        await tx.journalEntry.update({
+          where: { id: deposit.journalEntry.id },
+          data: { status: 'Cancelled', cancelledAt: new Date() },
+        });
+        await tx.accountingLedgerEntry.createMany({
+          data: deposit.journalEntry.items.map((item) => ({
+            date: new Date(),
+            accountId: item.accountId,
+            partyId: deposit.partyId,
+            debit: item.credit,
+            credit: item.debit,
+            referenceType: 'JournalEntry' as const,
+            referenceId: deposit.journalEntry!.id,
+            description: `[BATAL] ${item.description || 'Pembatalan uang muka vendor'}`,
+            fiscalYearId: deposit.fiscalYearId,
+          })),
+        });
+      } else {
+        // No linked journal (legacy imports) — reverse account balances directly
+        const vendorDepositAccount = await tx.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.VENDOR_DEPOSIT } });
+        const retainedAccount = await tx.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.RETAINED_EARNINGS } });
+
+        if (vendorDepositAccount && retainedAccount) {
+          // Reverse: CR Vendor Deposit / DR Retained Earnings
+          await updateAccountBalance(tx, vendorDepositAccount.id, 0, depositAmount);
+          await updateAccountBalance(tx, retainedAccount.id, depositAmount, 0);
+
+          // Create reversal journal
+          const jvNumber = await generateDocumentNumber(tx, 'JV', new Date(), deposit.fiscalYearId);
+          const journal = await tx.journalEntry.create({
+            data: {
+              entryNumber: jvNumber,
+              date: new Date(),
+              narration: `[BATAL] Pembatalan uang muka vendor: ${deposit.paymentNumber}`,
+              status: 'Submitted',
+              fiscalYearId: deposit.fiscalYearId,
+              createdBy: req.user!.userId,
+              submittedAt: new Date(),
+              items: {
+                create: [
+                  { accountId: retainedAccount.id, partyId: deposit.partyId, debit: depositAmount, credit: 0, description: `[BATAL] UM Vendor: ${deposit.paymentNumber}` },
+                  { accountId: vendorDepositAccount.id, partyId: deposit.partyId, debit: 0, credit: depositAmount, description: `[BATAL] UM Vendor: ${deposit.paymentNumber}` },
+                ],
+              },
+            },
+            include: { items: true },
+          });
+
+          await tx.accountingLedgerEntry.createMany({
+            data: journal.items.map((item) => ({
+              date: new Date(),
+              accountId: item.accountId,
+              partyId: item.partyId,
+              debit: item.debit,
+              credit: item.credit,
+              referenceType: 'JournalEntry' as const,
+              referenceId: journal.id,
+              description: item.description || `[BATAL] UM Vendor: ${deposit.paymentNumber}`,
+              fiscalYearId: deposit.fiscalYearId,
+            })),
+          });
+        }
+      }
+
+      // Restore party deposit balance
+      await tx.party.update({
+        where: { id: deposit.partyId },
+        data: { depositBalance: { decrement: depositAmount } },
+      });
+
+      // Mark deposit as cancelled
+      await tx.payment.update({
+        where: { id },
+        data: { status: 'Cancelled', cancelledAt: new Date() },
+      });
+    }, { timeout: 15000 });
+
+    return res.json({ message: 'Uang muka vendor berhasil dibatalkan.' });
+  } catch (error: any) {
+    return handleRouteError(res, error, 'PATCH /vendor-deposits/:id/cancel', 'Gagal membatalkan uang muka vendor.');
+  }
+});
+
 // POST /api/vendor-deposits/apply — apply deposit to purchase invoice
 router.post('/apply', roleMiddleware(['Admin', 'Accountant']), async (req: AuthRequest, res) => {
   const body = validateBody(ApplyVendorDepositSchema, req.body, res);

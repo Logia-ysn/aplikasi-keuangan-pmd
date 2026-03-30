@@ -1,6 +1,9 @@
 @import "tailwindcss";
 @config "../tailwind.config.js";
 
+/* Override dark: variant to use .dark class instead of prefers-color-scheme */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* ── Theme Variables ── */
 :root {
   --color-bg-primary: #ffffff;

@@ -152,4 +152,95 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
   }
 });
 
+// GET /api/journals/:id — get single journal entry
+router.get('/:id', async (req: AuthRequest, res) => {
+  try {
+    const id = req.params.id as string;
+    const entry = await prisma.journalEntry.findUnique({
+      where: { id },
+      include: {
+        items: { include: { account: { select: { id: true, accountNumber: true, name: true, rootType: true } } } },
+        user: { select: { fullName: true } },
+      },
+    });
+    if (!entry) return res.status(404).json({ error: 'Jurnal tidak ditemukan.' });
+    return res.json(entry);
+  } catch (error) {
+    logger.error({ error }, 'GET /journals/:id error');
+    return res.status(500).json({ error: 'Gagal mengambil data jurnal.' });
+  }
+});
+
+// PATCH /api/journals/:id/cancel — cancel a journal entry and reverse balances
+router.patch('/:id/cancel', roleMiddleware(['Admin', 'Accountant']), async (req: AuthRequest, res) => {
+  const id = req.params.id as string;
+
+  try {
+    const entry = await prisma.journalEntry.findUnique({
+      where: { id },
+      include: {
+        items: { include: { account: { select: { rootType: true } } } },
+        payment: { select: { id: true } },
+      },
+    });
+
+    if (!entry) return res.status(404).json({ error: 'Jurnal tidak ditemukan.' });
+    if (entry.status === 'Cancelled') return res.status(400).json({ error: 'Jurnal sudah dibatalkan.' });
+    if (entry.payment) return res.status(400).json({ error: 'Jurnal ini terkait pembayaran. Batalkan pembayaran terlebih dahulu.' });
+
+    await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      // Reverse account balances
+      await updateBalancesForItems(
+        tx,
+        entry.items.map((i) => ({
+          accountId: i.accountId,
+          debit: Number(i.credit),  // swap: old credit becomes debit
+          credit: Number(i.debit),  // swap: old debit becomes credit
+        }))
+      );
+
+      // Reverse party outstanding amounts
+      for (const item of entry.items) {
+        if (item.partyId) {
+          const isDebitNormal = item.account.rootType === 'ASSET' || item.account.rootType === 'EXPENSE';
+          const reverseImpact = isDebitNormal
+            ? Number(item.credit) - Number(item.debit)
+            : Number(item.debit) - Number(item.credit);
+          if (reverseImpact !== 0) {
+            await tx.party.update({
+              where: { id: item.partyId },
+              data: { outstandingAmount: { increment: reverseImpact } },
+            });
+          }
+        }
+      }
+
+      // Mark cancelled
+      await tx.journalEntry.update({
+        where: { id },
+        data: { status: 'Cancelled', cancelledAt: new Date() },
+      });
+
+      // Add reversal ledger entries
+      await tx.accountingLedgerEntry.createMany({
+        data: entry.items.map((item) => ({
+          date: new Date(),
+          accountId: item.accountId,
+          partyId: item.partyId,
+          debit: item.credit,   // reversed
+          credit: item.debit,   // reversed
+          referenceType: 'JournalEntry' as const,
+          referenceId: entry.id,
+          description: `[BATAL] ${item.description || entry.narration}`,
+          fiscalYearId: entry.fiscalYearId,
+        })),
+      });
+    }, { timeout: 15000 });
+
+    return res.json({ message: 'Jurnal berhasil dibatalkan.' });
+  } catch (error: any) {
+    return handleRouteError(res, error, 'PATCH /journals/:id/cancel', 'Gagal membatalkan jurnal.');
+  }
+});
+
 export default router;

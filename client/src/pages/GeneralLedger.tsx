@@ -1,14 +1,16 @@
 import { useState } from 'react';
 import {
-  Plus, Search, MoreHorizontal, Calendar as CalendarIcon,
-  Loader2, FileSpreadsheet, Upload
+  Plus, Search, Calendar as CalendarIcon,
+  Loader2, FileSpreadsheet, Upload, XCircle
 } from 'lucide-react';
 import { cn } from '../lib/utils';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../lib/api';
 import JournalEntryModal from '../components/JournalEntryModal';
 import ImportModal from '../components/ImportModal';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 import { formatRupiah, formatDate } from '../lib/formatters';
+import { toast } from 'sonner';
 
 export const GeneralLedger = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -16,6 +18,8 @@ export const GeneralLedger = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [cancelTarget, setCancelTarget] = useState<{ id: string; entryNumber: string } | null>(null);
+  const queryClient = useQueryClient();
 
   const setThisMonth = () => {
     const now = new Date();
@@ -40,6 +44,18 @@ export const GeneralLedger = () => {
       const response = await api.get(`/journals?${params.toString()}`);
       return response.data.data ?? response.data;
     }
+  });
+
+  const cancelMutation = useMutation({
+    mutationFn: (id: string) => api.patch(`/journals/${id}/cancel`),
+    onSuccess: () => {
+      toast.success('Jurnal berhasil dibatalkan.');
+      queryClient.invalidateQueries({ queryKey: ['journals'] });
+      queryClient.invalidateQueries({ queryKey: ['coa'] });
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.error || 'Gagal membatalkan jurnal.');
+    },
   });
 
   return (
@@ -121,9 +137,10 @@ export const GeneralLedger = () => {
               ).map((journal: any) => {
                 const totalDebit = journal.items.reduce((sum: number, item: any) => sum + Number(item.debit), 0);
                 const totalCredit = journal.items.reduce((sum: number, item: any) => sum + Number(item.credit), 0);
+                const isCancelled = journal.status === 'Cancelled';
 
                 return (
-                  <tr key={journal.id}>
+                  <tr key={journal.id} className={isCancelled ? 'opacity-50' : ''}>
                     <td className="text-gray-500 whitespace-nowrap">{formatDate(journal.date)}</td>
                     <td className="whitespace-nowrap">
                       <span className="font-mono text-xs text-gray-800 bg-gray-50 px-1.5 py-0.5 rounded">{journal.entryNumber}</span>
@@ -149,15 +166,21 @@ export const GeneralLedger = () => {
                     <td className="text-center">
                       <span className={cn(
                         'badge',
-                        journal.status === 'Submitted' ? 'badge-green' : 'badge-gray'
+                        isCancelled ? 'badge-red' : journal.status === 'Submitted' ? 'badge-green' : 'badge-gray'
                       )}>
-                        {journal.status === 'Submitted' ? 'Posted' : journal.status}
+                        {isCancelled ? 'Dibatalkan' : journal.status === 'Submitted' ? 'Posted' : journal.status}
                       </span>
                     </td>
                     <td>
-                      <button className="p-1.5 hover:bg-gray-100 rounded text-gray-400 hover:text-gray-600 transition-colors">
-                        <MoreHorizontal size={16} />
-                      </button>
+                      {!isCancelled && (
+                        <button
+                          onClick={() => setCancelTarget({ id: journal.id, entryNumber: journal.entryNumber })}
+                          className="p-1.5 hover:bg-red-50 rounded text-gray-400 hover:text-red-500 transition-colors"
+                          title="Batalkan"
+                        >
+                          <XCircle size={16} />
+                        </button>
+                      )}
                     </td>
                   </tr>
                 );
@@ -177,6 +200,21 @@ export const GeneralLedger = () => {
         isOpen={isImportOpen}
         onClose={() => setIsImportOpen(false)}
         importType="journals"
+      />
+
+      <ConfirmDialog
+        open={cancelTarget !== null}
+        onCancel={() => setCancelTarget(null)}
+        onConfirm={() => {
+          if (cancelTarget) {
+            cancelMutation.mutate(cancelTarget.id);
+            setCancelTarget(null);
+          }
+        }}
+        title="Batalkan Jurnal"
+        message={`Apakah Anda yakin ingin membatalkan jurnal ${cancelTarget?.entryNumber}? Saldo akun terkait akan dikembalikan. Tindakan ini tidak dapat dibatalkan.`}
+        confirmLabel="Ya, Batalkan"
+        variant="danger"
       />
     </div>
   );
