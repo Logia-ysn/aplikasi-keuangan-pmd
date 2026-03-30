@@ -7,6 +7,7 @@ import { CreateInventoryItemSchema, UpdateInventoryItemSchema, CreateStockMoveme
 import { BusinessError, handleRouteError } from '../utils/errors';
 import { generateDocumentNumber } from '../utils/documentNumber';
 import { updateAccountBalance } from '../utils/accountBalance';
+import { ACCOUNT_NUMBERS } from '../constants/accountNumbers';
 import { logger } from '../lib/logger';
 
 const router = Router();
@@ -230,9 +231,19 @@ router.post('/movements', roleMiddleware(['Admin', 'Accountant', 'StaffProduksi'
         data: { currentStock: { increment: stockDelta } },
       });
 
-      // 7. GL posting (only if item has accountId AND offsetAccountId provided and totalValue > 0)
+      // 7. GL posting (if offsetAccountId provided and totalValue > 0)
       let journalEntryId: string | null = null;
-      if (item.accountId && body.offsetAccountId && totalValue > 0) {
+      if (body.offsetAccountId && totalValue > 0) {
+        // Use item's accountId or fall back to default INVENTORY account (1.4.0)
+        let inventoryAccountId = item.accountId;
+        if (!inventoryAccountId) {
+          const defaultInvAccount = await tx.account.findFirst({
+            where: { accountNumber: ACCOUNT_NUMBERS.INVENTORY },
+          });
+          if (!defaultInvAccount) throw new BusinessError('Akun Persediaan default (1.4.0) tidak ditemukan.');
+          inventoryAccountId = defaultInvAccount.id;
+        }
+
         const userId = req.user!.userId;
         const typeLabels: Record<string, string> = {
           In: 'Stok Masuk',
@@ -242,7 +253,6 @@ router.post('/movements', roleMiddleware(['Admin', 'Accountant', 'StaffProduksi'
         };
 
         // Determine DR/CR
-        const inventoryAccountId = item.accountId;
         const offsetAccountId = body.offsetAccountId;
         let debitAccountId: string;
         let creditAccountId: string;

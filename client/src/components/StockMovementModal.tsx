@@ -60,9 +60,7 @@ export function StockMovementModal({ isOpen, onClose }: StockMovementModalProps)
   });
   const nonGroupAccounts = (coaData ?? []).filter((a: any) => !a.isGroup);
 
-  // Find selected item to check if it has accountId
   const selectedItem = items.find((i: any) => i.id === form.itemId);
-  const showOffsetAccount = Boolean(selectedItem?.accountId);
 
   const qty = Number(form.quantity) || 0;
   const unitCost = Number(form.unitCost) || 0;
@@ -74,6 +72,8 @@ export function StockMovementModal({ isOpen, onClose }: StockMovementModalProps)
       queryClient.invalidateQueries({ queryKey: ['stock-movements'] });
       queryClient.invalidateQueries({ queryKey: ['inventory-items'] });
       queryClient.invalidateQueries({ queryKey: ['inventory-items-active'] });
+      queryClient.invalidateQueries({ queryKey: ['coa'] });
+      queryClient.invalidateQueries({ queryKey: ['journals'] });
       toast.success('Gerakan stok berhasil dicatat.');
       onClose();
     },
@@ -238,28 +238,32 @@ export function StockMovementModal({ isOpen, onClose }: StockMovementModalProps)
               />
             </div>
 
-            {/* Akun Lawan — only show if selected item has accountId */}
-            {showOffsetAccount && (
-              <div>
-                <label htmlFor="mov-offset-account" className="block text-xs font-semibold text-gray-500 mb-1.5">
-                  Akun Lawan
-                  <span className="ml-1.5 text-[10px] font-normal text-blue-500">Diperlukan untuk posting GL</span>
-                </label>
-                <select
-                  id="mov-offset-account"
-                  value={form.offsetAccountId}
-                  onChange={e => setForm(f => ({ ...f, offsetAccountId: e.target.value }))}
-                  className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">— Tidak Dipilih —</option>
-                  {nonGroupAccounts.map((a: any) => (
-                    <option key={a.id} value={a.id}>
-                      {a.accountNumber} — {a.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
+            {/* Akun Lawan — wajib jika ada nilai untuk posting GL */}
+            <div>
+              <label htmlFor="mov-offset-account" className="block text-xs font-semibold text-gray-500 mb-1.5">
+                Akun Lawan {totalValue > 0 && <span className="text-red-500">*</span>}
+                <span className="ml-1.5 text-[10px] font-normal text-blue-500">Untuk posting ke COA</span>
+              </label>
+              <select
+                id="mov-offset-account"
+                required={totalValue > 0}
+                value={form.offsetAccountId}
+                onChange={e => setForm(f => ({ ...f, offsetAccountId: e.target.value }))}
+                className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">— Pilih Akun Lawan —</option>
+                {nonGroupAccounts.map((a: any) => (
+                  <option key={a.id} value={a.id}>
+                    {a.accountNumber} — {a.name}
+                  </option>
+                ))}
+              </select>
+              {totalValue > 0 && !form.offsetAccountId && (
+                <p className="text-[11px] text-amber-600 mt-1">
+                  Pilih akun lawan agar nilai stok tercatat di COA.
+                </p>
+              )}
+            </div>
 
             {/* Tipe Referensi */}
             <div>
