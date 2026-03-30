@@ -1,14 +1,28 @@
 import { useState, useMemo } from 'react';
-import { Search, Wallet, Loader2, CheckCircle2, DollarSign, AlertTriangle } from 'lucide-react';
+import { Search, Wallet, Loader2, CheckCircle2, DollarSign, AlertTriangle, XCircle } from 'lucide-react';
 import { cn } from '../lib/utils';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import api from '../lib/api';
 import { formatRupiah, formatDate } from '../lib/formatters';
 import CustomerDepositModal from '../components/CustomerDepositModal';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 
 export const CustomerDeposits = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [cancelId, setCancelId] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+
+  const cancelMutation = useMutation({
+    mutationFn: (id: string) => api.post(`/payments/${id}/cancel`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['customer-deposits'] });
+      queryClient.invalidateQueries({ queryKey: ['parties'] });
+      toast.success('Deposit berhasil dibatalkan.');
+    },
+    onError: (err: any) => toast.error(err.response?.data?.error || 'Gagal membatalkan deposit.'),
+  });
 
   const { data: deposits, isLoading } = useQuery({
     queryKey: ['customer-deposits'],
@@ -127,19 +141,20 @@ export const CustomerDeposits = () => {
                 <th scope="col" className="text-right">Digunakan</th>
                 <th scope="col" className="text-right">Sisa</th>
                 <th scope="col" className="text-center">Status</th>
+                <th scope="col" className="text-center w-20">Aksi</th>
               </tr>
             </thead>
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td colSpan={7} className="py-16 text-center text-gray-400">
+                  <td colSpan={8} className="py-16 text-center text-gray-400">
                     <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2 text-gray-300" />
                     Memuat data uang muka...
                   </td>
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-16 text-center">
+                  <td colSpan={8} className="py-16 text-center">
                     <Wallet className="w-10 h-10 text-gray-200 mx-auto mb-2" />
                     <p className="text-sm text-gray-400">Belum ada uang muka pelanggan.</p>
                     <button
@@ -185,6 +200,17 @@ export const CustomerDeposits = () => {
                            totalApplied > 0 ? 'Sebagian' : 'Aktif'}
                         </span>
                       </td>
+                      <td className="text-center">
+                        {!isCancelled && (
+                          <button
+                            onClick={() => setCancelId(dep.id)}
+                            className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors"
+                            title="Batalkan deposit"
+                          >
+                            <XCircle size={15} />
+                          </button>
+                        )}
+                      </td>
                     </tr>
                   );
                 })
@@ -197,6 +223,16 @@ export const CustomerDeposits = () => {
       <CustomerDepositModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
+      />
+
+      <ConfirmDialog
+        open={cancelId !== null}
+        title="Batalkan Deposit Pelanggan"
+        message="Yakin ingin membatalkan deposit ini? Saldo akan dikembalikan ke akun kas/bank asal. Deposit yang sudah dialokasikan ke invoice harus dibatalkan alokasinya terlebih dahulu."
+        confirmLabel="Batalkan Deposit"
+        variant="danger"
+        onConfirm={() => { if (cancelId) cancelMutation.mutate(cancelId); setCancelId(null); }}
+        onCancel={() => setCancelId(null)}
       />
     </div>
   );

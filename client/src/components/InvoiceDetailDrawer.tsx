@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { X, FileDown, Clock, CreditCard, Package, User, Calendar, AlertTriangle, CheckCircle2, Loader2, Wallet } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
+import { X, FileDown, Clock, CreditCard, Package, User, Calendar, AlertTriangle, CheckCircle2, Loader2, Wallet, XCircle, Pencil, Save } from 'lucide-react';
 import { cn } from '../lib/utils';
 import api from '../lib/api';
 import { formatRupiah, formatDate } from '../lib/formatters';
@@ -9,6 +10,7 @@ import InvoicePDF from '../lib/pdf/InvoicePDF';
 import { useCompanyPDF } from '../lib/pdf/useCompanyPDF';
 import ApplyDepositModal from './ApplyDepositModal';
 import ApplyCustomerDepositModal from './ApplyCustomerDepositModal';
+import { ConfirmDialog } from './ConfirmDialog';
 
 interface Props {
   type: 'sales' | 'purchase';
@@ -27,9 +29,16 @@ const statusConfig: Record<string, { label: string; badge: string; icon: React.R
 
 const InvoiceDetailDrawer: React.FC<Props> = ({ type, invoiceId, onClose }) => {
   const company = useCompanyPDF();
+  const queryClient = useQueryClient();
   const isSales = type === 'sales';
   const [isApplyDepositOpen, setIsApplyDepositOpen] = useState(false);
   const [isApplyCustomerDepositOpen, setIsApplyCustomerDepositOpen] = useState(false);
+  const [confirmCancel, setConfirmCancel] = useState(false);
+  const [cancelDepositAppId, setCancelDepositAppId] = useState<string | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editNotes, setEditNotes] = useState('');
+  const [editDueDate, setEditDueDate] = useState('');
+  const [editTerms, setEditTerms] = useState('');
   const endpoint = isSales ? '/sales/invoices' : '/purchase/invoices';
 
   const { data: invoice, isLoading } = useQuery({
@@ -39,6 +48,44 @@ const InvoiceDetailDrawer: React.FC<Props> = ({ type, invoiceId, onClose }) => {
       return res.data;
     },
     enabled: !!invoiceId,
+  });
+
+  const cancelMutation = useMutation({
+    mutationFn: () => api.post(`${endpoint}/${invoiceId}/cancel`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [isSales ? 'sales-invoices' : 'purchase-invoices'] });
+      queryClient.invalidateQueries({ queryKey: [isSales ? 'sales-invoice-detail' : 'purchase-invoice-detail', invoiceId] });
+      queryClient.invalidateQueries({ queryKey: ['parties'] });
+      toast.success('Invoice berhasil dibatalkan.');
+    },
+    onError: (err: any) => toast.error(err.response?.data?.error || 'Gagal membatalkan invoice.'),
+  });
+
+  const cancelDepositAppMutation = useMutation({
+    mutationFn: (appId: string) => {
+      const cancelEndpoint = isSales ? '/customer-deposits/apply' : '/vendor-deposits/apply';
+      return api.post(`${cancelEndpoint}/${appId}/cancel`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [isSales ? 'sales-invoice-detail' : 'purchase-invoice-detail', invoiceId] });
+      queryClient.invalidateQueries({ queryKey: [isSales ? 'sales-invoices' : 'purchase-invoices'] });
+      queryClient.invalidateQueries({ queryKey: [isSales ? 'customer-deposits' : 'vendor-deposits'] });
+      queryClient.invalidateQueries({ queryKey: ['parties'] });
+      toast.success('Alokasi uang muka berhasil dibatalkan.');
+    },
+    onError: (err: any) => toast.error(err.response?.data?.error || 'Gagal membatalkan alokasi uang muka.'),
+  });
+
+  const editMutation = useMutation({
+    mutationFn: (data: { notes?: string; dueDate?: string; terms?: string }) =>
+      api.put(`${endpoint}/${invoiceId}`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [isSales ? 'sales-invoice-detail' : 'purchase-invoice-detail', invoiceId] });
+      queryClient.invalidateQueries({ queryKey: [isSales ? 'sales-invoices' : 'purchase-invoices'] });
+      toast.success('Invoice berhasil diperbarui.');
+      setIsEditing(false);
+    },
+    onError: (err: any) => toast.error(err.response?.data?.error || 'Gagal memperbarui invoice.'),
   });
 
   if (!invoiceId) return null;
@@ -62,6 +109,23 @@ const InvoiceDetailDrawer: React.FC<Props> = ({ type, invoiceId, onClose }) => {
   const sc = statusConfig[invoice?.status] ?? statusConfig.Draft;
 
   const isOverdue = invoice?.dueDate && new Date(invoice.dueDate) < new Date() && outstanding > 0;
+  const canCancel = invoice && invoice.status !== 'Cancelled' && invoice.status !== 'Paid';
+  const canEdit = invoice && invoice.status !== 'Cancelled';
+
+  const startEditing = () => {
+    setEditNotes(invoice?.notes ?? '');
+    setEditDueDate(invoice?.dueDate ? new Date(invoice.dueDate).toISOString().split('T')[0] : '');
+    setEditTerms(invoice?.terms ?? '');
+    setIsEditing(true);
+  };
+
+  const saveEdit = () => {
+    editMutation.mutate({
+      notes: editNotes,
+      dueDate: editDueDate || undefined,
+      terms: editTerms || undefined,
+    });
+  };
 
   return (
     <>
@@ -86,7 +150,25 @@ const InvoiceDetailDrawer: React.FC<Props> = ({ type, invoiceId, onClose }) => {
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
+            {canEdit && !isEditing && (
+              <button
+                onClick={startEditing}
+                className="p-1.5 rounded-lg hover:bg-blue-50 text-gray-400 hover:text-blue-600 transition-colors"
+                title="Edit invoice"
+              >
+                <Pencil size={16} />
+              </button>
+            )}
+            {canCancel && (
+              <button
+                onClick={() => setConfirmCancel(true)}
+                className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors"
+                title="Batalkan invoice"
+              >
+                <XCircle size={16} />
+              </button>
+            )}
             {invoice && (
               <PDFDownloadButton
                 variant="button"
@@ -199,28 +281,52 @@ const InvoiceDetailDrawer: React.FC<Props> = ({ type, invoiceId, onClose }) => {
                   <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-1">
                     <Calendar size={10} /> Informasi Invoice
                   </p>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <p className="text-[10px] text-gray-400">Tanggal</p>
-                      <p className="text-xs font-medium text-gray-800">{formatDate(invoice.date)}</p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] text-gray-400">Jatuh Tempo</p>
-                      <p className={cn('text-xs font-medium', isOverdue ? 'text-red-500' : 'text-gray-800')}>
-                        {invoice.dueDate ? formatDate(invoice.dueDate) : '—'}
-                      </p>
-                    </div>
-                    {invoice.terms && (
+                  {isEditing ? (
+                    <div className="space-y-3">
                       <div>
-                        <p className="text-[10px] text-gray-400">Termin</p>
-                        <p className="text-xs font-medium text-gray-800">{invoice.terms}</p>
+                        <label className="text-[10px] text-gray-400">Jatuh Tempo</label>
+                        <input
+                          type="date"
+                          value={editDueDate}
+                          onChange={(e) => setEditDueDate(e.target.value)}
+                          className="w-full px-2 py-1.5 text-xs rounded border border-gray-200 focus:ring-2 focus:ring-blue-400 outline-none"
+                        />
                       </div>
-                    )}
-                    <div>
-                      <p className="text-[10px] text-gray-400">Dibuat oleh</p>
-                      <p className="text-xs font-medium text-gray-800">{invoice.user?.fullName ?? '—'}</p>
+                      <div>
+                        <label className="text-[10px] text-gray-400">Termin</label>
+                        <input
+                          type="text"
+                          value={editTerms}
+                          onChange={(e) => setEditTerms(e.target.value)}
+                          placeholder="Net 30"
+                          className="w-full px-2 py-1.5 text-xs rounded border border-gray-200 focus:ring-2 focus:ring-blue-400 outline-none"
+                        />
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <p className="text-[10px] text-gray-400">Tanggal</p>
+                        <p className="text-xs font-medium text-gray-800">{formatDate(invoice.date)}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-gray-400">Jatuh Tempo</p>
+                        <p className={cn('text-xs font-medium', isOverdue ? 'text-red-500' : 'text-gray-800')}>
+                          {invoice.dueDate ? formatDate(invoice.dueDate) : '—'}
+                        </p>
+                      </div>
+                      {invoice.terms && (
+                        <div>
+                          <p className="text-[10px] text-gray-400">Termin</p>
+                          <p className="text-xs font-medium text-gray-800">{invoice.terms}</p>
+                        </div>
+                      )}
+                      <div>
+                        <p className="text-[10px] text-gray-400">Dibuat oleh</p>
+                        <p className="text-xs font-medium text-gray-800">{invoice.user?.fullName ?? '—'}</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -346,20 +452,36 @@ const InvoiceDetailDrawer: React.FC<Props> = ({ type, invoiceId, onClose }) => {
                     {depositApplications.map((app: any) => (
                       <div key={app.id} className={cn(
                         'flex items-center justify-between p-3 rounded-lg',
-                        isSales ? 'bg-teal-50/50 border border-teal-100' : 'bg-amber-50/50 border border-amber-100'
+                        app.isCancelled
+                          ? 'bg-gray-50 border border-gray-200 opacity-50'
+                          : isSales ? 'bg-teal-50/50 border border-teal-100' : 'bg-amber-50/50 border border-amber-100'
                       )}>
                         <div className="flex items-center gap-3">
-                          <div className={cn('p-1.5 rounded', isSales ? 'bg-teal-100' : 'bg-amber-100')}>
-                            <Wallet size={13} className={isSales ? 'text-teal-600' : 'text-amber-600'} />
+                          <div className={cn('p-1.5 rounded', app.isCancelled ? 'bg-gray-100' : isSales ? 'bg-teal-100' : 'bg-amber-100')}>
+                            <Wallet size={13} className={app.isCancelled ? 'text-gray-400' : isSales ? 'text-teal-600' : 'text-amber-600'} />
                           </div>
                           <div>
-                            <p className="text-xs font-medium text-gray-800">{app.depositPayment?.paymentNumber}</p>
+                            <p className="text-xs font-medium text-gray-800">
+                              {app.depositPayment?.paymentNumber}
+                              {app.isCancelled && <span className="ml-1.5 text-[10px] text-red-400">(Dibatalkan)</span>}
+                            </p>
                             <p className="text-[10px] text-gray-400">{formatDate(app.appliedAt ?? app.depositPayment?.date)}</p>
                           </div>
                         </div>
-                        <span className={cn('font-mono text-sm font-semibold', isSales ? 'text-teal-600' : 'text-amber-600')}>
-                          {formatRupiah(Number(app.appliedAmount))}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className={cn('font-mono text-sm font-semibold', app.isCancelled ? 'text-gray-400 line-through' : isSales ? 'text-teal-600' : 'text-amber-600')}>
+                            {formatRupiah(Number(app.appliedAmount))}
+                          </span>
+                          {!app.isCancelled && invoice.status !== 'Cancelled' && (
+                            <button
+                              onClick={() => setCancelDepositAppId(app.id)}
+                              className="p-1 rounded hover:bg-red-50 text-gray-300 hover:text-red-500 transition-colors"
+                              title="Batalkan alokasi uang muka"
+                            >
+                              <XCircle size={14} />
+                            </button>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -384,16 +506,66 @@ const InvoiceDetailDrawer: React.FC<Props> = ({ type, invoiceId, onClose }) => {
               )}
 
               {/* Notes */}
-              {invoice.notes && (
-                <div className="px-6 py-4">
-                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-2">Catatan</p>
-                  <p className="text-sm text-gray-600 whitespace-pre-wrap">{invoice.notes}</p>
-                </div>
-              )}
+              <div className="px-6 py-4">
+                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-2">Catatan</p>
+                {isEditing ? (
+                  <div className="space-y-3">
+                    <textarea
+                      value={editNotes}
+                      onChange={(e) => setEditNotes(e.target.value)}
+                      rows={3}
+                      placeholder="Catatan invoice..."
+                      className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 focus:ring-2 focus:ring-blue-400 outline-none resize-none"
+                    />
+                    <div className="flex justify-end gap-2">
+                      <button
+                        onClick={() => setIsEditing(false)}
+                        className="px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                      >
+                        Batal
+                      </button>
+                      <button
+                        onClick={saveEdit}
+                        disabled={editMutation.isPending}
+                        className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors disabled:opacity-50"
+                      >
+                        {editMutation.isPending ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
+                        Simpan
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-600 whitespace-pre-wrap">
+                    {invoice.notes || <span className="text-gray-300 italic">Tidak ada catatan</span>}
+                  </p>
+                )}
+              </div>
             </>
           )}
         </div>
       </div>
+
+      {/* Cancel Invoice Confirm */}
+      <ConfirmDialog
+        open={confirmCancel}
+        title="Batalkan Invoice"
+        message="Yakin ingin membatalkan invoice ini? Semua jurnal GL, stok, dan saldo akan di-reverse. Invoice yang sudah ada pembayaran atau alokasi uang muka harus dibatalkan terlebih dahulu."
+        confirmLabel="Batalkan Invoice"
+        variant="danger"
+        onConfirm={() => { cancelMutation.mutate(); setConfirmCancel(false); }}
+        onCancel={() => setConfirmCancel(false)}
+      />
+
+      {/* Cancel Deposit Application Confirm */}
+      <ConfirmDialog
+        open={cancelDepositAppId !== null}
+        title="Batalkan Alokasi Uang Muka"
+        message="Yakin ingin membatalkan alokasi uang muka ini? Saldo deposit akan dikembalikan dan outstanding invoice akan bertambah kembali."
+        confirmLabel="Batalkan Alokasi"
+        variant="danger"
+        onConfirm={() => { if (cancelDepositAppId) cancelDepositAppMutation.mutate(cancelDepositAppId); setCancelDepositAppId(null); }}
+        onCancel={() => setCancelDepositAppId(null)}
+      />
 
       {/* Apply Deposit Modal (Purchase) */}
       {!isSales && invoice && (

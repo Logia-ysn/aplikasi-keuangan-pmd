@@ -290,6 +290,25 @@ router.post('/', roleMiddleware(['Admin', 'Accountant', 'StaffProduksi']), async
   }
 });
 
+// PUT /api/purchase/invoices/:id — edit invoice (notes, dueDate)
+router.put('/:id', roleMiddleware(['Admin', 'Accountant']), async (req: AuthRequest, res) => {
+  try {
+    const invoice = await prisma.purchaseInvoice.findUnique({ where: { id: req.params.id as string } });
+    if (!invoice) return res.status(404).json({ error: 'Invoice tidak ditemukan.' });
+    if (invoice.status === 'Cancelled') return res.status(400).json({ error: 'Invoice sudah dibatalkan, tidak bisa diedit.' });
+
+    const { notes, dueDate } = req.body;
+    const data: Prisma.PurchaseInvoiceUpdateInput = {};
+    if (notes !== undefined) data.notes = notes;
+    if (dueDate !== undefined) data.dueDate = dueDate ? new Date(dueDate) : null;
+
+    const updated = await prisma.purchaseInvoice.update({ where: { id: invoice.id }, data });
+    return res.json(updated);
+  } catch (error: any) {
+    return handleRouteError(res, error, 'PUT /purchase/invoices/:id', 'Gagal memperbarui invoice.');
+  }
+});
+
 // POST /api/purchase/invoices/:id/cancel — cancel purchase invoice
 router.post('/:id/cancel', roleMiddleware(['Admin']), async (req: AuthRequest, res) => {
   try {
