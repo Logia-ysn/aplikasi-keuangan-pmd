@@ -191,4 +191,88 @@ router.post('/:id/close', roleMiddleware(['Admin']), async (req: AuthRequest, re
   }
 });
 
+// POST /api/fiscal-years/:id/reopen — reopen a closed fiscal year (Admin only)
+router.post('/:id/reopen', roleMiddleware(['Admin']), async (req: AuthRequest, res) => {
+  const fyId = req.params.id as string;
+
+  try {
+    const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      const year = await tx.fiscalYear.findUnique({ where: { id: fyId } });
+      if (!year) throw new BusinessError('Tahun buku tidak ditemukan.');
+      if (!year.isClosed) throw new BusinessError('Tahun buku belum ditutup.');
+
+      // 1. Find and reverse the closing journal entry (CLOSE-{name})
+      const closeEntryNumber = `CLOSE-${year.name}`;
+      const closeEntry = await tx.journalEntry.findFirst({
+        where: { entryNumber: closeEntryNumber, fiscalYearId: fyId },
+        include: { items: true },
+      });
+
+      if (closeEntry) {
+        // Reverse GL ledger entries created by the closing
+        const closeLedgerEntries = await tx.accountingLedgerEntry.findMany({
+          where: { referenceType: 'JournalEntry', referenceId: closeEntry.id, fiscalYearId: fyId },
+        });
+
+        for (const entry of closeLedgerEntries) {
+          // Reverse the balance impact
+          await updateAccountBalance(tx, entry.accountId, Number(entry.credit), Number(entry.debit));
+        }
+
+        // Delete the closing ledger entries
+        await tx.accountingLedgerEntry.deleteMany({
+          where: { referenceType: 'JournalEntry', referenceId: closeEntry.id, fiscalYearId: fyId },
+        });
+
+        // Delete the closing journal entry (items cascade via onDelete: Cascade)
+        await tx.journalEntry.delete({ where: { id: closeEntry.id } });
+      }
+
+      // 2. Restore Revenue/Expense account balances
+      const fyAccountSums = await tx.accountingLedgerEntry.groupBy({
+        by: ['accountId'],
+        where: {
+          fiscalYearId: fyId,
+          isCancelled: false,
+          account: { OR: [{ rootType: 'REVENUE' as any }, { rootType: 'EXPENSE' as any }] },
+        },
+        _sum: { debit: true, credit: true },
+      });
+
+      const fyAccounts = await tx.account.findMany({
+        where: { id: { in: fyAccountSums.map((e) => e.accountId) } },
+        select: { id: true, rootType: true },
+      });
+      const fyAccountMap = new Map(fyAccounts.map((a) => [a.id, a]));
+
+      for (const entry of fyAccountSums) {
+        const acct = fyAccountMap.get(entry.accountId);
+        if (!acct) continue;
+        const debit = Number(entry._sum.debit || 0);
+        const credit = Number(entry._sum.credit || 0);
+        // Re-add the impact that was decremented during closing
+        const impact = acct.rootType === 'ASSET' || acct.rootType === 'EXPENSE'
+          ? debit - credit
+          : credit - debit;
+        if (impact !== 0) {
+          await tx.account.update({
+            where: { id: entry.accountId },
+            data: { balance: { increment: impact } },
+          });
+        }
+      }
+
+      // 3. Mark fiscal year as open
+      return tx.fiscalYear.update({
+        where: { id: fyId },
+        data: { isClosed: false, closedAt: null, closedBy: null },
+      });
+    }, { timeout: 30000 });
+
+    return res.json(result);
+  } catch (error: any) {
+    return handleRouteError(res, error, 'POST /fiscal-years/:id/reopen', 'Gagal membuka kembali tahun buku.');
+  }
+});
+
 export default router;

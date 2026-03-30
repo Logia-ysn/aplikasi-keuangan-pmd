@@ -32,6 +32,7 @@ const FiscalYearsTab: React.FC = () => {
   const [newStart, setNewStart] = useState('');
   const [newEnd, setNewEnd] = useState('');
   const [confirmClose, setConfirmClose] = useState<string | null>(null);
+  const [confirmReopen, setConfirmReopen] = useState<string | null>(null);
 
   const { data: years, isLoading } = useQuery<FiscalYear[]>({
     queryKey: ['fiscal-years'],
@@ -55,6 +56,15 @@ const FiscalYearsTab: React.FC = () => {
       toast.success('Tahun buku berhasil ditutup.');
     },
     onError: (error: any) => toast.error(error.response?.data?.error || 'Gagal menutup tahun buku.')
+  });
+
+  const reopenMutation = useMutation({
+    mutationFn: async (id: string) => api.post(`/fiscal-years/${id}/reopen`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['fiscal-years'] });
+      toast.success('Tahun buku berhasil dibuka kembali.');
+    },
+    onError: (error: any) => toast.error(error.response?.data?.error || 'Gagal membuka tahun buku.')
   });
 
   return (
@@ -106,7 +116,7 @@ const FiscalYearsTab: React.FC = () => {
                 </div>
               )}
 
-              <div className="mt-4">
+              <div className="mt-4 flex gap-2">
                 {!year.isClosed ? (
                   <button
                     onClick={() => setConfirmClose(year.id)}
@@ -116,7 +126,13 @@ const FiscalYearsTab: React.FC = () => {
                     <Lock size={13} /> Tutup Buku
                   </button>
                 ) : (
-                  <p className="text-center text-xs text-gray-400 py-2">Periode dikunci</p>
+                  <button
+                    onClick={() => setConfirmReopen(year.id)}
+                    disabled={reopenMutation.isPending}
+                    className="w-full btn-secondary justify-center text-xs py-2 disabled:opacity-50"
+                  >
+                    <Unlock size={13} /> Buka Kembali
+                  </button>
                 )}
               </div>
             </div>
@@ -128,11 +144,22 @@ const FiscalYearsTab: React.FC = () => {
       <ConfirmDialog
         open={confirmClose !== null}
         title="Tutup Tahun Buku"
-        message="Yakin ingin menutup tahun buku ini? Proses ini tidak dapat dibatalkan."
+        message="Yakin ingin menutup tahun buku ini? Jurnal penutup akan dibuat dan saldo revenue/expense akan direset."
         confirmLabel="Tutup Buku"
         variant="danger"
         onConfirm={() => { if (confirmClose) closeMutation.mutate(confirmClose); setConfirmClose(null); }}
         onCancel={() => setConfirmClose(null)}
+      />
+
+      {/* Confirm reopen dialog */}
+      <ConfirmDialog
+        open={confirmReopen !== null}
+        title="Buka Kembali Tahun Buku"
+        message="Yakin ingin membuka kembali tahun buku ini? Jurnal penutup akan dihapus dan saldo revenue/expense akan dipulihkan."
+        confirmLabel="Buka Kembali"
+        variant="danger"
+        onConfirm={() => { if (confirmReopen) reopenMutation.mutate(confirmReopen); setConfirmReopen(null); }}
+        onCancel={() => setConfirmReopen(null)}
       />
 
       {/* New fiscal year modal */}
