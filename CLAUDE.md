@@ -53,6 +53,7 @@ Akun-akun berikut digunakan untuk auto GL posting. Defined in `server/src/consta
 | 4.1 | Penjualan | Auto-credit on sales revenue |
 | 4.2 | Pendapatan Jasa | Service revenue |
 | 5 | Beban Pokok Penjualan | COGS |
+| 3.1 | Ekuitas Saldo Awal | Opening balance contra account (import/setup) |
 | 3.2 | Laba Ditahan | Retained earnings (year-end closing) |
 | 3.4 | Laba Tahun Berjalan | Computed current year profit |
 

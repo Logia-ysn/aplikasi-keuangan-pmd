@@ -8,6 +8,7 @@ export const ACCOUNT_NUMBERS = {
   VENDOR_DEPOSIT: '1.3',
   CUSTOMER_DEPOSIT: '2.1.2',
   COGS: '5',
+  OPENING_EQUITY: '3.1',
   RETAINED_EARNINGS: '3.2',
   CURRENT_PROFIT: '3.4',
 } as const;

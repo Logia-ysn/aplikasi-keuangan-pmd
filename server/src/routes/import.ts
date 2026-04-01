@@ -201,9 +201,9 @@ router.post(
             const apAccount = await prisma.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.AP } });
             const vendorDepositAccount = await prisma.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.VENDOR_DEPOSIT } });
             const customerDepositAccount = await prisma.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.CUSTOMER_DEPOSIT } });
-            const retainedAccount = await prisma.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.RETAINED_EARNINGS } });
+            const openingEquityAccount = await prisma.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.OPENING_EQUITY } });
 
-            if (retainedAccount) {
+            if (openingEquityAccount) {
               const now = new Date();
               const fiscalYear = await getOpenFiscalYear(prisma as any, now);
 
@@ -226,10 +226,10 @@ router.post(
                           create: isCustomer
                             ? [
                                 { accountId: receivableAccount.id, partyId: party.id, debit: openingBalance, credit: 0, description: `Saldo awal piutang: ${row.name}` },
-                                { accountId: retainedAccount.id, debit: 0, credit: openingBalance, description: `Saldo awal piutang: ${row.name}` },
+                                { accountId: openingEquityAccount.id, debit: 0, credit: openingBalance, description: `Saldo awal piutang: ${row.name}` },
                               ]
                             : [
-                                { accountId: retainedAccount.id, debit: openingBalance, credit: 0, description: `Saldo awal hutang: ${row.name}` },
+                                { accountId: openingEquityAccount.id, debit: openingBalance, credit: 0, description: `Saldo awal hutang: ${row.name}` },
                                 { accountId: receivableAccount.id, partyId: party.id, debit: 0, credit: openingBalance, description: `Saldo awal hutang: ${row.name}` },
                               ],
                         },
@@ -265,7 +265,7 @@ router.post(
                   const payNumber = await generateDocumentNumber(tx, 'PAY', now, fiscalYear.id);
                   const jvNumber = await generateDocumentNumber(tx, 'JV', now, fiscalYear.id);
 
-                  // GL journal: DR Uang Muka Pembelian (1.3) / CR Laba Ditahan
+                  // GL journal: DR Uang Muka Pembelian (1.3) / CR Ekuitas Saldo Awal
                   const journal = await tx.journalEntry.create({
                     data: {
                       entryNumber: jvNumber,
@@ -278,7 +278,7 @@ router.post(
                       items: {
                         create: [
                           { accountId: vendorDepositAccount.id, partyId: party.id, debit: depositBalance, credit: 0, description: `Saldo awal uang muka vendor: ${row.name}` },
-                          { accountId: retainedAccount.id, debit: 0, credit: depositBalance, description: `Saldo awal uang muka vendor: ${row.name}` },
+                          { accountId: openingEquityAccount.id, debit: 0, credit: depositBalance, description: `Saldo awal uang muka vendor: ${row.name}` },
                         ],
                       },
                     },
@@ -330,7 +330,7 @@ router.post(
                   const payNumber = await generateDocumentNumber(tx, 'PAY', now, fiscalYear.id);
                   const jvNumber = await generateDocumentNumber(tx, 'JV', now, fiscalYear.id);
 
-                  // GL journal: DR Laba Ditahan / CR Uang Muka Pelanggan (2.1.2)
+                  // GL journal: DR Ekuitas Saldo Awal / CR Uang Muka Pelanggan (2.1.2)
                   const journal = await tx.journalEntry.create({
                     data: {
                       entryNumber: jvNumber,
@@ -342,7 +342,7 @@ router.post(
                       submittedAt: now,
                       items: {
                         create: [
-                          { accountId: retainedAccount.id, debit: customerDepositBalance, credit: 0, description: `Saldo awal uang muka pelanggan: ${row.name}` },
+                          { accountId: openingEquityAccount.id, debit: customerDepositBalance, credit: 0, description: `Saldo awal uang muka pelanggan: ${row.name}` },
                           { accountId: customerDepositAccount.id, partyId: party.id, debit: 0, credit: customerDepositBalance, description: `Saldo awal uang muka pelanggan: ${row.name}` },
                         ],
                       },
@@ -537,8 +537,8 @@ router.post(
 
           // Create opening balance GL journal for non-group accounts with balance
           if (row.openingBalance !== 0 && !row.isGroup) {
-            const retainedAccount = await prisma.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.RETAINED_EARNINGS } });
-            if (retainedAccount && account.id !== retainedAccount.id) {
+            const openingEquity = await prisma.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.OPENING_EQUITY } });
+            if (openingEquity && account.id !== openingEquity.id) {
               const now = new Date();
               const fiscalYear = await getOpenFiscalYear(prisma as any, now);
               const jvNumber = await generateDocumentNumber(prisma as any, 'JV', now, fiscalYear.id);
@@ -566,7 +566,7 @@ router.post(
                     items: {
                       create: [
                         { accountId: account.id, debit: accountDebit, credit: accountCredit, description: `Saldo awal: ${row.accountNumber} - ${row.name}` },
-                        { accountId: retainedAccount.id, debit: accountCredit, credit: accountDebit, description: `Saldo awal: ${row.accountNumber} - ${row.name}` },
+                        { accountId: openingEquity.id, debit: accountCredit, credit: accountDebit, description: `Saldo awal: ${row.accountNumber} - ${row.name}` },
                       ],
                     },
                   },
@@ -881,13 +881,13 @@ router.post(
                 },
               });
 
-              // GL: DR Inventory / CR Retained Earnings
+              // GL: DR Inventory / CR Ekuitas Saldo Awal
               const invAccount = item.accountId
                 ? await tx.account.findUnique({ where: { id: item.accountId } })
                 : await tx.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.INVENTORY } });
-              const retainedAccount = await tx.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.RETAINED_EARNINGS } });
+              const openingEquity = await tx.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.OPENING_EQUITY } });
 
-              if (invAccount && retainedAccount) {
+              if (invAccount && openingEquity) {
                 const jvNumber = await generateDocumentNumber(tx, 'JV', now, fiscalYear.id);
                 const journal = await tx.journalEntry.create({
                   data: {
@@ -901,7 +901,7 @@ router.post(
                     items: {
                       create: [
                         { accountId: invAccount.id, debit: totalValue, credit: 0, description: `Saldo awal stok: ${row.code}` },
-                        { accountId: retainedAccount.id, debit: 0, credit: totalValue, description: `Saldo awal stok: ${row.code}` },
+                        { accountId: openingEquity.id, debit: 0, credit: totalValue, description: `Saldo awal stok: ${row.code}` },
                       ],
                     },
                   },

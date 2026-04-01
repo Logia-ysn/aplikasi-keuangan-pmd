@@ -138,11 +138,11 @@ router.patch('/:id/balance', roleMiddleware(['Admin']), async (req: AuthRequest,
 
       if (Math.abs(delta) < 0.01) return account; // No change
 
-      // Counter-entry to Retained Earnings
+      // Counter-entry to Opening Equity
       const equityAccount = await tx.account.findFirst({
-        where: { accountNumber: ACCOUNT_NUMBERS.RETAINED_EARNINGS },
+        where: { accountNumber: ACCOUNT_NUMBERS.OPENING_EQUITY },
       });
-      if (!equityAccount) throw new BusinessError('Akun Saldo Laba Ditahan (3.2.1) tidak ditemukan.');
+      if (!equityAccount) throw new BusinessError('Akun Ekuitas Saldo Awal (3.1) tidak ditemukan.');
 
       const now = new Date();
       const fiscalYear = await getOpenFiscalYear(tx, now);

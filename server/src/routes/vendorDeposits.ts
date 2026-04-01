@@ -149,12 +149,12 @@ router.patch('/:id/cancel', roleMiddleware(['Admin', 'Accountant']), async (req:
       } else {
         // No linked journal (legacy imports) — reverse account balances directly
         const vendorDepositAccount = await tx.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.VENDOR_DEPOSIT } });
-        const retainedAccount = await tx.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.RETAINED_EARNINGS } });
+        const openingEquityAccount = await tx.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.OPENING_EQUITY } });
 
-        if (vendorDepositAccount && retainedAccount) {
-          // Reverse: CR Vendor Deposit / DR Retained Earnings
+        if (vendorDepositAccount && openingEquityAccount) {
+          // Reverse: CR Vendor Deposit / DR Ekuitas Saldo Awal
           await updateAccountBalance(tx, vendorDepositAccount.id, 0, depositAmount);
-          await updateAccountBalance(tx, retainedAccount.id, depositAmount, 0);
+          await updateAccountBalance(tx, openingEquityAccount.id, depositAmount, 0);
 
           // Create reversal journal
           const jvNumber = await generateDocumentNumber(tx, 'JV', new Date(), deposit.fiscalYearId);
@@ -169,7 +169,7 @@ router.patch('/:id/cancel', roleMiddleware(['Admin', 'Accountant']), async (req:
               submittedAt: new Date(),
               items: {
                 create: [
-                  { accountId: retainedAccount.id, partyId: deposit.partyId, debit: depositAmount, credit: 0, description: `[BATAL] UM Vendor: ${deposit.paymentNumber}` },
+                  { accountId: openingEquityAccount.id, partyId: deposit.partyId, debit: depositAmount, credit: 0, description: `[BATAL] UM Vendor: ${deposit.paymentNumber}` },
                   { accountId: vendorDepositAccount.id, partyId: deposit.partyId, debit: 0, credit: depositAmount, description: `[BATAL] UM Vendor: ${deposit.paymentNumber}` },
                 ],
               },
