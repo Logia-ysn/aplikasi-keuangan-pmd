@@ -14,12 +14,13 @@ interface InvoiceItem {
   unit: string;
   rate: number;
   discount: number; // percent
+  taxPct: number;   // PPN % per item
 }
 
 const UNITS = ['Kg', 'Ton', 'Sak', 'Liter', 'Pcs', 'Box', 'Unit', 'Set', 'Meter', 'Jasa'];
 
 const defaultItem = (): InvoiceItem => ({
-  id: crypto.randomUUID(), itemName: '', inventoryItemId: '', description: '', quantity: 1, unit: 'Kg', rate: 0, discount: 0
+  id: crypto.randomUUID(), itemName: '', inventoryItemId: '', description: '', quantity: 1, unit: 'Kg', rate: 0, discount: 0, taxPct: 11
 });
 
 const PurchaseInvoiceModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, onClose }) => {
@@ -27,7 +28,6 @@ const PurchaseInvoiceModal: React.FC<{ isOpen: boolean; onClose: () => void }> =
   const [dueDate, setDueDate] = useState(() => new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0]);
   const [partyId, setPartyId] = useState('');
   const [notes, setNotes] = useState('');
-  const [taxPct, setTaxPct] = useState(0);
   const [potongan, setPotongan] = useState(0);
   const [biayaLain, setBiayaLain] = useState(0);
   const [items, setItems] = useState<InvoiceItem[]>([defaultItem()]);
@@ -67,7 +67,6 @@ const PurchaseInvoiceModal: React.FC<{ isOpen: boolean; onClose: () => void }> =
       setDueDate(new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0]);
       setPartyId('');
       setNotes('');
-      setTaxPct(0);
       setPotongan(0);
       setBiayaLain(0);
       setItems([defaultItem()]);
@@ -99,8 +98,9 @@ const PurchaseInvoiceModal: React.FC<{ isOpen: boolean; onClose: () => void }> =
     const base = item.quantity * item.rate;
     return base - (base * (item.discount / 100));
   };
+  const lineTax = (item: InvoiceItem) => lineTotal(item) * (item.taxPct / 100);
   const subtotal = items.reduce((s, it) => s + lineTotal(it), 0);
-  const taxAmount = subtotal * (taxPct / 100);
+  const taxAmount = items.reduce((s, it) => s + lineTax(it), 0);
   const grandTotal = subtotal + taxAmount - potongan + biayaLain;
   const canSubmit = partyId && items.some(i => i.itemName && i.rate > 0) && grandTotal > 0 && !mutation.isPending;
 
@@ -162,18 +162,7 @@ const PurchaseInvoiceModal: React.FC<{ isOpen: boolean; onClose: () => void }> =
                   className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
               <div className="col-span-2">
-                <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">PPN (%)</label>
-                <div className="relative max-w-[50%]">
-                  <input
-                    type="number"
-                    value={taxPct === 0 ? '' : taxPct}
-                    onChange={e => setTaxPct(Math.max(0, Math.min(100, Number(e.target.value))))}
-                    placeholder="0"
-                    min={0} max={100}
-                    className="w-full border border-gray-200 rounded-lg py-2 pl-3 pr-8 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                  />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 font-medium">%</span>
-                </div>
+                <p className="text-xs text-gray-400 mt-1">PPN diatur per baris item</p>
               </div>
             </div>
           </div>
@@ -196,7 +185,8 @@ const PurchaseInvoiceModal: React.FC<{ isOpen: boolean; onClose: () => void }> =
                     <th className="text-center px-3 py-3 w-20">Qty</th>
                     <th className="text-left px-3 py-3 w-24">Satuan</th>
                     <th className="text-right px-3 py-3 w-36">Harga Satuan</th>
-                    <th className="text-right px-3 py-3 w-24">Diskon %</th>
+                    <th className="text-right px-3 py-3 w-20">Diskon %</th>
+                    <th className="text-right px-3 py-3 w-20">PPN %</th>
                     <th className="text-right px-4 py-3 w-36">Jumlah</th>
                     <th className="w-8"></th>
                   </tr>
@@ -268,6 +258,16 @@ const PurchaseInvoiceModal: React.FC<{ isOpen: boolean; onClose: () => void }> =
                           className="w-full bg-transparent text-sm text-gray-600 text-right font-mono border-none focus:ring-0 focus:outline-none p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                         />
                       </td>
+                      <td className="px-3 py-3 text-right">
+                        <input
+                          type="number"
+                          value={item.taxPct || ''}
+                          onChange={e => updateItem(idx, 'taxPct', Math.max(0, Math.min(100, Number(e.target.value))))}
+                          placeholder="0"
+                          min={0} max={100}
+                          className="w-full bg-transparent text-sm text-blue-600 text-right font-mono border-none focus:ring-0 focus:outline-none p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        />
+                      </td>
                       <td className="px-4 py-3 text-right">
                         <span className="font-mono text-sm font-medium text-gray-900 tabular-nums">
                           {formatRupiah(lineTotal(item))}
@@ -312,10 +312,10 @@ const PurchaseInvoiceModal: React.FC<{ isOpen: boolean; onClose: () => void }> =
                   <span className="font-mono text-gray-800 tabular-nums">{formatRupiah(subtotal)}</span>
                 </div>
 
-                {/* PPN */}
-                {taxPct > 0 && (
+                {/* PPN (total per-item) */}
+                {taxAmount > 0 && (
                   <div className="flex justify-between text-sm">
-                    <span className="text-gray-500">PPN {taxPct}%</span>
+                    <span className="text-gray-500">PPN (per item)</span>
                     <span className="font-mono text-gray-800 tabular-nums">{formatRupiah(taxAmount)}</span>
                   </div>
                 )}
@@ -375,8 +375,8 @@ const PurchaseInvoiceModal: React.FC<{ isOpen: boolean; onClose: () => void }> =
             <button onClick={onClose} className="btn-secondary">Batal</button>
             <button
               onClick={() => mutation.mutate({
-                date: invoiceDate, dueDate, partyId, notes, taxPct, potongan, biayaLain,
-                items: items.map(i => ({ ...i, inventoryItemId: i.inventoryItemId || null })),
+                date: invoiceDate, dueDate, partyId, notes, potongan, biayaLain,
+                items: items.map(i => ({ ...i, inventoryItemId: i.inventoryItemId || null, taxPct: i.taxPct })),
               })}
               disabled={!canSubmit}
               className="btn-primary disabled:opacity-40 disabled:cursor-not-allowed"

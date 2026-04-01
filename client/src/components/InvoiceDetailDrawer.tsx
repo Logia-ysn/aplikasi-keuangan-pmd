@@ -100,7 +100,11 @@ const InvoiceDetailDrawer: React.FC<Props> = ({ type, invoiceId, onClose }) => {
   const items = invoice?.items ?? [];
   const subtotal = items.reduce((s: number, i: any) => s + Number(i.amount), 0);
   const taxPct = Number(invoice?.taxPct ?? 0);
-  const taxAmount = taxPct > 0 ? subtotal * taxPct / 100 : 0;
+  // Per-item tax: sum each item's tax, fallback to invoice-level for old invoices
+  const taxAmount = items.some((i: any) => Number(i.taxPct ?? 0) > 0)
+    ? items.reduce((s: number, i: any) => s + Number(i.amount) * Number(i.taxPct ?? 0) / 100, 0)
+    : (taxPct > 0 ? subtotal * taxPct / 100 : 0);
+  const hasPerItemTax = items.some((i: any) => Number(i.taxPct ?? 0) > 0);
   const potongan = Number(invoice?.potongan ?? 0);
   const biayaLain = Number(invoice?.biayaLain ?? 0);
   const allocations = invoice?.paymentAllocations ?? [];
@@ -202,6 +206,7 @@ const InvoiceDetailDrawer: React.FC<Props> = ({ type, invoiceId, onClose }) => {
                       unit: it.unit,
                       rate: it.rate,
                       discount: it.discount ?? 0,
+                      taxPct: it.taxPct ?? 0,
                       amount: it.amount,
                       description: it.description,
                     }))}
@@ -345,6 +350,7 @@ const InvoiceDetailDrawer: React.FC<Props> = ({ type, invoiceId, onClose }) => {
                         <th className="text-center px-3 py-2.5 w-16">Satuan</th>
                         <th className="text-right px-3 py-2.5 w-28">Harga</th>
                         <th className="text-right px-3 py-2.5 w-16">Disk%</th>
+                        <th className="text-right px-3 py-2.5 w-16">PPN%</th>
                         <th className="text-right px-4 py-2.5 w-28">Jumlah</th>
                       </tr>
                     </thead>
@@ -371,6 +377,11 @@ const InvoiceDetailDrawer: React.FC<Props> = ({ type, invoiceId, onClose }) => {
                               {Number(item.discount) > 0 ? `${Number(item.discount)}%` : '—'}
                             </span>
                           </td>
+                          <td className="px-3 py-2.5 text-right font-mono text-xs">
+                            <span className={Number(item.taxPct) > 0 ? 'text-blue-600' : 'text-gray-300'}>
+                              {Number(item.taxPct) > 0 ? `${Number(item.taxPct)}%` : '—'}
+                            </span>
+                          </td>
                           <td className="px-4 py-2.5 text-right font-mono text-xs font-medium text-gray-900">
                             {formatRupiah(Number(item.amount))}
                           </td>
@@ -389,9 +400,9 @@ const InvoiceDetailDrawer: React.FC<Props> = ({ type, invoiceId, onClose }) => {
                       <span className="text-gray-500">Subtotal</span>
                       <span className="font-mono text-gray-800 tabular-nums">{formatRupiah(subtotal)}</span>
                     </div>
-                    {taxPct > 0 && (
+                    {taxAmount > 0 && (
                       <div className="flex justify-between text-sm">
-                        <span className="text-gray-500">PPN {taxPct}%</span>
+                        <span className="text-gray-500">{hasPerItemTax ? 'PPN (per item)' : `PPN ${taxPct}%`}</span>
                         <span className="font-mono text-gray-800 tabular-nums">{formatRupiah(taxAmount)}</span>
                       </div>
                     )}

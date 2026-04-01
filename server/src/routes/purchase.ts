@@ -93,12 +93,17 @@ router.post('/', roleMiddleware(['Admin', 'Accountant', 'StaffProduksi']), async
       const apAccount = await systemAccounts.getAccount('AP');
       const inventoryAccount = await systemAccounts.getAccount('INVENTORY');
 
-      const subtotal = body.items.reduce((sum, item) => {
+      const itemsWithAmount = body.items.map((item) => {
         const base = new Decimal(item.quantity).mul(new Decimal(item.rate));
         const disc = base.mul(new Decimal(item.discount ?? 0).div(100));
-        return sum.plus(base.minus(disc));
-      }, new Decimal(0));
-      const taxAmount = subtotal.mul(new Decimal(body.taxPct ?? 0).div(100));
+        const amount = base.minus(disc).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
+        return { ...item, computedAmount: amount };
+      });
+      const subtotal = itemsWithAmount.reduce((sum, item) => sum.plus(item.computedAmount), new Decimal(0));
+      // Per-item tax: sum each item's tax amount
+      const taxAmount = itemsWithAmount.reduce((sum, item) => {
+        return sum.plus(item.computedAmount.mul(new Decimal(item.taxPct ?? 0).div(100)));
+      }, new Decimal(0)).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
       const grandTotal = subtotal
         .plus(taxAmount)
         .minus(new Decimal(body.potongan ?? 0))
@@ -122,7 +127,7 @@ router.post('/', roleMiddleware(['Admin', 'Accountant', 'StaffProduksi']), async
           partyId: body.partyId,
           grandTotal: grandTotalNum,
           outstanding: grandTotalNum,
-          taxPct: body.taxPct ?? 0,
+          taxPct: 0, // tax is per-item now
           potongan: body.potongan ?? 0,
           biayaLain: body.biayaLain ?? 0,
           status: 'Submitted',
@@ -131,13 +136,7 @@ router.post('/', roleMiddleware(['Admin', 'Accountant', 'StaffProduksi']), async
           createdBy: req.user!.userId,
           submittedAt: new Date(),
           items: {
-            create: body.items.map((item) => {
-              const itemAmount = new Decimal(item.quantity)
-                .mul(new Decimal(item.rate))
-                .mul(new Decimal(1).minus(new Decimal(item.discount ?? 0).div(100)))
-                .toDecimalPlaces(2, Decimal.ROUND_HALF_UP)
-                .toNumber();
-              // Use item-specific inventory account if available
+            create: itemsWithAmount.map((item) => {
               const linkedItem = item.inventoryItemId ? invItemMap.get(item.inventoryItemId) : null;
               const itemAccountId = linkedItem?.accountId || inventoryAccount.id;
               return {
@@ -147,7 +146,8 @@ router.post('/', roleMiddleware(['Admin', 'Accountant', 'StaffProduksi']), async
                 unit: item.unit || 'pcs',
                 rate: item.rate,
                 discount: item.discount ?? 0,
-                amount: itemAmount,
+                amount: item.computedAmount.toNumber(),
+                taxPct: item.taxPct ?? 0,
                 accountId: itemAccountId,
                 description: item.description || null,
               };
@@ -183,15 +183,23 @@ router.post('/', roleMiddleware(['Admin', 'Accountant', 'StaffProduksi']), async
         }
       }
 
-      // Allocate remaining amount (tax, biayaLain, potongan) to generic inventory
-      const remainder = new Decimal(grandTotalNum).minus(itemsTotal).toNumber();
-      if (Math.abs(remainder) > 0.001) {
+      // Allocate potongan/biayaLain adjustment to generic inventory
+      const adjustmentRemainder = new Decimal(body.biayaLain ?? 0).minus(new Decimal(body.potongan ?? 0));
+      if (!adjustmentRemainder.isZero()) {
+        const adjNum = adjustmentRemainder.toNumber();
         const existing = debitByAccount.get(inventoryAccount.id);
         if (existing) {
-          existing.amount += remainder;
+          existing.amount += adjNum;
         } else {
-          debitByAccount.set(inventoryAccount.id, { amount: remainder, names: ['Biaya tambahan'] });
+          debitByAccount.set(inventoryAccount.id, { amount: adjNum, names: ['Biaya tambahan'] });
         }
+      }
+
+      // Add tax GL entry (DR PPN Masukan / TAX_INPUT) if there's any tax
+      const taxAmountNum = taxAmount.toNumber();
+      if (taxAmountNum > 0) {
+        const taxInputAccount = await systemAccounts.getAccount('TAX_INPUT');
+        debitByAccount.set(taxInputAccount.id, { amount: taxAmountNum, names: ['PPN Masukan'] });
       }
 
       const jvNumber = `JV-${invoice.invoiceNumber}`;

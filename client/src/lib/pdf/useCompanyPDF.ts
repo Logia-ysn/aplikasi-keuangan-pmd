@@ -7,6 +7,7 @@ export interface CompanyPDF {
   phone: string | null;
   email: string | null;
   taxId: string | null;
+  logoUrl: string | null;
 }
 
 const FALLBACK: CompanyPDF = {
@@ -15,6 +16,7 @@ const FALLBACK: CompanyPDF = {
   phone: null,
   email: null,
   taxId: null,
+  logoUrl: null,
 };
 
 /**
@@ -39,5 +41,6 @@ export function useCompanyPDF(): CompanyPDF {
     phone:   data.phone        || null,
     email:   data.email        || null,
     taxId:   data.taxId        || null,
+    logoUrl: data.logoUrl      || null,
   };
 }

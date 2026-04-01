@@ -38,7 +38,7 @@ const allNavItems: NavItem[] = [
   { icon: Package, label: 'Pembelian', href: '/purchase', roles: ['Admin', 'Accountant', 'StaffProduksi'] },
   { icon: Warehouse, label: 'Stok & Gudang', href: '/inventory' },
   { icon: CreditCard, label: 'Bank & Kas', href: '/payments', roles: ['Admin', 'Accountant', 'Viewer'] },
-  { icon: Wallet, label: 'Uang Muka Vendor', href: '/vendor-deposits', roles: ['Admin', 'Accountant'] },
+  { icon: Wallet, label: 'Uang Muka Vendor', href: '/vendor-deposits', roles: ['Admin', 'Accountant', 'StaffProduksi'] },
   { icon: Wallet, label: 'Uang Muka Pelanggan', href: '/customer-deposits', roles: ['Admin', 'Accountant'] },
   { icon: Scale, label: 'Rekonsiliasi Bank', href: '/reconciliation', roles: ['Admin', 'Accountant'] },
   { icon: Users, label: 'Pelanggan & Vendor', href: '/parties', roles: ['Admin', 'Accountant', 'StaffProduksi'] },

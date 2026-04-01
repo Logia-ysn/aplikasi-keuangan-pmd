@@ -102,8 +102,8 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
       const resolvedItems: Array<{
         itemName: string; itemType: string; inventoryItemId: string | null;
         serviceItemId: string | null; quantity: number; unit: string;
-        rate: number; discount: number; amount: number; accountId: string;
-        description: string | null;
+        rate: number; discount: number; amount: number; taxPct: number;
+        accountId: string; description: string | null;
       }> = [];
 
       for (const item of body.items) {
@@ -133,13 +133,17 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
           rate: item.rate,
           discount: item.discount ?? 0,
           amount: itemAmount,
+          taxPct: item.taxPct ?? 0,
           accountId: lineAccountId,
           description: item.description || null,
         });
       }
 
       const subtotal = resolvedItems.reduce((sum, item) => sum.plus(new Decimal(item.amount)), new Decimal(0));
-      const taxAmount = subtotal.mul(new Decimal(body.taxPct ?? 0).div(100));
+      // Per-item tax: sum each item's tax amount
+      const taxAmount = resolvedItems.reduce((sum, item) => {
+        return sum.plus(new Decimal(item.amount).mul(new Decimal(item.taxPct).div(100)));
+      }, new Decimal(0)).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
       const grandTotal = subtotal
         .plus(taxAmount)
         .minus(new Decimal(body.potongan ?? 0))
@@ -156,7 +160,7 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
           partyId: body.partyId,
           grandTotal: grandTotalNum,
           outstanding: grandTotalNum,
-          taxPct: body.taxPct ?? 0,
+          taxPct: 0, // tax is per-item now
           potongan: body.potongan ?? 0,
           biayaLain: body.biayaLain ?? 0,
           labelPotongan: body.labelPotongan || null,
@@ -179,8 +183,8 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
         revenueByAccount.set(ri.accountId, prev.plus(new Decimal(ri.amount)));
       }
 
-      // Adjustment for tax/potongan/biayaLain: allocate to the largest revenue account
-      const adjustmentAmount = grandTotal.minus(subtotal);
+      // Adjustment for potongan/biayaLain: allocate to the largest revenue account
+      const adjustmentAmount = new Decimal(body.biayaLain ?? 0).minus(new Decimal(body.potongan ?? 0));
       if (!adjustmentAmount.isZero()) {
         let primaryAccountId = salesAccount.id;
         let maxAmount = new Decimal(0);
@@ -191,7 +195,7 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
         revenueByAccount.set(primaryAccountId, prev.plus(adjustmentAmount));
       }
 
-      // Build multi-line journal: 1 DR (AR) + N CR (revenue accounts)
+      // Build multi-line journal: 1 DR (AR) + N CR (revenue accounts) + optional CR (tax)
       const creditJournalItems: Array<{ accountId: string; debit: number; credit: number; description: string }> = [];
       for (const [accId, amt] of revenueByAccount) {
         const creditNum = amt.toDecimalPlaces(2).toNumber();
@@ -200,6 +204,16 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
         creditJournalItems.push({
           accountId: accId, debit: 0, credit: creditNum,
           description: `${acc?.name ?? 'Penjualan'}: ${invoice.invoiceNumber}`,
+        });
+      }
+
+      // Add tax GL entry (CR PPN Keluaran / TAX_OUTPUT) if there's any tax
+      const taxAmountNum = taxAmount.toNumber();
+      if (taxAmountNum > 0) {
+        const taxOutputAccount = await systemAccounts.getAccount('TAX_OUTPUT');
+        creditJournalItems.push({
+          accountId: taxOutputAccount.id, debit: 0, credit: taxAmountNum,
+          description: `PPN Keluaran: ${invoice.invoiceNumber}`,
         });
       }
 

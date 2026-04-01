@@ -45,6 +45,7 @@ const InvoiceItemSchema = z.object({
   unit: z.string().optional(),
   rate: z.coerce.number().positive('Harga harus lebih dari 0.'),
   discount: z.coerce.number().min(0).max(100).optional().default(0), // persen diskon per baris
+  taxPct: z.coerce.number().min(0).max(100).optional().default(0),   // PPN % per baris
   description: z.string().optional(),
 });
 
@@ -237,6 +238,7 @@ const InvoiceTemplateItemSchema = z.object({
   unit: z.string().optional(),
   rate: z.coerce.number().min(0),
   discount: z.coerce.number().min(0).max(100).optional(),
+  taxPct: z.coerce.number().min(0).max(100).optional(),
   accountId: z.string().uuid().optional(),
 });
 

@@ -1,6 +1,6 @@
 import React from 'react';
 import {
-  Document, Page, View, Text, StyleSheet, Font,
+  Document, Page, View, Text, Image, StyleSheet, Font,
 } from '@react-pdf/renderer';
 
 // ─── Register fonts (Helvetica is built-in — no download needed) ─────────────
@@ -36,12 +36,14 @@ const S = StyleSheet.create({
   },
 
   // ── Header ──
-  headerRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 },
-  companyBlock: { flexDirection: 'column', maxWidth: 220 },
-  companyName: { fontSize: 15, fontFamily: 'Helvetica-Bold', color: C.primary, marginBottom: 3 },
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 },
+  companyBlock: { flexDirection: 'row', alignItems: 'center', flex: 1, gap: 12 },
+  companyLogo: { width: 56, height: 56, objectFit: 'contain' as const },
+  companyInfo: { flexDirection: 'column' as const, flex: 1 },
+  companyName: { fontSize: 14, fontFamily: 'Helvetica-Bold', color: C.primary, marginBottom: 2 },
   companyMeta: { fontSize: 7.5, color: C.muted, lineHeight: 1.5 },
-  invoiceBlock: { alignItems: 'flex-end' },
-  invoiceTitle: { fontSize: 18, fontFamily: 'Helvetica-Bold', color: C.primary, letterSpacing: 1, marginBottom: 4 },
+  invoiceBlock: { alignItems: 'flex-end', flexShrink: 0, marginLeft: 20 },
+  invoiceTitle: { fontSize: 16, fontFamily: 'Helvetica-Bold', color: C.primary, letterSpacing: 1, marginBottom: 4 },
   invoiceNumber: { fontSize: 10, fontFamily: 'Helvetica-Bold', color: C.dark },
   statusPill: {
     marginTop: 5, paddingVertical: 3, paddingHorizontal: 10,
@@ -77,6 +79,7 @@ const S = StyleSheet.create({
   colUnit:   { width: 36, textAlign: 'center' },
   colRate:   { width: 68, textAlign: 'right' },
   colDisc:   { width: 30, textAlign: 'right' },
+  colTax:    { width: 30, textAlign: 'right' },
   colAmount: { width: 76, textAlign: 'right' },
   tableMono: { fontFamily: 'Helvetica', fontSize: 8 },
 
@@ -125,6 +128,7 @@ export interface InvoicePDFItem {
   unit: string;
   rate: number | string;
   discount?: number | string;
+  taxPct?: number | string;
   amount: number | string;
   description?: string | null;
 }
@@ -157,6 +161,7 @@ export interface InvoicePDFProps {
     phone?: string | null;
     email?: string | null;
     taxId?: string | null;
+    logoUrl?: string | null;
   };
 }
 
@@ -189,9 +194,12 @@ const InvoicePDF: React.FC<InvoicePDFProps> = (props) => {
 
   // Subtotal from items
   const subtotal = items.reduce((s, i) => s + Number(i.amount), 0);
-  // Tax amount back-calculated (best estimate)
-  const taxAmount = numTax > 0 ? subtotal * numTax / 100 : numGT - subtotal + numPot - numBiaya;
-  const showTax = numTax > 0;
+  // Per-item tax: sum each item's tax, fallback to invoice-level for old invoices
+  const hasPerItemTax = items.some(i => Number(i.taxPct ?? 0) > 0);
+  const taxAmount = hasPerItemTax
+    ? items.reduce((s, i) => s + Number(i.amount) * Number(i.taxPct ?? 0) / 100, 0)
+    : (numTax > 0 ? subtotal * numTax / 100 : 0);
+  const showTax = taxAmount > 0;
   const showPot = numPot > 0;
   const showBiaya = numBiaya > 0;
 
@@ -205,11 +213,16 @@ const InvoicePDF: React.FC<InvoicePDFProps> = (props) => {
         {/* ── HEADER ── */}
         <View style={S.headerRow} fixed>
           <View style={S.companyBlock}>
-            <Text style={S.companyName}>{company.name}</Text>
-            {company.address && <Text style={S.companyMeta}>{company.address}</Text>}
-            {company.phone  && <Text style={S.companyMeta}>Telp: {company.phone}</Text>}
-            {company.email  && <Text style={S.companyMeta}>{company.email}</Text>}
-            {company.taxId  && <Text style={S.companyMeta}>NPWP: {company.taxId}</Text>}
+            {company.logoUrl && (
+              <Image style={S.companyLogo} src={company.logoUrl} />
+            )}
+            <View style={S.companyInfo}>
+              <Text style={S.companyName}>{company.name}</Text>
+              {company.address && <Text style={S.companyMeta}>{company.address}</Text>}
+              {company.phone  && <Text style={S.companyMeta}>Telp: {company.phone}</Text>}
+              {company.email  && <Text style={S.companyMeta}>{company.email}</Text>}
+              {company.taxId  && <Text style={S.companyMeta}>NPWP: {company.taxId}</Text>}
+            </View>
           </View>
           <View style={S.invoiceBlock}>
             <Text style={S.invoiceTitle}>{title}</Text>
@@ -268,6 +281,7 @@ const InvoicePDF: React.FC<InvoicePDFProps> = (props) => {
             <Text style={[S.tableHeaderText, S.colUnit]}>Sat.</Text>
             <Text style={[S.tableHeaderText, S.colRate]}>Harga Sat.</Text>
             <Text style={[S.tableHeaderText, S.colDisc]}>Disk%</Text>
+            <Text style={[S.tableHeaderText, S.colTax]}>PPN%</Text>
             <Text style={[S.tableHeaderText, S.colAmount]}>Jumlah</Text>
           </View>
 
@@ -291,6 +305,9 @@ const InvoicePDF: React.FC<InvoicePDFProps> = (props) => {
               <Text style={[S.tableCell, S.tableMono, S.colDisc, { color: Number(item.discount) > 0 ? C.orange : C.faint }]}>
                 {Number(item.discount) > 0 ? `${Number(item.discount)}%` : '—'}
               </Text>
+              <Text style={[S.tableCell, S.tableMono, S.colTax, { color: Number(item.taxPct) > 0 ? C.accent : C.faint }]}>
+                {Number(item.taxPct) > 0 ? `${Number(item.taxPct)}%` : '—'}
+              </Text>
               <Text style={[S.tableCell, S.tableMono, S.colAmount, { fontFamily: 'Helvetica-Bold' }]}>
                 {idr(Number(item.amount))}
               </Text>
@@ -307,7 +324,7 @@ const InvoicePDF: React.FC<InvoicePDFProps> = (props) => {
             </View>
             {showTax && (
               <View style={S.summaryRight}>
-                <Text style={S.summaryLabel}>PPN {numTax}%</Text>
+                <Text style={S.summaryLabel}>{hasPerItemTax ? 'PPN (per item)' : `PPN ${numTax}%`}</Text>
                 <Text style={S.summaryValue}>{idr(taxAmount)}</Text>
               </View>
             )}

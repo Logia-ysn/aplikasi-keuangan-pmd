@@ -71,7 +71,7 @@ function App() {
             <Route path="/sales" element={<FinanceRoute><SalesInvoices /></FinanceRoute>} />
             <Route path="/purchase" element={<RoleRoute allowed={['Admin', 'Accountant', 'StaffProduksi']}><PurchaseInvoices /></RoleRoute>} />
             <Route path="/payments" element={<FinanceRoute><Payments /></FinanceRoute>} />
-            <Route path="/vendor-deposits" element={<RoleRoute allowed={['Admin', 'Accountant']}><VendorDeposits /></RoleRoute>} />
+            <Route path="/vendor-deposits" element={<RoleRoute allowed={['Admin', 'Accountant', 'StaffProduksi']}><VendorDeposits /></RoleRoute>} />
             <Route path="/customer-deposits" element={<RoleRoute allowed={['Admin', 'Accountant']}><CustomerDeposits /></RoleRoute>} />
             <Route path="/parties" element={<RoleRoute allowed={['Admin', 'Accountant', 'StaffProduksi']}><PartiesPage /></RoleRoute>} />
             <Route path="/inventory" element={<InventoryPage />} />

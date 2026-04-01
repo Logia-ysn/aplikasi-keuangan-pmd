@@ -202,6 +202,7 @@ model SalesInvoiceItem {
   rate             Decimal        @db.Decimal(15, 2)
   discount         Decimal        @default(0) @db.Decimal(5, 2)
   amount           Decimal        @db.Decimal(15, 2)
+  taxPct           Decimal        @default(0) @db.Decimal(5, 2) @map("tax_pct")
   accountId        String         @map("account_id")
   account          Account        @relation(fields: [accountId], references: [id])
   description      String?
@@ -257,6 +258,7 @@ model PurchaseInvoiceItem {
   rate              Decimal         @db.Decimal(15, 2)
   discount          Decimal         @default(0) @db.Decimal(5, 2)
   amount            Decimal         @db.Decimal(15, 2)
+  taxPct            Decimal         @default(0) @db.Decimal(5, 2) @map("tax_pct")
   accountId         String          @map("account_id")
   account           Account         @relation(fields: [accountId], references: [id])
   description       String?
