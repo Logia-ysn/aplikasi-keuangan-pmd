@@ -6,15 +6,15 @@ Aplikasi ERP keuangan berbasis web untuk pengelolaan keuangan perusahaan. Fullst
 
 | Modul | Deskripsi |
 |---|---|
-| Dashboard | KPI real-time, 8 widget yang bisa di-toggle, grafik pendapatan vs beban |
-| Bagan Akun | Hierarki COA parent-child, import CSV/Excel |
+| Dashboard | KPI real-time (kas, piutang, hutang, deposit supplier, persediaan, laba), widget toggle, grafik pendapatan vs beban |
+| Bagan Akun | Hierarki COA parent-child, import CSV/Excel dengan saldo awal, auto GL posting |
 | Buku Besar | Jurnal double-entry, filter tanggal, import CSV |
 | Penjualan | Invoice pelanggan, auto-posting GL, PPN, diskon, cancel |
 | Pembelian | Invoice pemasok, auto-posting GL, cancel |
 | Bank & Kas | Penerimaan/pengeluaran, auto-alokasi invoice, cancel |
 | Rekonsiliasi Bank | Cocokkan mutasi bank dengan transaksi buku |
-| Pelanggan & Vendor | Manajemen mitra, saldo terutang, import CSV |
-| Stok & Gudang | Item inventori, mutasi stok, produksi dengan rendemen |
+| Pelanggan & Vendor | Manajemen mitra, saldo terutang, deposit vendor/pelanggan, import Excel dengan saldo awal |
+| Stok & Gudang | Item inventori, mutasi stok, produksi dengan rendemen, import saldo awal stok |
 | Laporan | Trial Balance, Laba Rugi, Neraca, Arus Kas, Aging, Pajak |
 | Drill-down | Klik angka di laporan untuk lihat detail transaksi |
 | Transaksi Berulang | Template jurnal otomatis (harian/mingguan/bulanan) |

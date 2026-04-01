@@ -3,8 +3,8 @@
  * Update file ini setiap kali release baru.
  */
 
-export const APP_VERSION = '2.1.0';
-export const APP_BUILD_DATE = '2026-04-01';
+export const APP_VERSION = '2.2.0';
+export const APP_BUILD_DATE = '2026-04-02';
 export const APP_NAME = 'Keuangan';
 
 export interface ChangelogEntry {
@@ -15,6 +15,25 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '2.2.0',
+    date: '2026-04-02',
+    title: 'Perbaikan Import Saldo Awal & Dashboard',
+    changes: [
+      'Fix import COA: saldo awal tidak lagi terhitung 2x (double balance)',
+      'Fix import party: kolom outstandingAmount/piutang/hutang sekarang dikenali sebagai alias openingBalance',
+      'Fix import party: depositBalance otomatis di-map ke customerDepositBalance untuk tipe Customer',
+      'Fix import inventory: currentStock sekarang terupdate setelah import stok awal',
+      'Fix Excel formula: cell dengan formula (=A1*B1) sekarang terbaca nilainya, bukan [object Object]',
+      'Auto-detect openingPrice: sistem otomatis mendeteksi apakah kolom berisi harga satuan atau total value',
+      'Tambah kolom openingQty & openingPrice di template download Master Item',
+      'Tambah kolom openingQty & openingPrice di preview import inventory',
+      'Dashboard: tambah KPI card Deposit Supplier di dashboard utama',
+      'Dashboard: tambah KPI Nilai Persediaan (format Rupiah) di dashboard gudang',
+      'Dashboard: status bar stok hanya muncul jika item punya minimum stok > 0',
+      'Perbesar presisi decimal stock_movements dari (15,x) ke (20,x) untuk mencegah overflow',
+    ],
+  },
   {
     version: '2.1.0',
     date: '2026-04-01',
