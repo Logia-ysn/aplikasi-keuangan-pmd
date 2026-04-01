@@ -15,9 +15,10 @@ router.get('/metrics', async (req, res) => {
     });
     const cashBalance = cashAccountRecords.reduce((sum, acc) => sum + Number(acc.balance), 0);
 
-    const [arMapping, apMapping, inventoryValueResult] = await Promise.all([
+    const [arMapping, apMapping, vendorDepositMapping, inventoryValueResult] = await Promise.all([
       systemAccounts.getAccount('AR'),
       systemAccounts.getAccount('AP'),
+      systemAccounts.getAccount('VENDOR_DEPOSIT'),
       prisma.$queryRaw<[{ total: bigint }]>`
         SELECT COALESCE(SUM(
           CASE WHEN sm.movement_type IN ('In', 'AdjustmentIn') THEN sm.total_value
@@ -29,9 +30,10 @@ router.get('/metrics', async (req, res) => {
       `,
     ]);
 
-    const [arAcc, apAcc] = await Promise.all([
+    const [arAcc, apAcc, vendorDepositAcc] = await Promise.all([
       prisma.account.findUnique({ where: { id: arMapping.id }, select: { balance: true } }),
       prisma.account.findUnique({ where: { id: apMapping.id }, select: { balance: true } }),
+      prisma.account.findUnique({ where: { id: vendorDepositMapping.id }, select: { balance: true } }),
     ]);
 
     const now = new Date();
@@ -56,6 +58,7 @@ router.get('/metrics', async (req, res) => {
       cashBalance,
       accountsReceivable: Math.max(0, Number(arAcc?.balance || 0)),
       accountsPayable: Math.max(0, Number(apAcc?.balance || 0)),
+      vendorDeposit: Math.max(0, Number(vendorDepositAcc?.balance || 0)),
       inventoryValue: Math.max(0, Number(inventoryValueResult[0]?.total || 0)),
       netProfit,
     });
