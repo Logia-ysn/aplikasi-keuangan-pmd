@@ -3,7 +3,7 @@
  * Update file ini setiap kali release baru.
  */
 
-export const APP_VERSION = '2.0.0';
+export const APP_VERSION = '2.1.0';
 export const APP_BUILD_DATE = '2026-04-01';
 export const APP_NAME = 'Keuangan';
 
@@ -15,6 +15,22 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '2.1.0',
+    date: '2026-04-01',
+    title: 'Akun Sistem Komprehensif (IFRS/GAAP) & Perbaikan UI',
+    changes: [
+      '26 system account roles berdasarkan standar akuntansi global IFRS/GAAP (dari 12 menjadi 26)',
+      'Grup baru: Pajak (PPN Masukan/Keluaran, PPh Badan), Diskon & Retur, Aset Tetap & Depresiasi',
+      'Grup baru: Biaya Bank & Bunga, Selisih Kurs, Piutang Tak Tertagih, Akrual & Dibayar Dimuka',
+      'Grup baru: Pendapatan & Beban Lain-lain, Pembulatan & Selisih, Prive',
+      '4 akun COA baru: Cadangan Kerugian Piutang (1.2.5), Prive (3.5), Beban Piutang Tak Tertagih (6.27), Pembulatan & Selisih (8.8)',
+      'Fix Pengaturan Akun Sistem: dropdown sekarang menampilkan semua akun COA dengan benar',
+      'Upload file backup dari luar: support upload .sql.gz via Pengaturan > Backup',
+      'Dashboard stok: tampilkan semua item diurutkan berdasarkan jumlah stok',
+      '11 grup UI untuk konfigurasi akun sistem (dari 6 menjadi 11)',
+    ],
+  },
   {
     version: '2.0.0',
     date: '2026-04-01',

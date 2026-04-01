@@ -26,7 +26,8 @@ Aplikasi ERP keuangan berbasis web untuk pengelolaan keuangan perusahaan. Fullst
 | Global Search | Ctrl+K command palette, cari apapun |
 | Keyboard Shortcuts | Ctrl+K, ?, Escape |
 | Onboarding | Setup wizard pertama kali |
-| Backup & Restore | Backup/restore database dari UI |
+| Backup & Restore | Backup/restore database dari UI, upload backup eksternal |
+| Akun Sistem | 26 role akun konfigurabel (IFRS/GAAP): pajak, diskon, depresiasi, dll |
 
 ## Tech Stack
 
@@ -259,22 +260,37 @@ docker compose up -d
 
 ---
 
-## Nomor Akun Sistem
+## Akun Sistem (System Account Roles)
 
-Akun-akun ini digunakan oleh sistem untuk auto-posting:
+Akun-akun ini digunakan oleh sistem untuk auto GL posting. Semua bisa dikonfigurasi via **Pengaturan > Akun Sistem**.
 
-| Kode | Nama | Fungsi |
-|---|---|---|
-| `1.1.1` | Kas Utama | Akun kas tunai |
-| `1.1.2` | Bank BCA | Akun bank |
-| `1.1.3` | Piutang Usaha | Auto-debit saat invoice penjualan |
-| `1.1.4` | Persediaan Gabah | Auto-debit saat invoice pembelian |
-| `2.1.1` | Hutang Usaha | Auto-credit saat invoice pembelian |
-| `4.1.1` | Penjualan | Auto-credit saat invoice penjualan |
-| `3.2.1` | Laba Ditahan | Target tutup buku tahunan |
-| `3.3.1` | Laba Tahun Berjalan | Computed di Balance Sheet |
+| Grup | Role | Default COA | Fungsi |
+|---|---|---|---|
+| **Kas & Bank** | CASH (multi) | 1.1.1–1.1.5 | Akun kas/bank untuk pembayaran |
+| **Piutang & Hutang** | AR, AP | 1.2.1, 2.1.1 | Auto-posting invoice penjualan/pembelian |
+| | ALLOWANCE_DOUBTFUL | 1.2.5 | Cadangan kerugian piutang |
+| | BAD_DEBT_EXPENSE | 6.27 | Beban piutang tak tertagih |
+| **Persediaan & HPP** | INVENTORY, COGS | 1.4.0, 5 | Persediaan & HPP |
+| **Pendapatan** | SALES, SERVICE_REVENUE | 4.1, 4.2 | Pendapatan penjualan & jasa |
+| | SALES_DISCOUNT, SALES_RETURN | 4.4, 4.3 | Contra revenue |
+| **Pajak** | TAX_INPUT, TAX_OUTPUT | 1.5.3, 2.2.1 | PPN Masukan & Keluaran |
+| | INCOME_TAX_EXPENSE | 6.17 | Beban PPh Badan |
+| **Deposit** | VENDOR_DEPOSIT, CUSTOMER_DEPOSIT | 1.3, 2.1.2 | Uang muka vendor/pelanggan |
+| **Aset Tetap** | FIXED_ASSET (multi) | 1.6.1–1.6.5 | Aset tetap per kategori |
+| | ACCUM_DEPRECIATION (multi) | 1.7.1–1.7.4 | Akumulasi penyusutan |
+| | DEPRECIATION_EXPENSE (multi) | 6.21–6.24 | Beban penyusutan periodik |
+| **Bank & Bunga** | BANK_CHARGE, INTEREST_EXPENSE | 8.2, 8.1 | Biaya bank & bunga pinjaman |
+| | INTEREST_INCOME | 7.1 | Pendapatan bunga |
+| **Selisih Kurs** | FX_GAIN_LOSS, FX_UNREALIZED | 8.4, 8.5 | Laba/rugi kurs |
+| **Akrual** | PREPAID_EXPENSE (multi) | 1.5.1–1.5.2 | Biaya dibayar dimuka |
+| | ACCRUED_EXPENSE | 2.2.6 | Hutang beban akrual |
+| **Lain-lain** | OTHER_INCOME, OTHER_EXPENSE | 7.4, 8.7 | Non-operating income/expense |
+| | SHIPPING_EXPENSE | 6.14 | Beban pengiriman |
+| | ROUNDING_ACCOUNT | 8.8 | Pembulatan & selisih |
+| **Ekuitas** | OPENING_EQUITY, RETAINED_EARNINGS | 3.1, 3.2 | Saldo awal & laba ditahan |
+| | CURRENT_PROFIT, OWNER_DRAWING | 3.4, 3.5 | Laba berjalan & prive |
 
-> Jangan hapus atau ubah nomor akun di atas. Bisa menambah akun baru dengan nomor lain.
+> Mapping akun bisa diubah kapan saja via UI tanpa ubah kode. Mendukung berbagai jenis industri.
 
 ---
 
