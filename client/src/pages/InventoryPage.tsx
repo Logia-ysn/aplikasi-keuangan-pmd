@@ -260,6 +260,8 @@ export function InventoryPage() {
                     description: i.description ?? '',
                     currentStock: Number(i.currentStock ?? 0),
                     minimumStock: Number(i.minimumStock ?? 0),
+                    openingQty: '',
+                    openingPrice: '',
                   })),
                   'master-item'
                 )

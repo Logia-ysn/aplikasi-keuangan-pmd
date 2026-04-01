@@ -105,12 +105,14 @@ export default function TopItemsByStock() {
                       {formatNumber(min)}
                     </td>
                     <td className="py-2">
-                      <div className="w-full h-2 rounded-full bg-gray-100 dark:bg-gray-700">
-                        <div
-                          className={cn('h-2 rounded-full transition-all', stockColor(current, min))}
-                          style={{ width: `${stockPct(current, min)}%` }}
-                        />
-                      </div>
+                      {min > 0 ? (
+                        <div className="w-full h-2 rounded-full bg-gray-100 dark:bg-gray-700">
+                          <div
+                            className={cn('h-2 rounded-full transition-all', stockColor(current, min))}
+                            style={{ width: `${stockPct(current, min)}%` }}
+                          />
+                        </div>
+                      ) : null}
                     </td>
                   </tr>
                 );

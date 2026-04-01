@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { Package, CheckCircle, AlertTriangle, ArrowLeftRight, Loader2 } from 'lucide-react';
+import { Package, CheckCircle, AlertTriangle, ArrowLeftRight, Loader2, Banknote } from 'lucide-react';
 import api from '../../lib/api';
 import { cn } from '../../lib/utils';
 
@@ -12,6 +12,7 @@ interface DashboardMetrics {
   activeItems: number;
   lowStockItems: number;
   movementsThisMonth: number;
+  inventoryValue: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -20,6 +21,9 @@ interface DashboardMetrics {
 
 const formatNumber = (val: number | string, decimals = 0) =>
   Number(val).toLocaleString('id-ID', { maximumFractionDigits: decimals });
+
+const formatRupiah = (value: number) =>
+  new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(value);
 
 // ---------------------------------------------------------------------------
 // Sub-components
@@ -32,9 +36,10 @@ interface KpiCardProps {
   bgClass: string;
   iconClass: string;
   loading: boolean;
+  format?: 'number' | 'rupiah';
 }
 
-function KpiCard({ title, value, icon: Icon, bgClass, iconClass, loading }: KpiCardProps) {
+function KpiCard({ title, value, icon: Icon, bgClass, iconClass, loading, format = 'number' }: KpiCardProps) {
   return (
     <div
       className="border rounded-xl p-5"
@@ -55,7 +60,7 @@ function KpiCard({ title, value, icon: Icon, bgClass, iconClass, loading }: KpiC
         <Loader2 className="w-5 h-5 animate-spin" style={{ color: 'var(--color-text-muted)' }} />
       ) : (
         <p className="text-2xl font-semibold tabular-nums" style={{ color: 'var(--color-text-primary)' }}>
-          {formatNumber(value)}
+          {format === 'rupiah' ? formatRupiah(value) : formatNumber(value)}
         </p>
       )}
     </div>
@@ -76,7 +81,7 @@ export default function WarehouseKPICards() {
   });
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
       <KpiCard
         title="Total Item"
         value={metrics?.totalItems ?? 0}
@@ -108,6 +113,15 @@ export default function WarehouseKPICards() {
         bgClass="bg-purple-50 dark:bg-purple-900/30"
         iconClass="text-purple-600"
         loading={isLoading}
+      />
+      <KpiCard
+        title="Nilai Persediaan"
+        value={metrics?.inventoryValue ?? 0}
+        icon={Banknote}
+        bgClass="bg-emerald-50 dark:bg-emerald-900/30"
+        iconClass="text-emerald-600"
+        loading={isLoading}
+        format="rupiah"
       />
     </div>
   );

@@ -688,7 +688,7 @@ router.put('/production-runs/:id/cancel', roleMiddleware(['Admin']), async (req:
 // GET /api/inventory/dashboard/metrics — KPI summary
 router.get('/dashboard/metrics', async (_req, res) => {
   try {
-    const [totalItems, activeItems, lowStockRaw, movements] = await Promise.all([
+    const [totalItems, activeItems, lowStockRaw, movements, inventoryValueResult] = await Promise.all([
       prisma.inventoryItem.count(),
       prisma.inventoryItem.count({ where: { isActive: true, currentStock: { gt: 0 } } }),
       prisma.$queryRaw<Array<{ count: bigint }>>`
@@ -700,6 +700,15 @@ router.get('/dashboard/metrics', async (_req, res) => {
           date: { gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1) }
         }
       }),
+      prisma.$queryRaw<[{ total: bigint }]>`
+        SELECT COALESCE(SUM(
+          CASE WHEN sm.movement_type IN ('In', 'AdjustmentIn') THEN sm.total_value
+               ELSE -sm.total_value END
+        ), 0) AS total
+        FROM stock_movements sm
+        JOIN inventory_items ii ON sm.item_id = ii.id
+        WHERE ii.is_active = true AND sm.is_cancelled = false
+      `,
     ]);
 
     const lowStockCount = Number(lowStockRaw[0]?.count ?? 0);
@@ -709,6 +718,7 @@ router.get('/dashboard/metrics', async (_req, res) => {
       activeItems,
       lowStockCount,
       movementsThisMonth: movements,
+      inventoryValue: Math.max(0, Number(inventoryValueResult[0]?.total || 0)),
     });
   } catch (error) {
     logger.error({ error }, 'GET /inventory/dashboard/metrics error');

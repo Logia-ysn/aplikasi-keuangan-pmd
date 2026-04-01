@@ -490,9 +490,9 @@ model StockMovement {
   itemId          String            @map("item_id")
   item            InventoryItem     @relation(fields: [itemId], references: [id])
   movementType    StockMovementType @map("movement_type")
-  quantity        Decimal           @db.Decimal(15, 3)
-  unitCost        Decimal           @default(0) @db.Decimal(15, 2) @map("unit_cost")
-  totalValue      Decimal           @default(0) @db.Decimal(15, 2) @map("total_value")
+  quantity        Decimal           @db.Decimal(20, 3)
+  unitCost        Decimal           @default(0) @db.Decimal(20, 2) @map("unit_cost")
+  totalValue      Decimal           @default(0) @db.Decimal(20, 2) @map("total_value")
   notes           String?
   referenceType   String?           @map("reference_type")
   referenceId     String?           @map("reference_id")

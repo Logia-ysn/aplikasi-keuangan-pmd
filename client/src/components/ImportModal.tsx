@@ -56,9 +56,9 @@ const typeConfig = {
   inventory: {
     title: 'Import Master Item',
     endpoint: '/import/inventory',
-    columns: ['code', 'name', 'unit', 'category', 'description', 'minimumStock'],
-    templateHeaders: 'code,name,unit,category,description,minimumStock',
-    templateSample: 'GKP,Gabah Kering Panen,Kg,Bahan Baku,,1000',
+    columns: ['code', 'name', 'unit', 'category', 'description', 'minimumStock', 'openingQty', 'openingPrice'],
+    templateHeaders: 'code,name,unit,category,description,minimumStock,openingQty,openingPrice',
+    templateSample: 'GKP,Gabah Kering Panen,Kg,Bahan Baku,,1000,500,10000',
     queryKeys: ['inventory-items'],
   },
 };

@@ -78,7 +78,12 @@ async function parseFile(buffer: Buffer, filename: string): Promise<Record<strin
       row.eachCell((cell, colNumber) => {
         const header = headers[colNumber - 1];
         if (header !== undefined) {
-          rowData[header] = String(cell.value ?? '');
+          // For formula cells, use the cached result; otherwise use the raw value
+          const raw = cell.value;
+          const resolved = (raw && typeof raw === 'object' && 'result' in raw)
+            ? (raw as { result: unknown }).result
+            : raw;
+          rowData[header] = String(resolved ?? '');
         }
       });
       rows.push(rowData);
@@ -823,7 +828,7 @@ router.post(
 
         const openingQtyStr = (r.openingQty || r.opening_qty || r.stokAwal || r.stok_awal || '').trim();
         const openingQty = openingQtyStr ? parseFloat(openingQtyStr) : 0;
-        const openingPriceStr = (r.openingPrice || r.opening_price || r.hargaAwal || r.harga_awal || '').trim();
+        const openingPriceStr = (r.openingPrice || r.opening_price || r.openingValue || r.opening_value || r.hargaAwal || r.harga_awal || r.nilaiAwal || r.nilai_awal || '').trim();
         const openingPrice = openingPriceStr ? parseFloat(openingPriceStr) : 0;
 
         if (isNaN(openingQty)) {
@@ -864,7 +869,13 @@ router.post(
 
           // Create opening stock movement if qty > 0
           if (openingQty > 0 && openingPrice > 0) {
-            const totalValue = openingQty * openingPrice;
+            // Auto-detect if openingPrice is total value or unit price:
+            // If openingPrice / qty yields a reasonable unit cost (< openingPrice itself),
+            // and the raw total (qty * price) exceeds 18 digits, treat price as total value.
+            const rawTotal = openingQty * openingPrice;
+            const isLikelyTotalValue = rawTotal > 9_999_999_999_999_999;
+            const unitCost = isLikelyTotalValue ? (openingPrice / openingQty) : openingPrice;
+            const totalValue = isLikelyTotalValue ? openingPrice : rawTotal;
 
             await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
               const now = new Date();
@@ -877,7 +888,7 @@ router.post(
                   itemId: item.id,
                   movementType: 'In',
                   quantity: openingQty,
-                  unitCost: openingPrice,
+                  unitCost: unitCost,
                   totalValue,
                   date: now,
                   referenceType: 'OpeningBalance',
@@ -885,6 +896,12 @@ router.post(
                   createdById: req.user!.userId,
                   fiscalYearId: fiscalYear.id,
                 },
+              });
+
+              // Update currentStock on inventory item
+              await tx.inventoryItem.update({
+                where: { id: item.id },
+                data: { currentStock: { increment: openingQty } },
               });
 
               // GL: DR Inventory / CR Ekuitas Saldo Awal
