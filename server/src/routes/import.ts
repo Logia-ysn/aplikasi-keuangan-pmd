@@ -127,7 +127,7 @@ router.post(
           continue;
         }
 
-        const openingBalanceStr = (r.openingBalance || r.opening_balance || r.saldoAwal || r.saldo_awal || r.balance || '').toString().trim();
+        const openingBalanceStr = (r.openingBalance || r.opening_balance || r.outstandingAmount || r.outstanding_amount || r.saldoAwal || r.saldo_awal || r.piutang || r.hutang || r.balance || '').toString().trim();
         const openingBalance = openingBalanceStr ? parseFloat(openingBalanceStr) : 0;
         if (isNaN(openingBalance)) {
           errors.push({ row: rowNum, message: `openingBalance "${openingBalanceStr}" bukan angka valid.` });
@@ -169,7 +169,14 @@ router.post(
       let success = 0;
       for (const row of validRows) {
         try {
-          const { openingBalance, depositBalance, customerDepositBalance, ...partyData } = row;
+          const { openingBalance, depositBalance: rawDepositBalance, customerDepositBalance: rawCustomerDepositBalance, ...partyData } = row;
+
+          // If customer has depositBalance but no customerDepositBalance, treat it as customer deposit
+          const isCustomerType = row.partyType === 'Customer';
+          const depositBalance = isCustomerType ? 0 : rawDepositBalance;
+          const customerDepositBalance = isCustomerType
+            ? (rawCustomerDepositBalance || rawDepositBalance)
+            : rawCustomerDepositBalance;
 
           // Find existing party by name or create new
           let party = await prisma.party.findFirst({
@@ -442,7 +449,7 @@ router.post(
         const parentNumber = (r.parentNumber || r.parent_number || '').trim();
         const isGroupStr = (r.isGroup || r.is_group || '').toString().trim().toLowerCase();
         const isGroup = ['true', '1', 'yes', 'ya'].includes(isGroupStr);
-        const openingBalanceStr = (r.openingBalance || r.opening_balance || r.saldoAwal || r.saldo_awal || r.balance || '').toString().trim();
+        const openingBalanceStr = (r.openingBalance || r.opening_balance || r.outstandingAmount || r.outstanding_amount || r.saldoAwal || r.saldo_awal || r.piutang || r.hutang || r.balance || '').toString().trim();
         const openingBalance = openingBalanceStr ? parseFloat(openingBalanceStr) : 0;
 
         if (!accountNumber) {
@@ -526,7 +533,6 @@ router.post(
             accountType: row.accountType as any,
             parentId,
             isGroup: row.isGroup,
-            ...(row.openingBalance !== 0 ? { balance: row.openingBalance } : {}),
           };
 
           const account = await prisma.account.upsert({
