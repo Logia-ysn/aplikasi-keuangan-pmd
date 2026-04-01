@@ -899,4 +899,114 @@ router.post('/reset-data', roleMiddleware(['Admin']), async (req, res) => {
   }
 });
 
+// GET /api/settings/check-update — Check GitHub for newer version
+router.get('/check-update', roleMiddleware(['Admin']), async (_req, res) => {
+  try {
+    const currentVersion = (() => {
+      try {
+        const versionFile = require('fs').readFileSync(
+          path.resolve(__dirname, '../../../client/src/lib/version.ts'), 'utf-8'
+        );
+        const match = versionFile.match(/APP_VERSION\s*=\s*'([^']+)'/);
+        return match?.[1] || 'unknown';
+      } catch {
+        return 'unknown';
+      }
+    })();
+
+    // Fetch latest version from GitHub
+    const response = await fetch(
+      'https://raw.githubusercontent.com/Logia-ysn/aplikasi-keuangan-pmd/main/client/src/lib/version.ts',
+      { signal: AbortSignal.timeout(10000) }
+    );
+
+    if (!response.ok) {
+      return res.json({ currentVersion, remoteVersion: null, updateAvailable: false, error: 'Gagal cek GitHub.' });
+    }
+
+    const content = await response.text();
+    const remoteMatch = content.match(/APP_VERSION\s*=\s*'([^']+)'/);
+    const remoteVersion = remoteMatch?.[1] || 'unknown';
+
+    // Get current git info
+    const { execFile } = await import('child_process');
+    const { promisify } = await import('util');
+    const execFileAsync = promisify(execFile);
+    const gitOpts = { cwd: path.resolve(__dirname, '../../..'), timeout: 15000 };
+
+    let localCommit = 'unknown';
+    let remoteCommit = 'unknown';
+    try {
+      await execFileAsync('git', ['fetch', 'origin', 'main', '--quiet'], gitOpts);
+      localCommit = (await execFileAsync('git', ['rev-parse', '--short', 'HEAD'], gitOpts)).stdout.trim();
+      remoteCommit = (await execFileAsync('git', ['rev-parse', '--short', 'origin/main'], gitOpts)).stdout.trim();
+    } catch { /* git not available in container */ }
+
+    const compareSemver = (a: string, b: string) => {
+      const pa = a.split('.').map(Number);
+      const pb = b.split('.').map(Number);
+      for (let i = 0; i < 3; i++) {
+        if ((pa[i] || 0) > (pb[i] || 0)) return 1;
+        if ((pa[i] || 0) < (pb[i] || 0)) return -1;
+      }
+      return 0;
+    };
+
+    const updateAvailable = compareSemver(remoteVersion, currentVersion) > 0 || localCommit !== remoteCommit;
+
+    return res.json({
+      currentVersion,
+      remoteVersion,
+      localCommit,
+      remoteCommit,
+      updateAvailable,
+    });
+  } catch (error) {
+    logger.error({ error }, 'GET /settings/check-update error');
+    return res.status(500).json({ error: 'Gagal mengecek update.' });
+  }
+});
+
+// POST /api/settings/trigger-update — Trigger app rebuild via updater container
+router.post('/trigger-update', roleMiddleware(['Admin']), async (_req, res) => {
+  try {
+    const { execFile } = await import('child_process');
+    const { promisify } = await import('util');
+    const execFileAsync = promisify(execFile);
+
+    // Check if updater container exists
+    try {
+      const { stdout } = await execFileAsync(
+        'docker', ['ps', '--filter', 'name=updater', '--format', '{{.Names}}'],
+        { timeout: 5000 }
+      );
+
+      if (!stdout.trim()) {
+        return res.status(400).json({ error: 'Updater container tidak berjalan. Jalankan: docker compose up -d updater' });
+      }
+    } catch {
+      // Docker not accessible from this container
+    }
+
+    // Send response first, then trigger update in background
+    res.json({ message: 'Update sedang diproses. Aplikasi akan restart dalam beberapa saat.' });
+
+    // Trigger rebuild via updater container (non-blocking)
+    const projectDir = path.resolve(__dirname, '../../..');
+    execFile('docker', [
+      'exec', 'finance-pmd-updater-1', 'sh', '-c',
+      'cd /project && git pull origin main && docker compose up -d --build app'
+    ], { timeout: 300000, cwd: projectDir }, (error, stdout, stderr) => {
+      if (error) {
+        logger.error({ error: error.message, stderr }, 'Update trigger failed');
+      } else {
+        logger.info({ stdout: stdout.trim() }, 'Update trigger completed');
+      }
+    });
+  } catch (error) {
+    logger.error({ error }, 'POST /settings/trigger-update error');
+    return res.status(500).json({ error: 'Gagal trigger update.' });
+  }
+});
+
 export default router;
