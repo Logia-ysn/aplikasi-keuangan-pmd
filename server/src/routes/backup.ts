@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { spawn, execFileSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
+import multer from 'multer';
 import { roleMiddleware } from '../middleware/auth';
 import { logger } from '../lib/logger';
 
@@ -282,6 +283,52 @@ router.get('/download/:filename', roleMiddleware(['Admin']), async (req, res) =>
   } catch (error) {
     logger.error({ error }, 'GET /backup/download error');
     return res.status(500).json({ error: 'Gagal mengunduh backup.' });
+  }
+});
+
+// POST /api/backup/upload — upload backup file from external source
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: async (_req, _file, cb) => {
+      await ensureBackupDir();
+      cb(null, BACKUP_DIR);
+    },
+    filename: (_req, file, cb) => {
+      // Keep original filename if .sql.gz, otherwise prefix with upload-
+      const name = file.originalname.endsWith('.sql.gz')
+        ? file.originalname
+        : `upload-${Date.now()}.sql.gz`;
+      cb(null, name);
+    },
+  }),
+  limits: { fileSize: 500 * 1024 * 1024 }, // 500 MB max
+  fileFilter: (_req, file, cb) => {
+    if (file.originalname.endsWith('.sql.gz') || file.mimetype === 'application/gzip' || file.mimetype === 'application/x-gzip') {
+      cb(null, true);
+    } else {
+      cb(new Error('Hanya file .sql.gz yang diperbolehkan.'));
+    }
+  },
+});
+
+router.post('/upload', roleMiddleware(['Admin']), upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'File backup tidak ditemukan dalam request.' });
+    }
+
+    const filename = req.file.filename;
+    const size = req.file.size;
+
+    logger.info({ filename, size }, 'Backup file uploaded');
+    return res.json({
+      message: `File ${filename} berhasil diupload.`,
+      filename,
+      size,
+    });
+  } catch (error: unknown) {
+    logger.error({ error: error instanceof Error ? error.message : error }, 'POST /backup/upload error');
+    return res.status(500).json({ error: 'Gagal mengupload file backup.' });
   }
 });
 

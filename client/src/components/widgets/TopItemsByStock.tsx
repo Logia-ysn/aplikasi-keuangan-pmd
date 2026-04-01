@@ -56,7 +56,7 @@ export default function TopItemsByStock() {
     >
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>
-          Item Stok Terbanyak
+          Daftar Stok Item {data ? `(${data.length})` : ''}
         </h2>
       </div>
       {isLoading ? (
@@ -69,7 +69,7 @@ export default function TopItemsByStock() {
           <p className="text-xs">Belum ada data item</p>
         </div>
       ) : (
-        <div className="overflow-x-auto">
+        <div className="overflow-auto max-h-96">
           <table className="w-full text-xs">
             <thead>
               <tr style={{ color: 'var(--color-text-muted)' }}>

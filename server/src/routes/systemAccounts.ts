@@ -108,9 +108,7 @@ router.put('/', async (req: AuthRequest, res: Response) => {
     if (!account.isActive) {
       return res.status(400).json({ error: `Akun "${account.accountNumber} - ${account.name}" tidak aktif.` });
     }
-    if (account.isGroup) {
-      return res.status(400).json({ error: `Akun "${account.accountNumber} - ${account.name}" adalah grup, tidak bisa dipilih.` });
-    }
+
   }
 
   // Validate single-account roles don't have multiple entries

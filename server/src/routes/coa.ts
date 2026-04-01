@@ -44,6 +44,7 @@ router.get('/flat', async (req, res) => {
         accountType: true,
         rootType: true,
         isGroup: true,
+        isActive: true,
         balance: true,
       },
     });

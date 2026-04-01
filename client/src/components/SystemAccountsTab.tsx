@@ -38,11 +38,16 @@ interface AccountOption {
 
 const ROLE_GROUPS = [
   { title: 'Kas & Bank', roles: ['CASH'] },
-  { title: 'Piutang & Hutang', roles: ['AR', 'AP'] },
+  { title: 'Piutang & Hutang', roles: ['AR', 'AP', 'ALLOWANCE_DOUBTFUL', 'BAD_DEBT_EXPENSE'] },
   { title: 'Persediaan & HPP', roles: ['INVENTORY', 'COGS'] },
-  { title: 'Pendapatan', roles: ['SALES', 'SERVICE_REVENUE'] },
+  { title: 'Pendapatan', roles: ['SALES', 'SERVICE_REVENUE', 'SALES_DISCOUNT', 'SALES_RETURN'] },
+  { title: 'Pajak', roles: ['TAX_INPUT', 'TAX_OUTPUT', 'INCOME_TAX_EXPENSE'] },
   { title: 'Deposit', roles: ['VENDOR_DEPOSIT', 'CUSTOMER_DEPOSIT'] },
-  { title: 'Ekuitas', roles: ['OPENING_EQUITY', 'RETAINED_EARNINGS', 'CURRENT_PROFIT'] },
+  { title: 'Aset Tetap & Depresiasi', roles: ['FIXED_ASSET', 'ACCUM_DEPRECIATION', 'DEPRECIATION_EXPENSE'] },
+  { title: 'Biaya Bank & Bunga', roles: ['BANK_CHARGE', 'INTEREST_EXPENSE', 'INTEREST_INCOME'] },
+  { title: 'Akrual & Dibayar Dimuka', roles: ['PREPAID_EXPENSE', 'ACCRUED_EXPENSE'] },
+  { title: 'Pendapatan & Beban Lain-lain', roles: ['OTHER_INCOME', 'OTHER_EXPENSE', 'FX_GAIN_LOSS', 'FX_UNREALIZED', 'SHIPPING_EXPENSE', 'ROUNDING_ACCOUNT'] },
+  { title: 'Ekuitas', roles: ['OPENING_EQUITY', 'RETAINED_EARNINGS', 'CURRENT_PROFIT', 'OWNER_DRAWING'] },
 ];
 
 export const SystemAccountsTab: React.FC = () => {
@@ -61,8 +66,8 @@ export const SystemAccountsTab: React.FC = () => {
   const { data: accounts } = useQuery<AccountOption[]>({
     queryKey: ['coa-options'],
     queryFn: async () => {
-      const res = await api.get('/coa');
-      return res.data.filter((a: AccountOption) => !a.isGroup && a.isActive);
+      const res = await api.get('/coa/flat');
+      return res.data.filter((a: AccountOption) => a.isActive);
     },
   });
 

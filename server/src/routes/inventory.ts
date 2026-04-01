@@ -799,9 +799,8 @@ router.get('/dashboard/movement-trend', async (_req, res) => {
 router.get('/dashboard/top-items', async (_req, res) => {
   try {
     const items = await prisma.inventoryItem.findMany({
-      where: { isActive: true, currentStock: { gt: 0 } },
+      where: { isActive: true },
       orderBy: { currentStock: 'desc' },
-      take: 10,
       select: { id: true, code: true, name: true, unit: true, category: true, currentStock: true, minimumStock: true },
     });
 

@@ -957,6 +957,7 @@ const BackupTab: React.FC = () => {
   const [restoreInput, setRestoreInput] = useState('');
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [resetInput, setResetInput] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const generateDummyMutation = useMutation({
     mutationFn: async () => api.post('/settings/generate-dummy'),
@@ -1015,6 +1016,33 @@ const BackupTab: React.FC = () => {
     onError: (error: any) => toast.error(error.response?.data?.error || 'Gagal restore backup.'),
   });
 
+  const uploadMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      return api.post('/backup/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+    },
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ['backups'] });
+      toast.success(res.data.message || 'File backup berhasil diupload.');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    },
+    onError: (error: any) => toast.error(error.response?.data?.error || 'Gagal mengupload file backup.'),
+  });
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.name.endsWith('.sql.gz')) {
+      toast.error('Hanya file .sql.gz yang diperbolehkan.');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+    uploadMutation.mutate(file);
+  };
+
   const handleDownload = (filename: string) => {
     const token = localStorage.getItem('token');
     const baseUrl = (import.meta as any).env?.VITE_API_URL || '/api';
@@ -1055,14 +1083,31 @@ const BackupTab: React.FC = () => {
           <h2 className="text-base font-semibold" style={{ color: 'var(--color-text-primary)' }}>Backup & Restore</h2>
           <p className="text-sm mt-0.5" style={{ color: 'var(--color-text-muted)' }}>Kelola cadangan database aplikasi.</p>
         </div>
-        <button
-          onClick={() => createMutation.mutate()}
-          disabled={createMutation.isPending}
-          className="btn-primary"
-        >
-          {createMutation.isPending ? <Loader2 size={15} className="animate-spin" /> : <HardDrive size={15} />}
-          {createMutation.isPending ? 'Memproses...' : 'Buat Backup Sekarang'}
-        </button>
+        <div className="flex items-center gap-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".sql.gz"
+            onChange={handleFileUpload}
+            className="hidden"
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploadMutation.isPending}
+            className="btn-secondary"
+          >
+            {uploadMutation.isPending ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />}
+            {uploadMutation.isPending ? 'Mengupload...' : 'Upload Backup'}
+          </button>
+          <button
+            onClick={() => createMutation.mutate()}
+            disabled={createMutation.isPending}
+            className="btn-primary"
+          >
+            {createMutation.isPending ? <Loader2 size={15} className="animate-spin" /> : <HardDrive size={15} />}
+            {createMutation.isPending ? 'Memproses...' : 'Buat Backup'}
+          </button>
+        </div>
       </div>
 
       {/* Last backup info */}

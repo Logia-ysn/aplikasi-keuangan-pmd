@@ -82,6 +82,7 @@ async function main() {
     { accountNumber: '1.2.2', name: 'Piutang Karyawan', accountType: A, rootType: RootType.ASSET, isGroup: false, parentNumber: '1.2' },
     { accountNumber: '1.2.3', name: 'Piutang Owner', accountType: A, rootType: RootType.ASSET, isGroup: false, parentNumber: '1.2' },
     { accountNumber: '1.2.4', name: 'Piutang Lain-lain', accountType: A, rootType: RootType.ASSET, isGroup: false, parentNumber: '1.2' },
+    { accountNumber: '1.2.5', name: 'Cadangan Kerugian Piutang', accountType: A, rootType: RootType.ASSET, isGroup: false, parentNumber: '1.2' },
 
     // 1.3 Uang Muka Pembelian
     { accountNumber: '1.3', name: 'Uang Muka Pembelian', accountType: A, rootType: RootType.ASSET, isGroup: false, parentNumber: '1' },
@@ -175,6 +176,7 @@ async function main() {
     { accountNumber: '3.2', name: 'Laba Ditahan', accountType: E, rootType: RootType.EQUITY, isGroup: false, parentNumber: '3' },
     { accountNumber: '3.3', name: 'Modal Saham', accountType: E, rootType: RootType.EQUITY, isGroup: false, parentNumber: '3' },
     { accountNumber: '3.4', name: 'Laba Tahun Berjalan', accountType: E, rootType: RootType.EQUITY, isGroup: false, parentNumber: '3' },
+    { accountNumber: '3.5', name: 'Prive', accountType: E, rootType: RootType.EQUITY, isGroup: false, parentNumber: '3' },
 
     // ═══════════════════════════════════════════
     // 4. PENDAPATAN OPERASIONAL
@@ -220,6 +222,7 @@ async function main() {
     { accountNumber: '6.24', name: 'Beban Penyusutan Inventaris Kantor', accountType: X, rootType: RootType.EXPENSE, isGroup: false, parentNumber: '6' },
     { accountNumber: '6.25', name: 'Beban Pemeliharaan Mesin', accountType: X, rootType: RootType.EXPENSE, isGroup: false, parentNumber: '6' },
     { accountNumber: '6.26', name: 'Beban Pemeliharaan Gedung', accountType: X, rootType: RootType.EXPENSE, isGroup: false, parentNumber: '6' },
+    { accountNumber: '6.27', name: 'Beban Piutang Tak Tertagih', accountType: X, rootType: RootType.EXPENSE, isGroup: false, parentNumber: '6' },
 
     // ═══════════════════════════════════════════
     // 7. PENDAPATAN DILUAR USAHA
@@ -241,6 +244,7 @@ async function main() {
     { accountNumber: '8.5', name: 'Laba/Rugi Belum Terealisasi', accountType: X, rootType: RootType.EXPENSE, isGroup: false, parentNumber: '8' },
     { accountNumber: '8.6', name: 'Laba/Rugi Disposisi Aset', accountType: X, rootType: RootType.EXPENSE, isGroup: false, parentNumber: '8' },
     { accountNumber: '8.7', name: 'Beban Diluar Usaha Lainnya', accountType: X, rootType: RootType.EXPENSE, isGroup: false, parentNumber: '8' },
+    { accountNumber: '8.8', name: 'Pembulatan & Selisih', accountType: X, rootType: RootType.EXPENSE, isGroup: false, parentNumber: '8' },
   ];
 
   const numberToId: Record<string, string> = {};
@@ -309,6 +313,50 @@ async function main() {
     { role: 'OPENING_EQUITY', accountNumber: '3.1', sortOrder: 0 },
     { role: 'RETAINED_EARNINGS', accountNumber: '3.2', sortOrder: 0 },
     { role: 'CURRENT_PROFIT', accountNumber: '3.4', sortOrder: 0 },
+    // Pajak
+    { role: 'TAX_INPUT', accountNumber: '1.5.3', sortOrder: 0 },
+    { role: 'TAX_OUTPUT', accountNumber: '2.2.1', sortOrder: 0 },
+    { role: 'INCOME_TAX_EXPENSE', accountNumber: '6.17', sortOrder: 0 },
+    // Diskon
+    { role: 'SALES_DISCOUNT', accountNumber: '4.4', sortOrder: 0 },
+    { role: 'SALES_RETURN', accountNumber: '4.3', sortOrder: 0 },
+    // Pengiriman
+    { role: 'SHIPPING_EXPENSE', accountNumber: '6.14', sortOrder: 0 },
+    // Aset Tetap & Depresiasi
+    { role: 'FIXED_ASSET', accountNumber: '1.6.1', sortOrder: 0 },
+    { role: 'FIXED_ASSET', accountNumber: '1.6.2', sortOrder: 1 },
+    { role: 'FIXED_ASSET', accountNumber: '1.6.3', sortOrder: 2 },
+    { role: 'FIXED_ASSET', accountNumber: '1.6.4', sortOrder: 3 },
+    { role: 'FIXED_ASSET', accountNumber: '1.6.5', sortOrder: 4 },
+    { role: 'ACCUM_DEPRECIATION', accountNumber: '1.7.1', sortOrder: 0 },
+    { role: 'ACCUM_DEPRECIATION', accountNumber: '1.7.2', sortOrder: 1 },
+    { role: 'ACCUM_DEPRECIATION', accountNumber: '1.7.3', sortOrder: 2 },
+    { role: 'ACCUM_DEPRECIATION', accountNumber: '1.7.4', sortOrder: 3 },
+    { role: 'DEPRECIATION_EXPENSE', accountNumber: '6.21', sortOrder: 0 },
+    { role: 'DEPRECIATION_EXPENSE', accountNumber: '6.22', sortOrder: 1 },
+    { role: 'DEPRECIATION_EXPENSE', accountNumber: '6.23', sortOrder: 2 },
+    { role: 'DEPRECIATION_EXPENSE', accountNumber: '6.24', sortOrder: 3 },
+    // Biaya Bank & Bunga
+    { role: 'BANK_CHARGE', accountNumber: '8.2', sortOrder: 0 },
+    { role: 'INTEREST_EXPENSE', accountNumber: '8.1', sortOrder: 0 },
+    { role: 'INTEREST_INCOME', accountNumber: '7.1', sortOrder: 0 },
+    // Selisih Kurs
+    { role: 'FX_GAIN_LOSS', accountNumber: '8.4', sortOrder: 0 },
+    { role: 'FX_UNREALIZED', accountNumber: '8.5', sortOrder: 0 },
+    // Piutang Tak Tertagih
+    { role: 'BAD_DEBT_EXPENSE', accountNumber: '6.27', sortOrder: 0 },
+    { role: 'ALLOWANCE_DOUBTFUL', accountNumber: '1.2.5', sortOrder: 0 },
+    // Akrual & Dibayar Dimuka
+    { role: 'PREPAID_EXPENSE', accountNumber: '1.5.1', sortOrder: 0 },
+    { role: 'PREPAID_EXPENSE', accountNumber: '1.5.2', sortOrder: 1 },
+    { role: 'ACCRUED_EXPENSE', accountNumber: '2.2.6', sortOrder: 0 },
+    // Ekuitas tambahan
+    { role: 'OWNER_DRAWING', accountNumber: '3.5', sortOrder: 0 },
+    // Pendapatan & Beban Lain-lain
+    { role: 'OTHER_INCOME', accountNumber: '7.4', sortOrder: 0 },
+    { role: 'OTHER_EXPENSE', accountNumber: '8.7', sortOrder: 0 },
+    // Pembulatan
+    { role: 'ROUNDING_ACCOUNT', accountNumber: '8.8', sortOrder: 0 },
   ];
 
   for (const mapping of systemMappings) {
