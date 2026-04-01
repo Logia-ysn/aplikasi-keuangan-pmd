@@ -3,8 +3,8 @@
  * Update file ini setiap kali release baru.
  */
 
-export const APP_VERSION = '1.9.0';
-export const APP_BUILD_DATE = '2026-03-29';
+export const APP_VERSION = '2.0.0';
+export const APP_BUILD_DATE = '2026-04-01';
 export const APP_NAME = 'Keuangan';
 
 export interface ChangelogEntry {
@@ -15,6 +15,24 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '2.0.0',
+    date: '2026-04-01',
+    title: 'Konfigurasi Akun Sistem & Perbaikan COA',
+    changes: [
+      'Fitur Akun Sistem: konfigurasi mapping akun COA untuk auto GL posting via Pengaturan > Akun Sistem',
+      'Akun sistem (AR, AP, Kas, Penjualan, dll) sekarang bisa diganti tanpa ubah kode — mendukung berbagai jenis industri',
+      'Multi-akun untuk Kas & Bank: tambah/hapus akun bank fleksibel',
+      'Validasi startup: warning otomatis jika mapping akun belum lengkap',
+      'Perbaikan COA: akun 7 dipisah menjadi 7 (Pendapatan Diluar Usaha) dan 8 (Beban Diluar Usaha)',
+      'Akun 5 (HPP) sekarang isGroup=true untuk mendukung sub-akun',
+      'Fix saldo awal: gunakan Ekuitas Saldo Awal (3.1) bukan Laba Ditahan (3.2)',
+      'Fix import Excel: kolom "balance" sekarang terbaca saat import COA',
+      'Fix stok: GL posting otomatis saat tambah riwayat stok meskipun item belum punya akun',
+      'Fix laporan Laba Rugi: support multiple root group pendapatan dan beban',
+      'Refactor 13 route files: hapus hardcoded account numbers',
+    ],
+  },
   {
     version: '1.9.0',
     date: '2026-03-29',
