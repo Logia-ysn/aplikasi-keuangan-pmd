@@ -9,7 +9,7 @@ import { getOpenFiscalYear } from '../utils/fiscalYear';
 import { validateBody } from '../utils/validate';
 import { CreatePaymentSchema } from '../utils/schemas';
 import { BusinessError, handleRouteError } from '../utils/errors';
-import { ACCOUNT_NUMBERS } from '../constants/accountNumbers';
+import { systemAccounts } from '../services/systemAccounts';
 import { logger } from '../lib/logger';
 
 const router = Router();
@@ -102,9 +102,7 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
       // Verify account exists and is a cash/bank account
       const bankAccount = await tx.account.findUnique({ where: { id: body.accountId } });
       if (!bankAccount) throw new BusinessError('Akun kas/bank tidak ditemukan.');
-      const isCashAccount = ACCOUNT_NUMBERS.CASH.some(
-        (prefix) => bankAccount.accountNumber.startsWith(prefix)
-      );
+      const isCashAccount = await systemAccounts.isCashAccount(bankAccount.accountNumber);
       if (!isCashAccount) {
         throw new BusinessError('Akun yang dipilih bukan akun kas/bank.');
       }
@@ -139,8 +137,7 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
         if (party.partyType !== 'Supplier' && party.partyType !== 'Both') {
           throw new BusinessError('Uang muka hanya dapat dibuat untuk Supplier.');
         }
-        const depositAccount = await tx.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.VENDOR_DEPOSIT } });
-        if (!depositAccount) throw new BusinessError('Akun Uang Muka Vendor (1.2.1) tidak ditemukan.');
+        const depositAccount = await systemAccounts.getAccount('VENDOR_DEPOSIT');
 
         const jvNumber = `JV-${paymentNumber}`;
         const existingJV = await tx.journalEntry.findUnique({ where: { entryNumber: jvNumber } });
@@ -187,8 +184,7 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
         if (party.partyType !== 'Customer' && party.partyType !== 'Both') {
           throw new BusinessError('Uang muka pelanggan hanya dapat dibuat untuk Customer.');
         }
-        const depositAccount = await tx.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.CUSTOMER_DEPOSIT } });
-        if (!depositAccount) throw new BusinessError('Akun Uang Muka Pelanggan (2.1.2) tidak ditemukan.');
+        const depositAccount = await systemAccounts.getAccount('CUSTOMER_DEPOSIT');
 
         const jvNumber = `JV-${paymentNumber}`;
         const existingJV = await tx.journalEntry.findUnique({ where: { entryNumber: jvNumber } });
@@ -231,9 +227,8 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
       }
 
       // ── Receive / Pay branch ────────────────────────────────────────────
-      const arAccount = await tx.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.AR } });
-      const apAccount = await tx.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.AP } });
-      if (!arAccount || !apAccount) throw new BusinessError('Konfigurasi akun AR/AP tidak ditemukan.');
+      const arAccount = await systemAccounts.getAccount('AR');
+      const apAccount = await systemAccounts.getAccount('AP');
 
       // Determine GL posting sides
       // Receive (customer paying us): Dr Bank/Kas, Cr AR
@@ -370,9 +365,9 @@ router.post('/:id/cancel', roleMiddleware(['Admin']), async (req: AuthRequest, r
           await tx.accountingLedgerEntry.updateMany({ where: { referenceId: journal.id }, data: { isCancelled: true } });
         }
 
-        const depositAccount = await tx.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.VENDOR_DEPOSIT } });
+        const depositAccount = await systemAccounts.getAccount('VENDOR_DEPOSIT');
         const numAmountVal = numAmount.toNumber();
-        if (depositAccount) await updateAccountBalance(tx, depositAccount.id, 0, numAmountVal);
+        await updateAccountBalance(tx, depositAccount.id, 0, numAmountVal);
         await updateAccountBalance(tx, payment.accountId, numAmountVal, 0);
 
         await tx.party.update({
@@ -404,9 +399,9 @@ router.post('/:id/cancel', roleMiddleware(['Admin']), async (req: AuthRequest, r
           await tx.accountingLedgerEntry.updateMany({ where: { referenceId: journal.id }, data: { isCancelled: true } });
         }
 
-        const depositAccount = await tx.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.CUSTOMER_DEPOSIT } });
+        const depositAccount = await systemAccounts.getAccount('CUSTOMER_DEPOSIT');
         const numAmountVal = numAmount.toNumber();
-        if (depositAccount) await updateAccountBalance(tx, depositAccount.id, numAmountVal, 0); // reverse CR
+        await updateAccountBalance(tx, depositAccount.id, numAmountVal, 0); // reverse CR
         await updateAccountBalance(tx, payment.accountId, 0, numAmountVal); // reverse DR
 
         await tx.party.update({
@@ -473,15 +468,15 @@ router.post('/:id/cancel', roleMiddleware(['Admin']), async (req: AuthRequest, r
       }
 
       // Reverse account balances
-      const arAccount = await tx.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.AR } });
-      const apAccount = await tx.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.AP } });
+      const arAccount = await systemAccounts.getAccount('AR');
+      const apAccount = await systemAccounts.getAccount('AP');
       const numAmountVal = numAmount.toNumber();
 
       if (payment.paymentType === 'Receive') {
         await updateAccountBalance(tx, payment.accountId, 0, numAmountVal); // reverse bank debit
-        if (arAccount) await updateAccountBalance(tx, arAccount.id, numAmountVal, 0); // reverse AR credit
+        await updateAccountBalance(tx, arAccount.id, numAmountVal, 0); // reverse AR credit
       } else {
-        if (apAccount) await updateAccountBalance(tx, apAccount.id, 0, numAmountVal); // reverse AP debit
+        await updateAccountBalance(tx, apAccount.id, 0, numAmountVal); // reverse AP debit
         await updateAccountBalance(tx, payment.accountId, numAmountVal, 0); // reverse bank credit
       }
 

@@ -45,6 +45,7 @@ model Account {
   movementsAsOffset   StockMovement[]          @relation("MovementOffset")
   reconciliations     BankReconciliation[]     @relation("ReconciliationAccount")
   serviceItems        ServiceItem[]            @relation("ServiceItemAccount")
+  systemAccountMappings SystemAccountMapping[] @relation("MappedAccount")
   createdAt           DateTime                 @default(now())
   updatedAt           DateTime                 @updatedAt
 
@@ -405,6 +406,20 @@ model CompanySettings {
   fiscalYearStartMonth Int     @default(1) @map("fiscal_year_start_month")
 
   @@map("company_settings")
+}
+
+model SystemAccountMapping {
+  id        String   @id @default(uuid())
+  role      String
+  accountId String   @map("account_id")
+  account   Account  @relation("MappedAccount", fields: [accountId], references: [id])
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([role, accountId])
+  @@index([role])
+  @@map("system_account_mappings")
 }
 
 enum DocumentStatus {

@@ -14,6 +14,7 @@ import { id } from 'date-fns/locale';
 import { cn } from '../lib/utils';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { APP_VERSION, APP_BUILD_DATE, APP_NAME, CHANGELOG } from '../lib/version';
+import { SystemAccountsTab } from '../components/SystemAccountsTab';
 
 interface FiscalYear {
   id: string;
@@ -1354,10 +1355,11 @@ const BackupTab: React.FC = () => {
 
 // ─── Main Settings Page ───────────────────────────────────
 export const SettingsPage: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'fiscal' | 'company' | 'tax' | 'backup' | 'about'>('fiscal');
+  const [activeTab, setActiveTab] = useState<'fiscal' | 'company' | 'accounts' | 'tax' | 'backup' | 'about'>('fiscal');
   const tabs = [
     { id: 'fiscal', label: 'Tahun Buku', icon: Calendar },
     { id: 'company', label: 'Profil Perusahaan', icon: Building2 },
+    { id: 'accounts', label: 'Akun Sistem', icon: Shield },
     { id: 'tax', label: 'Pajak', icon: Receipt },
     { id: 'backup', label: 'Backup', icon: HardDrive },
     { id: 'about', label: 'Tentang Aplikasi', icon: Info },
@@ -1395,6 +1397,7 @@ export const SettingsPage: React.FC = () => {
 
       {activeTab === 'fiscal' && <FiscalYearsTab />}
       {activeTab === 'company' && <CompanySettingsTab />}
+      {activeTab === 'accounts' && <SystemAccountsTab />}
       {activeTab === 'tax' && <TaxConfigTab />}
       {activeTab === 'backup' && <BackupTab />}
       {activeTab === 'about' && <AboutTab />}

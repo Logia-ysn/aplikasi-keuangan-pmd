@@ -8,7 +8,7 @@ import { AuthRequest, roleMiddleware } from '../middleware/auth';
 import { updateAccountBalance, updateBalancesForItems } from '../utils/accountBalance';
 import { generateDocumentNumber } from '../utils/documentNumber';
 import { getOpenFiscalYear } from '../utils/fiscalYear';
-import { ACCOUNT_NUMBERS } from '../constants/accountNumbers';
+import { systemAccounts } from '../services/systemAccounts';
 import { logger } from '../lib/logger';
 
 const router = Router();
@@ -127,7 +127,7 @@ router.post(
           continue;
         }
 
-        const openingBalanceStr = (r.openingBalance || r.opening_balance || r.saldoAwal || r.saldo_awal || '').trim();
+        const openingBalanceStr = (r.openingBalance || r.opening_balance || r.saldoAwal || r.saldo_awal || r.balance || '').toString().trim();
         const openingBalance = openingBalanceStr ? parseFloat(openingBalanceStr) : 0;
         if (isNaN(openingBalance)) {
           errors.push({ row: rowNum, message: `openingBalance "${openingBalanceStr}" bukan angka valid.` });
@@ -197,20 +197,20 @@ router.post(
           if (needsJournal) {
             const isCustomer = row.partyType === 'Customer' || row.partyType === 'Both';
             const isSupplier = row.partyType === 'Supplier' || row.partyType === 'Both';
-            const arAccount = await prisma.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.AR } });
-            const apAccount = await prisma.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.AP } });
-            const vendorDepositAccount = await prisma.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.VENDOR_DEPOSIT } });
-            const customerDepositAccount = await prisma.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.CUSTOMER_DEPOSIT } });
-            const openingEquityAccount = await prisma.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.OPENING_EQUITY } });
+            const arAccount = await systemAccounts.getAccount('AR');
+            const apAccount = await systemAccounts.getAccount('AP');
+            const vendorDepositAccount = await systemAccounts.getAccount('VENDOR_DEPOSIT');
+            const customerDepositAccount = await systemAccounts.getAccount('CUSTOMER_DEPOSIT');
+            const openingEquityAccount = await systemAccounts.getAccount('OPENING_EQUITY');
 
-            if (openingEquityAccount) {
+            {
               const now = new Date();
               const fiscalYear = await getOpenFiscalYear(prisma as any, now);
 
               // 1) AR/AP opening balance journal
               if (openingBalance > 0) {
                 const receivableAccount = isCustomer ? arAccount : apAccount;
-                if (receivableAccount) {
+                {
                   const jvNumber = await generateDocumentNumber(prisma as any, 'JV', now, fiscalYear.id);
                   await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
                     const journal = await tx.journalEntry.create({
@@ -260,7 +260,7 @@ router.post(
               }
 
               // 2) Vendor deposit: create Payment record + GL journal
-              if (depositBalance > 0 && isSupplier && vendorDepositAccount) {
+              if (depositBalance > 0 && isSupplier) {
                 await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
                   const payNumber = await generateDocumentNumber(tx, 'PAY', now, fiscalYear.id);
                   const jvNumber = await generateDocumentNumber(tx, 'JV', now, fiscalYear.id);
@@ -325,7 +325,7 @@ router.post(
               }
 
               // 3) Customer deposit: create Payment record + GL journal
-              if (customerDepositBalance > 0 && isCustomer && customerDepositAccount) {
+              if (customerDepositBalance > 0 && isCustomer) {
                 await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
                   const payNumber = await generateDocumentNumber(tx, 'PAY', now, fiscalYear.id);
                   const jvNumber = await generateDocumentNumber(tx, 'JV', now, fiscalYear.id);
@@ -442,7 +442,7 @@ router.post(
         const parentNumber = (r.parentNumber || r.parent_number || '').trim();
         const isGroupStr = (r.isGroup || r.is_group || '').toString().trim().toLowerCase();
         const isGroup = ['true', '1', 'yes', 'ya'].includes(isGroupStr);
-        const openingBalanceStr = (r.openingBalance || r.opening_balance || r.saldoAwal || r.saldo_awal || '').trim();
+        const openingBalanceStr = (r.openingBalance || r.opening_balance || r.saldoAwal || r.saldo_awal || r.balance || '').toString().trim();
         const openingBalance = openingBalanceStr ? parseFloat(openingBalanceStr) : 0;
 
         if (!accountNumber) {
@@ -537,8 +537,8 @@ router.post(
 
           // Create opening balance GL journal for non-group accounts with balance
           if (row.openingBalance !== 0 && !row.isGroup) {
-            const openingEquity = await prisma.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.OPENING_EQUITY } });
-            if (openingEquity && account.id !== openingEquity.id) {
+            const openingEquity = await systemAccounts.getAccount('OPENING_EQUITY');
+            if (account.id !== openingEquity.id) {
               const now = new Date();
               const fiscalYear = await getOpenFiscalYear(prisma as any, now);
               const jvNumber = await generateDocumentNumber(prisma as any, 'JV', now, fiscalYear.id);
@@ -884,10 +884,10 @@ router.post(
               // GL: DR Inventory / CR Ekuitas Saldo Awal
               const invAccount = item.accountId
                 ? await tx.account.findUnique({ where: { id: item.accountId } })
-                : await tx.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.INVENTORY } });
-              const openingEquity = await tx.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.OPENING_EQUITY } });
+                : await systemAccounts.getAccount('INVENTORY');
+              const openingEquity = await systemAccounts.getAccount('OPENING_EQUITY');
 
-              if (invAccount && openingEquity) {
+              if (invAccount) {
                 const jvNumber = await generateDocumentNumber(tx, 'JV', now, fiscalYear.id);
                 const journal = await tx.journalEntry.create({
                   data: {

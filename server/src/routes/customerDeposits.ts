@@ -9,7 +9,7 @@ import { getOpenFiscalYear } from '../utils/fiscalYear';
 import { validateBody } from '../utils/validate';
 import { ApplyCustomerDepositSchema } from '../utils/schemas';
 import { BusinessError, handleRouteError } from '../utils/errors';
-import { ACCOUNT_NUMBERS } from '../constants/accountNumbers';
+import { systemAccounts } from '../services/systemAccounts';
 import { logger } from '../lib/logger';
 
 const router = Router();
@@ -148,10 +148,10 @@ router.patch('/:id/cancel', roleMiddleware(['Admin', 'Accountant']), async (req:
         });
       } else {
         // No linked journal (legacy imports) — reverse account balances directly
-        const customerDepositAccount = await tx.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.CUSTOMER_DEPOSIT } });
-        const openingEquityAccount = await tx.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.OPENING_EQUITY } });
+        const customerDepositAccount = await systemAccounts.getAccount('CUSTOMER_DEPOSIT');
+        const openingEquityAccount = await systemAccounts.getAccount('OPENING_EQUITY');
 
-        if (customerDepositAccount && openingEquityAccount) {
+        {
           // Reverse: DR Customer Deposit / CR Ekuitas Saldo Awal
           await updateAccountBalance(tx, customerDepositAccount.id, depositAmount, 0);
           await updateAccountBalance(tx, openingEquityAccount.id, 0, depositAmount);
@@ -261,9 +261,8 @@ router.post('/apply', roleMiddleware(['Admin', 'Accountant']), async (req: AuthR
       const parsedDate = new Date();
       const fiscalYear = await getOpenFiscalYear(tx, parsedDate);
 
-      const arAccount = await tx.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.AR } });
-      const depositAccount = await tx.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.CUSTOMER_DEPOSIT } });
-      if (!arAccount || !depositAccount) throw new BusinessError('Konfigurasi akun AR/Uang Muka Pelanggan tidak ditemukan.');
+      const arAccount = await systemAccounts.getAccount('AR');
+      const depositAccount = await systemAccounts.getAccount('CUSTOMER_DEPOSIT');
 
       const applyAmountNum = applyAmount.toNumber();
 

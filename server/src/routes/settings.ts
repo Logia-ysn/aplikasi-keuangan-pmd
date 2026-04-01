@@ -7,7 +7,7 @@ import { roleMiddleware } from '../middleware/auth';
 import { validateBody } from '../utils/validate';
 import { UpdateCompanySettingsSchema } from '../utils/schemas';
 import { logger } from '../lib/logger';
-import { ACCOUNT_NUMBERS } from '../constants/accountNumbers';
+import { systemAccounts } from '../services/systemAccounts';
 import { generateDocumentNumber } from '../utils/documentNumber';
 import { getOpenFiscalYear } from '../utils/fiscalYear';
 
@@ -125,13 +125,14 @@ router.post('/generate-dummy', roleMiddleware(['Admin']), async (req, res) => {
     // Get account IDs
     const accounts = await prisma.account.findMany({ where: { isGroup: false } });
     const acctMap = new Map(accounts.map(a => [a.accountNumber, a.id]));
-    const kasId = acctMap.get(ACCOUNT_NUMBERS.CASH[0]);       // 1.1.1 Petty Cash
-    const bankId = acctMap.get(ACCOUNT_NUMBERS.CASH[1]);      // 1.1.2 Bank BRI
-    const arId = acctMap.get(ACCOUNT_NUMBERS.AR);             // 1.2.1 Piutang Usaha
-    const invId = acctMap.get(ACCOUNT_NUMBERS.INVENTORY);     // 1.4.0 Persediaan
-    const apId = acctMap.get(ACCOUNT_NUMBERS.AP);             // 2.1.1 Hutang Usaha
-    const salesId = acctMap.get(ACCOUNT_NUMBERS.SALES);       // 4.1 Penjualan
-    const cogsId = acctMap.get(ACCOUNT_NUMBERS.COGS);         // 5 HPP
+    const cashMappings = await systemAccounts.getAccounts('CASH');
+    const kasId = cashMappings[0]?.id;                        // Petty Cash
+    const bankId = cashMappings[1]?.id;                       // Bank BRI
+    const arId = (await systemAccounts.getAccount('AR')).id;
+    const invId = (await systemAccounts.getAccount('INVENTORY')).id;
+    const apId = (await systemAccounts.getAccount('AP')).id;
+    const salesId = (await systemAccounts.getAccount('SALES')).id;
+    const cogsId = (await systemAccounts.getAccount('COGS')).id;
     const gajiId = acctMap.get('6.4');                         // Beban Gaji
     const listrikId = acctMap.get('6.11');                     // Beban Listrik
 

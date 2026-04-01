@@ -9,7 +9,7 @@ import { getOpenFiscalYear } from '../utils/fiscalYear';
 import { validateBody } from '../utils/validate';
 import { CreatePurchaseInvoiceSchema } from '../utils/schemas';
 import { BusinessError, handleRouteError } from '../utils/errors';
-import { ACCOUNT_NUMBERS } from '../constants/accountNumbers';
+import { systemAccounts } from '../services/systemAccounts';
 import { logger } from '../lib/logger';
 
 const router = Router();
@@ -90,9 +90,8 @@ router.post('/', roleMiddleware(['Admin', 'Accountant', 'StaffProduksi']), async
       if (!party) throw new BusinessError('Data supplier tidak ditemukan.');
       if (!party.isActive) throw new BusinessError('Supplier sudah tidak aktif.');
 
-      const apAccount = await tx.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.AP } });
-      const inventoryAccount = await tx.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.INVENTORY } });
-      if (!apAccount || !inventoryAccount) throw new BusinessError('Konfigurasi akun AP/Persediaan tidak ditemukan.');
+      const apAccount = await systemAccounts.getAccount('AP');
+      const inventoryAccount = await systemAccounts.getAccount('INVENTORY');
 
       const subtotal = body.items.reduce((sum, item) => {
         const base = new Decimal(item.quantity).mul(new Decimal(item.rate));
@@ -362,10 +361,10 @@ router.post('/:id/cancel', roleMiddleware(['Admin']), async (req: AuthRequest, r
         }
       } else {
         // Fallback: reverse generic accounts
-        const apAccount = await tx.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.AP } });
-        const inventoryAccount = await tx.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.INVENTORY } });
-        if (inventoryAccount) await updateAccountBalance(tx, inventoryAccount.id, 0, Number(invoice.grandTotal));
-        if (apAccount) await updateAccountBalance(tx, apAccount.id, Number(invoice.grandTotal), 0);
+        const apAccount = await systemAccounts.getAccount('AP');
+        const inventoryAccount = await systemAccounts.getAccount('INVENTORY');
+        await updateAccountBalance(tx, inventoryAccount.id, 0, Number(invoice.grandTotal));
+        await updateAccountBalance(tx, apAccount.id, Number(invoice.grandTotal), 0);
       }
 
       await tx.party.update({

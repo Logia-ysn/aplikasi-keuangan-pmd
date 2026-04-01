@@ -9,7 +9,7 @@ import { getOpenFiscalYear } from '../utils/fiscalYear';
 import { validateBody } from '../utils/validate';
 import { ApplyVendorDepositSchema } from '../utils/schemas';
 import { BusinessError, handleRouteError } from '../utils/errors';
-import { ACCOUNT_NUMBERS } from '../constants/accountNumbers';
+import { systemAccounts } from '../services/systemAccounts';
 import { logger } from '../lib/logger';
 
 const router = Router();
@@ -148,10 +148,10 @@ router.patch('/:id/cancel', roleMiddleware(['Admin', 'Accountant']), async (req:
         });
       } else {
         // No linked journal (legacy imports) — reverse account balances directly
-        const vendorDepositAccount = await tx.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.VENDOR_DEPOSIT } });
-        const openingEquityAccount = await tx.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.OPENING_EQUITY } });
+        const vendorDepositAccount = await systemAccounts.getAccount('VENDOR_DEPOSIT');
+        const openingEquityAccount = await systemAccounts.getAccount('OPENING_EQUITY');
 
-        if (vendorDepositAccount && openingEquityAccount) {
+        {
           // Reverse: CR Vendor Deposit / DR Ekuitas Saldo Awal
           await updateAccountBalance(tx, vendorDepositAccount.id, 0, depositAmount);
           await updateAccountBalance(tx, openingEquityAccount.id, depositAmount, 0);
@@ -261,9 +261,8 @@ router.post('/apply', roleMiddleware(['Admin', 'Accountant']), async (req: AuthR
       const parsedDate = new Date();
       const fiscalYear = await getOpenFiscalYear(tx, parsedDate);
 
-      const apAccount = await tx.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.AP } });
-      const depositAccount = await tx.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.VENDOR_DEPOSIT } });
-      if (!apAccount || !depositAccount) throw new BusinessError('Konfigurasi akun AP/Uang Muka tidak ditemukan.');
+      const apAccount = await systemAccounts.getAccount('AP');
+      const depositAccount = await systemAccounts.getAccount('VENDOR_DEPOSIT');
 
       const applyAmountNum = applyAmount.toNumber();
 

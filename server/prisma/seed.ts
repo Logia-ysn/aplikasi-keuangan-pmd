@@ -188,7 +188,7 @@ async function main() {
     // ═══════════════════════════════════════════
     // 5. BEBAN POKOK PENJUALAN
     // ═══════════════════════════════════════════
-    { accountNumber: '5', name: 'Beban Pokok Penjualan', accountType: X, rootType: RootType.EXPENSE, isGroup: false },
+    { accountNumber: '5', name: 'Beban Pokok Penjualan', accountType: X, rootType: RootType.EXPENSE, isGroup: true },
 
     // ═══════════════════════════════════════════
     // 6. BEBAN OPERASIONAL
@@ -222,26 +222,25 @@ async function main() {
     { accountNumber: '6.26', name: 'Beban Pemeliharaan Gedung', accountType: X, rootType: RootType.EXPENSE, isGroup: false, parentNumber: '6' },
 
     // ═══════════════════════════════════════════
-    // 7. PENDAPATAN & BEBAN DILUAR USAHA
+    // 7. PENDAPATAN DILUAR USAHA
     // ═══════════════════════════════════════════
-    { accountNumber: '7', name: 'Pendapatan & Beban Diluar Usaha', accountType: R, rootType: RootType.REVENUE, isGroup: true },
+    { accountNumber: '7', name: 'Pendapatan Diluar Usaha', accountType: R, rootType: RootType.REVENUE, isGroup: true },
+    { accountNumber: '7.1', name: 'Pendapatan Bunga Deposito', accountType: R, rootType: RootType.REVENUE, isGroup: false, parentNumber: '7' },
+    { accountNumber: '7.2', name: 'Penjualan Persediaan / Perlengkapan', accountType: R, rootType: RootType.REVENUE, isGroup: false, parentNumber: '7' },
+    { accountNumber: '7.3', name: 'Laba/Rugi Revaluasi Aset', accountType: R, rootType: RootType.REVENUE, isGroup: false, parentNumber: '7' },
+    { accountNumber: '7.4', name: 'Pendapatan Diluar Usaha Lainnya', accountType: R, rootType: RootType.REVENUE, isGroup: false, parentNumber: '7' },
 
-    // 7.1 Pendapatan Diluar Usaha
-    { accountNumber: '7.1', name: 'Pendapatan Diluar Usaha', accountType: R, rootType: RootType.REVENUE, isGroup: true, parentNumber: '7' },
-    { accountNumber: '7.1.1', name: 'Pendapatan Bunga Deposito', accountType: R, rootType: RootType.REVENUE, isGroup: false, parentNumber: '7.1' },
-    { accountNumber: '7.1.2', name: 'Penjualan Persediaan / Perlengkapan', accountType: R, rootType: RootType.REVENUE, isGroup: false, parentNumber: '7.1' },
-    { accountNumber: '7.1.3', name: 'Laba/Rugi Revaluasi Aset', accountType: R, rootType: RootType.REVENUE, isGroup: false, parentNumber: '7.1' },
-    { accountNumber: '7.1.4', name: 'Pendapatan Diluar Usaha Lainnya', accountType: R, rootType: RootType.REVENUE, isGroup: false, parentNumber: '7.1' },
-
-    // 7.2 Beban Diluar Usaha
-    { accountNumber: '7.2', name: 'Beban Diluar Usaha', accountType: X, rootType: RootType.EXPENSE, isGroup: true, parentNumber: '7' },
-    { accountNumber: '7.2.1', name: 'Beban Bunga Pinjaman', accountType: X, rootType: RootType.EXPENSE, isGroup: false, parentNumber: '7.2' },
-    { accountNumber: '7.2.2', name: 'Beban Adm. Bank & Buku Cek/Giro', accountType: X, rootType: RootType.EXPENSE, isGroup: false, parentNumber: '7.2' },
-    { accountNumber: '7.2.3', name: 'Pajak Jasa Giro', accountType: X, rootType: RootType.EXPENSE, isGroup: false, parentNumber: '7.2' },
-    { accountNumber: '7.2.4', name: 'Laba/Rugi Terealisasi', accountType: X, rootType: RootType.EXPENSE, isGroup: false, parentNumber: '7.2' },
-    { accountNumber: '7.2.5', name: 'Laba/Rugi Belum Terealisasi', accountType: X, rootType: RootType.EXPENSE, isGroup: false, parentNumber: '7.2' },
-    { accountNumber: '7.2.6', name: 'Laba/Rugi Disposisi Aset', accountType: X, rootType: RootType.EXPENSE, isGroup: false, parentNumber: '7.2' },
-    { accountNumber: '7.2.7', name: 'Beban Diluar Usaha Lainnya', accountType: X, rootType: RootType.EXPENSE, isGroup: false, parentNumber: '7.2' },
+    // ═══════════════════════════════════════════
+    // 8. BEBAN DILUAR USAHA
+    // ═══════════════════════════════════════════
+    { accountNumber: '8', name: 'Beban Diluar Usaha', accountType: X, rootType: RootType.EXPENSE, isGroup: true },
+    { accountNumber: '8.1', name: 'Beban Bunga Pinjaman', accountType: X, rootType: RootType.EXPENSE, isGroup: false, parentNumber: '8' },
+    { accountNumber: '8.2', name: 'Beban Adm. Bank & Buku Cek/Giro', accountType: X, rootType: RootType.EXPENSE, isGroup: false, parentNumber: '8' },
+    { accountNumber: '8.3', name: 'Pajak Jasa Giro', accountType: X, rootType: RootType.EXPENSE, isGroup: false, parentNumber: '8' },
+    { accountNumber: '8.4', name: 'Laba/Rugi Terealisasi', accountType: X, rootType: RootType.EXPENSE, isGroup: false, parentNumber: '8' },
+    { accountNumber: '8.5', name: 'Laba/Rugi Belum Terealisasi', accountType: X, rootType: RootType.EXPENSE, isGroup: false, parentNumber: '8' },
+    { accountNumber: '8.6', name: 'Laba/Rugi Disposisi Aset', accountType: X, rootType: RootType.EXPENSE, isGroup: false, parentNumber: '8' },
+    { accountNumber: '8.7', name: 'Beban Diluar Usaha Lainnya', accountType: X, rootType: RootType.EXPENSE, isGroup: false, parentNumber: '8' },
   ];
 
   const numberToId: Record<string, string> = {};
@@ -292,7 +291,47 @@ async function main() {
     console.log(`- Upserted Service Item: ${si.code} ${si.name}`);
   }
 
-  // 5. Seed Company Settings
+  // 5. Seed System Account Mappings
+  const systemMappings: { role: string; accountNumber: string; sortOrder: number }[] = [
+    { role: 'CASH', accountNumber: '1.1.1', sortOrder: 0 },
+    { role: 'CASH', accountNumber: '1.1.2', sortOrder: 1 },
+    { role: 'CASH', accountNumber: '1.1.3', sortOrder: 2 },
+    { role: 'CASH', accountNumber: '1.1.4', sortOrder: 3 },
+    { role: 'CASH', accountNumber: '1.1.5', sortOrder: 4 },
+    { role: 'AR', accountNumber: '1.2.1', sortOrder: 0 },
+    { role: 'INVENTORY', accountNumber: '1.4.0', sortOrder: 0 },
+    { role: 'AP', accountNumber: '2.1.1', sortOrder: 0 },
+    { role: 'SALES', accountNumber: '4.1', sortOrder: 0 },
+    { role: 'SERVICE_REVENUE', accountNumber: '4.2', sortOrder: 0 },
+    { role: 'VENDOR_DEPOSIT', accountNumber: '1.3', sortOrder: 0 },
+    { role: 'CUSTOMER_DEPOSIT', accountNumber: '2.1.2', sortOrder: 0 },
+    { role: 'COGS', accountNumber: '5', sortOrder: 0 },
+    { role: 'OPENING_EQUITY', accountNumber: '3.1', sortOrder: 0 },
+    { role: 'RETAINED_EARNINGS', accountNumber: '3.2', sortOrder: 0 },
+    { role: 'CURRENT_PROFIT', accountNumber: '3.4', sortOrder: 0 },
+  ];
+
+  for (const mapping of systemMappings) {
+    const accountId = numberToId[mapping.accountNumber];
+    if (!accountId) {
+      console.log(`- Skipped system mapping ${mapping.role}: account ${mapping.accountNumber} not found`);
+      continue;
+    }
+    await prisma.systemAccountMapping.upsert({
+      where: {
+        role_accountId: { role: mapping.role, accountId },
+      },
+      update: { sortOrder: mapping.sortOrder },
+      create: {
+        role: mapping.role,
+        accountId,
+        sortOrder: mapping.sortOrder,
+      },
+    });
+  }
+  console.log(`- Seeded ${systemMappings.length} system account mappings`);
+
+  // 6. Seed Company Settings
   await prisma.companySettings.upsert({
     where: { slug: 'default' },
     update: {},

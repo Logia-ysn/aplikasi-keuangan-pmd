@@ -3,7 +3,7 @@ import ExcelJS from 'exceljs';
 import { prisma } from '../lib/prisma';
 import { Prisma } from '@prisma/client';
 import { computeImpact } from '../utils/accountBalance';
-import { ACCOUNT_NUMBERS } from '../constants/accountNumbers';
+import { systemAccounts } from '../services/systemAccounts';
 import { logger } from '../lib/logger';
 import { compareAccountNumber } from '../utils/accountSort';
 
@@ -142,30 +142,24 @@ router.get('/profit-loss', async (req, res) => {
         }))
         .filter((a) => a.balance !== 0 || a.isGroup);
 
-    const revenueRoot = allAccounts.find((a) => a.isGroup && a.rootType === 'REVENUE' && !a.parentId);
-    const revenueAccounts = buildHierarchy(revenueRoot?.id || null);
+    // Build top-level items for each rootType — include roots themselves with nested children
+    const buildRootItems = (rootType: string): any[] => {
+      const roots = allAccounts.filter((a) => a[`rootType`] === rootType && !a.parentId);
+      return roots
+        .map((root) => ({
+          id: root.id,
+          name: root.name,
+          accountNumber: root.accountNumber,
+          isGroup: root.isGroup,
+          balance: getBalance(root.id),
+          children: root.isGroup ? buildHierarchy(root.id) : [],
+        }))
+        .filter((a) => a.balance !== 0 || a.isGroup)
+        .sort((a: any, b: any) => compareAccountNumber(a.accountNumber, b.accountNumber));
+    };
 
-    // Handle ALL root-level EXPENSE accounts (both group and non-group like HPP account 5)
-    const expenseRoots = allAccounts.filter((a) => a.rootType === 'EXPENSE' && !a.parentId);
-    const expenseAccounts: any[] = [];
-    for (const root of expenseRoots) {
-      if (root.isGroup) {
-        expenseAccounts.push(...buildHierarchy(root.id));
-      } else {
-        const balance = getBalance(root.id);
-        if (balance !== 0) {
-          expenseAccounts.push({
-            id: root.id,
-            name: root.name,
-            accountNumber: root.accountNumber,
-            isGroup: root.isGroup,
-            balance,
-            children: [],
-          });
-        }
-      }
-    }
-    expenseAccounts.sort((a: any, b: any) => compareAccountNumber(a.accountNumber, b.accountNumber));
+    const revenueAccounts = buildRootItems('REVENUE');
+    const expenseAccounts = buildRootItems('EXPENSE');
 
     const totalRevenue = revenueAccounts.reduce((s: number, a: any) => s + Number(a.balance), 0);
     const totalExpense = expenseAccounts.reduce((s: number, a: any) => s + Number(a.balance), 0);
@@ -259,19 +253,20 @@ router.get('/balance-sheet', async (req, res) => {
       (Number(expAgg._sum?.debit || 0) - Number(expAgg._sum?.credit || 0));
 
     // Remove real 3.3.1 account from hierarchy to avoid double-counting with synthetic entry
+    const currentProfitAccount = await systemAccounts.getAccount('CURRENT_PROFIT');
     const filterOutCurrentProfit = (items: any[]): any[] =>
       items
         .map((item) => ({
           ...item,
           children: item.children ? filterOutCurrentProfit(item.children) : [],
         }))
-        .filter((item) => item.accountNumber !== ACCOUNT_NUMBERS.CURRENT_PROFIT);
+        .filter((item) => item.accountNumber !== currentProfitAccount.accountNumber);
     const filteredEquity = filterOutCurrentProfit(equity);
 
     filteredEquity.push({
       id: 'current-profit',
       name: 'Laba Tahun Berjalan',
-      accountNumber: ACCOUNT_NUMBERS.CURRENT_PROFIT,
+      accountNumber: currentProfitAccount.accountNumber,
       isGroup: false,
       balance: currentProfit,
       children: [],
@@ -306,13 +301,7 @@ router.get('/cash-flow', async (req, res) => {
   const end = parsedEnd ?? new Date();
 
   try {
-    const cashAccounts = await prisma.account.findMany({
-      where: {
-        OR: ACCOUNT_NUMBERS.CASH.map((prefix) => ({ accountNumber: { startsWith: prefix } })),
-        isGroup: false,
-        isActive: true,
-      },
-    });
+    const cashAccounts = await systemAccounts.getAccounts('CASH');
     const cashAccountIds = cashAccounts.map((a) => a.id);
 
     const cashEntries = await prisma.accountingLedgerEntry.findMany({
@@ -335,12 +324,15 @@ router.get('/cash-flow', async (req, res) => {
     const investingDetails: any[] = [];
     const financingDetails: any[] = [];
 
+    const arAccount = await systemAccounts.getAccount('AR');
+    const apAccount = await systemAccounts.getAccount('AP');
+
     offsettingEntries.forEach((ent) => {
       const amount = Number(ent.credit) - Number(ent.debit);
       const rootType = ent.account.rootType as string;
       const accNum = ent.account.accountNumber;
 
-      if (rootType === 'REVENUE' || rootType === 'EXPENSE' || accNum.startsWith(ACCOUNT_NUMBERS.AR) || accNum.startsWith(ACCOUNT_NUMBERS.AP)) {
+      if (rootType === 'REVENUE' || rootType === 'EXPENSE' || accNum.startsWith(arAccount.accountNumber) || accNum.startsWith(apAccount.accountNumber)) {
         operating += amount;
         operatingDetails.push({ name: ent.account.name, amount });
       } else if (accNum.startsWith('1.6') || accNum.startsWith('1.7')) {

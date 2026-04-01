@@ -6,7 +6,7 @@ import { updateAccountBalance } from '../utils/accountBalance';
 import { validateBody } from '../utils/validate';
 import { CreateFiscalYearSchema } from '../utils/schemas';
 import { BusinessError, handleRouteError } from '../utils/errors';
-import { ACCOUNT_NUMBERS } from '../constants/accountNumbers';
+import { systemAccounts } from '../services/systemAccounts';
 import { logger } from '../lib/logger';
 
 const router = Router();
@@ -82,10 +82,10 @@ router.post('/:id/close', roleMiddleware(['Admin']), async (req: AuthRequest, re
       const netExpense = Number(expAgg._sum?.debit || 0) - Number(expAgg._sum?.credit || 0);
       const profit = netRevenue - netExpense;
 
-      const retainedEarningsAcc = await tx.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.RETAINED_EARNINGS } });
-      const currentProfitAcc = await tx.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.CURRENT_PROFIT } });
+      const retainedEarningsAcc = await systemAccounts.getAccount('RETAINED_EARNINGS');
+      const currentProfitAcc = await systemAccounts.getAccount('CURRENT_PROFIT');
 
-      if (retainedEarningsAcc && currentProfitAcc && profit !== 0) {
+      if (profit !== 0) {
         // 2. Transfer profit/loss to Retained Earnings
         const closeEntry = await tx.journalEntry.create({
           data: {

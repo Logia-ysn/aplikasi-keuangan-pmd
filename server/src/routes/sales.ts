@@ -9,7 +9,7 @@ import { getOpenFiscalYear } from '../utils/fiscalYear';
 import { validateBody } from '../utils/validate';
 import { CreateSalesInvoiceSchema } from '../utils/schemas';
 import { BusinessError, handleRouteError } from '../utils/errors';
-import { ACCOUNT_NUMBERS } from '../constants/accountNumbers';
+import { systemAccounts } from '../services/systemAccounts';
 import { logger } from '../lib/logger';
 
 const router = Router();
@@ -92,12 +92,11 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
       if (!party) throw new BusinessError('Data pelanggan tidak ditemukan.');
       if (!party.isActive) throw new BusinessError('Pelanggan sudah tidak aktif.');
 
-      const arAccount = await tx.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.AR } });
-      const salesAccount = await tx.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.SALES } });
-      if (!arAccount || !salesAccount) throw new BusinessError('Konfigurasi akun AR/Penjualan tidak ditemukan.');
+      const arAccount = await systemAccounts.getAccount('AR');
+      const salesAccount = await systemAccounts.getAccount('SALES');
 
-      const inventoryAccount = await tx.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.INVENTORY } });
-      const cogsAccount = await tx.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.COGS } });
+      const inventoryAccount = await systemAccounts.getAccount('INVENTORY');
+      const cogsAccount = await systemAccounts.getAccount('COGS');
 
       // Resolve per-item accountId (service items may have their own revenue account)
       const resolvedItems: Array<{
@@ -285,7 +284,7 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
 
       // Post COGS journal if any inventory items were sold
       const totalCogsNum = totalCogs.toDecimalPlaces(2).toNumber();
-      if (totalCogsNum > 0 && inventoryAccount && cogsAccount) {
+      if (totalCogsNum > 0) {
         const cogsJvNumber = `JV-COGS-${invoice.invoiceNumber}`;
         const cogsJournal = await tx.journalEntry.create({
           data: {
@@ -415,13 +414,13 @@ router.post('/:id/cancel', roleMiddleware(['Admin']), async (req: AuthRequest, r
         });
 
         // Reverse COGS and inventory balances
-        const cogsAccount = await tx.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.COGS } });
-        const inventoryAccount = await tx.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.INVENTORY } });
+        const cogsAccount = await systemAccounts.getAccount('COGS');
+        const inventoryAccount = await systemAccounts.getAccount('INVENTORY');
         // Sum the COGS amount from journal items
         const cogsItems = await tx.journalItem.findMany({ where: { journalEntryId: cogsJournal.id } });
         const cogsDebitTotal = cogsItems.reduce((sum, ji) => sum + Number(ji.debit), 0);
-        if (cogsAccount && cogsDebitTotal > 0) await updateAccountBalance(tx, cogsAccount.id, 0, cogsDebitTotal);
-        if (inventoryAccount && cogsDebitTotal > 0) await updateAccountBalance(tx, inventoryAccount.id, cogsDebitTotal, 0);
+        if (cogsDebitTotal > 0) await updateAccountBalance(tx, cogsAccount.id, 0, cogsDebitTotal);
+        if (cogsDebitTotal > 0) await updateAccountBalance(tx, inventoryAccount.id, cogsDebitTotal, 0);
       }
 
       // Reverse stock movements created from this invoice

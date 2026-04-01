@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { prisma } from '../lib/prisma';
-import { ACCOUNT_NUMBERS } from '../constants/accountNumbers';
+import { systemAccounts } from '../services/systemAccounts';
 import { logger } from '../lib/logger';
 
 const router = Router();
@@ -8,18 +8,16 @@ const router = Router();
 // GET /api/dashboard/metrics
 router.get('/metrics', async (req, res) => {
   try {
-    const cashAccounts = await prisma.account.findMany({
-      where: {
-        OR: ACCOUNT_NUMBERS.CASH.map((num) => ({ accountNumber: { startsWith: num } })),
-        isGroup: false,
-        isActive: true,
-      },
+    const cashAccounts = await systemAccounts.getAccounts('CASH');
+    // Fetch actual balances for cash accounts
+    const cashAccountRecords = await prisma.account.findMany({
+      where: { id: { in: cashAccounts.map((a) => a.id) }, isGroup: false, isActive: true },
     });
-    const cashBalance = cashAccounts.reduce((sum, acc) => sum + Number(acc.balance), 0);
+    const cashBalance = cashAccountRecords.reduce((sum, acc) => sum + Number(acc.balance), 0);
 
-    const [arAcc, apAcc, inventoryValueResult] = await Promise.all([
-      prisma.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.AR } }),
-      prisma.account.findFirst({ where: { accountNumber: ACCOUNT_NUMBERS.AP } }),
+    const [arMapping, apMapping, inventoryValueResult] = await Promise.all([
+      systemAccounts.getAccount('AR'),
+      systemAccounts.getAccount('AP'),
       prisma.$queryRaw<[{ total: bigint }]>`
         SELECT COALESCE(SUM(
           CASE WHEN sm.movement_type IN ('In', 'AdjustmentIn') THEN sm.total_value
@@ -29,6 +27,11 @@ router.get('/metrics', async (req, res) => {
         JOIN inventory_items ii ON sm.item_id = ii.id
         WHERE ii.is_active = true AND sm.is_cancelled = false
       `,
+    ]);
+
+    const [arAcc, apAcc] = await Promise.all([
+      prisma.account.findUnique({ where: { id: arMapping.id }, select: { balance: true } }),
+      prisma.account.findUnique({ where: { id: apMapping.id }, select: { balance: true } }),
     ]);
 
     const now = new Date();

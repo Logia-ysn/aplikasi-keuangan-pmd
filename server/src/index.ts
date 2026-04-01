@@ -34,6 +34,8 @@ import backupRoutes from './routes/backup';
 import serviceItemRoutes from './routes/serviceItems';
 import vendorDepositRoutes from './routes/vendorDeposits';
 import customerDepositRoutes from './routes/customerDeposits';
+import systemAccountRoutes from './routes/systemAccounts';
+import { systemAccounts } from './services/systemAccounts';
 
 const app = express();
 const port = process.env.PORT || 3001;
@@ -132,6 +134,7 @@ app.use('/api/backup', backupRoutes);
 app.use('/api/service-items', serviceItemRoutes);
 app.use('/api/vendor-deposits', vendorDepositRoutes);
 app.use('/api/customer-deposits', customerDepositRoutes);
+app.use('/api/system-accounts', systemAccountRoutes);
 
 // ─── Serve Frontend (Production) ──────────────────────────────────────────────
 // In production, serve the built React client from ../client/dist
@@ -157,4 +160,7 @@ process.on('SIGTERM', () => { logger.info('SIGTERM received, shutting down'); pr
 
 app.listen(port, () => {
   logger.info(`Server running at http://localhost:${port}`);
+  systemAccounts.validateStartup().catch((err) => {
+    logger.error({ err }, 'System account mapping validation failed');
+  });
 });
