@@ -9,6 +9,7 @@ import { generateDocumentNumber } from '../utils/documentNumber';
 import { updateAccountBalance } from '../utils/accountBalance';
 import { systemAccounts } from '../services/systemAccounts';
 import { logger } from '../lib/logger';
+import { calcWeightedAverage } from '../utils/weightedAverage';
 
 const router = Router();
 
@@ -224,11 +225,15 @@ router.post('/movements', roleMiddleware(['Admin', 'Accountant', 'StaffProduksi'
       const unitCost = body.unitCost ?? 0;
       const totalValue = qty * unitCost;
 
-      // 6. Update stock
+      // 6. Update stock + weighted average cost
       const stockDelta = isIn ? qty : -qty;
+      const updateData: Record<string, unknown> = { currentStock: { increment: stockDelta } };
+      if (isIn && unitCost > 0) {
+        updateData.averageCost = calcWeightedAverage(item.currentStock, item.averageCost, qty, unitCost);
+      }
       await tx.inventoryItem.update({
         where: { id: item.id },
-        data: { currentStock: { increment: stockDelta } },
+        data: updateData,
       });
 
       // 7. GL posting (if offsetAccountId provided and totalValue > 0)
@@ -551,12 +556,20 @@ router.post('/production-runs', roleMiddleware(['Admin', 'Accountant', 'StaffPro
 
       // 8. Process outputs: increase stock + create StockMovement In (with unitPrice if provided)
       for (const output of body.outputs) {
+        const outputItem = await tx.inventoryItem.findUnique({ where: { id: output.itemId } });
+        const unitCost = output.unitPrice ?? 0;
+
+        const newAvgCost = outputItem && unitCost > 0
+          ? calcWeightedAverage(outputItem.currentStock, outputItem.averageCost, output.quantity, unitCost)
+          : undefined;
+
         await tx.inventoryItem.update({
           where: { id: output.itemId },
-          data: { currentStock: { increment: output.quantity } },
+          data: {
+            currentStock: { increment: output.quantity },
+            ...(newAvgCost !== undefined ? { averageCost: newAvgCost } : {}),
+          },
         });
-
-        const unitCost = output.unitPrice ?? 0;
         const totalValue = new Decimal(output.quantity).mul(new Decimal(unitCost)).toDecimalPlaces(2).toNumber();
 
         const movNumber = await generateDocumentNumber(tx, 'SM', runDate, fiscalYear.id);

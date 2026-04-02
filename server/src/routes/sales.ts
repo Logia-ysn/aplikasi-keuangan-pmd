@@ -264,17 +264,20 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
         if (!inventoryItem || !inventoryItem.isActive) continue;
 
         const qty = Number(item.quantity);
-        const lineAmount = Number(item.amount);
 
-        // Reduce stock
+        // Use weighted average cost for COGS (not selling price)
+        const avgCost = Number(inventoryItem.averageCost);
+        const cogsUnitCost = avgCost > 0 ? avgCost : 0;
+        const cogsAmount = new Decimal(qty).times(new Decimal(cogsUnitCost)).toDecimalPlaces(2).toNumber();
+
+        // Reduce stock (averageCost unchanged on stock out)
         await tx.inventoryItem.update({
           where: { id: inventoryItem.id },
           data: { currentStock: { decrement: qty } },
         });
 
-        // Create stock movement Out
+        // Create stock movement Out with actual cost (not selling price)
         const movementNumber = await generateDocumentNumber(tx, 'SM', parsedDate, fiscalYear.id);
-        const unitCost = new Decimal(item.amount.toString()).div(new Decimal(item.quantity.toString())).toDecimalPlaces(2).toNumber();
         await tx.stockMovement.create({
           data: {
             movementNumber,
@@ -282,8 +285,8 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
             itemId: inventoryItem.id,
             movementType: 'Out',
             quantity: qty,
-            unitCost,
-            totalValue: lineAmount,
+            unitCost: cogsUnitCost,
+            totalValue: cogsAmount,
             referenceType: 'SalesInvoice',
             referenceId: invoice.id,
             notes: `Auto dari ${invoice.invoiceNumber}`,
@@ -292,7 +295,7 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
           },
         });
 
-        totalCogs = totalCogs.plus(new Decimal(lineAmount));
+        totalCogs = totalCogs.plus(new Decimal(cogsAmount));
         logger.info({ invoiceId: invoice.id, itemId: inventoryItem.id, qty }, 'Auto stock deduction from sales');
       }
 

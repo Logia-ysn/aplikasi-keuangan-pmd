@@ -472,6 +472,7 @@ model InventoryItem {
   category     String?
   description  String?
   currentStock Decimal         @default(0) @db.Decimal(15, 3) @map("current_stock")
+  averageCost  Decimal         @default(0) @db.Decimal(20, 2) @map("average_cost")
   minimumStock Decimal         @default(0) @db.Decimal(15, 3) @map("minimum_stock")
   isActive     Boolean         @default(true) @map("is_active")
   isDummy      Boolean         @default(false) @map("is_dummy")

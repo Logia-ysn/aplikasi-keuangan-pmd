@@ -11,6 +11,7 @@ import { CreatePurchaseInvoiceSchema } from '../utils/schemas';
 import { BusinessError, handleRouteError } from '../utils/errors';
 import { systemAccounts } from '../services/systemAccounts';
 import { logger } from '../lib/logger';
+import { calcWeightedAverage } from '../utils/weightedAverage';
 
 const router = Router();
 
@@ -263,9 +264,20 @@ router.post('/', roleMiddleware(['Admin', 'Accountant', 'StaffProduksi']), async
         const unitCost = new Decimal(item.amount.toString()).div(new Decimal(item.quantity.toString())).toDecimalPlaces(2).toNumber();
         const totalValue = Number(item.amount);
 
+        // Recalculate weighted average cost
+        const newAvgCost = calcWeightedAverage(
+          inventoryItem.currentStock,
+          inventoryItem.averageCost,
+          Number(item.quantity),
+          unitCost,
+        );
+
         await tx.inventoryItem.update({
           where: { id: inventoryItem.id },
-          data: { currentStock: { increment: Number(item.quantity) } },
+          data: {
+            currentStock: { increment: Number(item.quantity) },
+            averageCost: newAvgCost,
+          },
         });
 
         await tx.stockMovement.create({

@@ -10,6 +10,7 @@ import { generateDocumentNumber } from '../utils/documentNumber';
 import { getOpenFiscalYear } from '../utils/fiscalYear';
 import { systemAccounts } from '../services/systemAccounts';
 import { logger } from '../lib/logger';
+import { calcWeightedAverage } from '../utils/weightedAverage';
 
 const router = Router();
 
@@ -898,10 +899,14 @@ router.post(
                 },
               });
 
-              // Update currentStock on inventory item
+              // Update currentStock and averageCost on inventory item
+              const newAvgCost = calcWeightedAverage(item.currentStock, item.averageCost, openingQty, unitCost);
               await tx.inventoryItem.update({
                 where: { id: item.id },
-                data: { currentStock: { increment: openingQty } },
+                data: {
+                  currentStock: { increment: openingQty },
+                  averageCost: newAvgCost,
+                },
               });
 
               // GL: DR Inventory / CR Ekuitas Saldo Awal
