@@ -1014,21 +1014,31 @@ router.get('/dashboard/movement-trend', async (_req, res) => {
   }
 });
 
-// GET /api/inventory/dashboard/top-items — Top 10 items by stock quantity
+// GET /api/inventory/dashboard/top-items — All active items sorted by stock value (qty × avg cost) desc
 router.get('/dashboard/top-items', async (_req, res) => {
   try {
     const items = await prisma.inventoryItem.findMany({
       where: { isActive: true },
-      orderBy: { currentStock: 'desc' },
-      select: { id: true, code: true, name: true, unit: true, category: true, currentStock: true, minimumStock: true },
+      select: { id: true, code: true, name: true, unit: true, category: true, currentStock: true, minimumStock: true, averageCost: true },
     });
 
-    return res.json(items.map(i => ({
-      ...i,
-      currentStock: Number(i.currentStock),
-      minimumStock: Number(i.minimumStock),
-      stockPct: Number(i.minimumStock) > 0 ? Math.round(Number(i.currentStock) / Number(i.minimumStock) * 100) : null,
-    })));
+    const mapped = items.map(i => {
+      const currentStock = Number(i.currentStock);
+      const minimumStock = Number(i.minimumStock);
+      const averageCost = Number(i.averageCost);
+      return {
+        ...i,
+        currentStock,
+        minimumStock,
+        averageCost,
+        stockValue: currentStock * averageCost,
+        stockPct: minimumStock > 0 ? Math.round(currentStock / minimumStock * 100) : null,
+      };
+    });
+
+    mapped.sort((a, b) => b.stockValue - a.stockValue);
+
+    return res.json(mapped);
   } catch (error) {
     logger.error({ error }, 'GET /inventory/dashboard/top-items error');
     return res.status(500).json({ error: 'Gagal mengambil data item.' });

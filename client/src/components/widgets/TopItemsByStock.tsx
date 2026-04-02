@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Warehouse, Loader2 } from 'lucide-react';
 import api from '../../lib/api';
 import { cn } from '../../lib/utils';
+import { formatRupiah } from '../../lib/formatters';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -13,6 +14,8 @@ interface TopItem {
   name: string;
   currentStock: number;
   minimumStock: number;
+  averageCost: number;
+  stockValue: number;
   unit: string;
 }
 
@@ -76,6 +79,7 @@ export default function TopItemsByStock() {
                 <th className="text-left font-medium pb-2">Kode</th>
                 <th className="text-left font-medium pb-2">Nama</th>
                 <th className="text-right font-medium pb-2">Stok</th>
+                <th className="text-right font-medium pb-2">Nilai</th>
                 <th className="text-right font-medium pb-2">Min</th>
                 <th className="font-medium pb-2 w-24">Status</th>
               </tr>
@@ -100,6 +104,9 @@ export default function TopItemsByStock() {
                     </td>
                     <td className="py-2 text-right tabular-nums" style={{ color: 'var(--color-text-primary)' }}>
                       {formatNumber(current)}
+                    </td>
+                    <td className="py-2 text-right tabular-nums font-mono" style={{ color: 'var(--color-text-primary)' }}>
+                      {formatRupiah(item.stockValue)}
                     </td>
                     <td className="py-2 text-right tabular-nums" style={{ color: 'var(--color-text-muted)' }}>
                       {formatNumber(min)}

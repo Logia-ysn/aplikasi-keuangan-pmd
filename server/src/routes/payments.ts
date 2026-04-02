@@ -99,12 +99,16 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
 
       const fiscalYear = await getOpenFiscalYear(tx, parsedDate);
 
-      // Verify account exists and is a cash/bank account
-      const bankAccount = await tx.account.findUnique({ where: { id: body.accountId } });
-      if (!bankAccount) throw new BusinessError('Akun kas/bank tidak ditemukan.');
-      const isCashAccount = await systemAccounts.isCashAccount(bankAccount.accountNumber);
-      if (!isCashAccount) {
-        throw new BusinessError('Akun yang dipilih bukan akun kas/bank.');
+      // Verify account exists and is a cash/bank account (skip for opening balance deposits)
+      const isOpeningDeposit = body.isOpeningBalance === true &&
+        (body.paymentType === 'VendorDeposit' || body.paymentType === 'CustomerDeposit');
+      if (!isOpeningDeposit) {
+        const bankAccount = await tx.account.findUnique({ where: { id: body.accountId } });
+        if (!bankAccount) throw new BusinessError('Akun kas/bank tidak ditemukan.');
+        const isCashAccount = await systemAccounts.isCashAccount(bankAccount.accountNumber);
+        if (!isCashAccount) {
+          throw new BusinessError('Akun yang dipilih bukan akun kas/bank.');
+        }
       }
 
       // Verify party exists and is active
@@ -115,13 +119,18 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
       const paymentNumber = await generateDocumentNumber(tx, 'PAY', parsedDate, fiscalYear.id);
       const numAmount = body.amount;
 
+      // For opening balance deposits, resolve accountId to the real Ekuitas Saldo Awal account
+      const resolvedAccountId = isOpeningDeposit
+        ? (await systemAccounts.getAccount('OPENING_EQUITY')).id
+        : body.accountId;
+
       const payment = await tx.payment.create({
         data: {
           paymentNumber,
           date: parsedDate,
           partyId: body.partyId,
           paymentType: body.paymentType,
-          accountId: body.accountId,
+          accountId: resolvedAccountId,
           amount: numAmount,
           status: 'Submitted',
           referenceNo: body.referenceNo || null,
@@ -133,11 +142,19 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
       });
 
       // ── VendorDeposit branch: DR Uang Muka Vendor / CR Kas ──────────────
+      // If isOpeningBalance: DR Uang Muka Vendor / CR Ekuitas Saldo Awal (3.1)
+      // Normal:              DR Uang Muka Vendor / CR Kas/Bank
       if (body.paymentType === 'VendorDeposit') {
         if (party.partyType !== 'Supplier' && party.partyType !== 'Both') {
           throw new BusinessError('Uang muka hanya dapat dibuat untuk Supplier.');
         }
         const depositAccount = await systemAccounts.getAccount('VENDOR_DEPOSIT');
+
+        const isOpening = body.isOpeningBalance === true;
+        const creditAccountId = isOpening
+          ? (await systemAccounts.getAccount('OPENING_EQUITY')).id
+          : body.accountId;
+        const narrationPrefix = isOpening ? 'Saldo Awal Uang Muka Vendor' : 'Uang Muka Vendor';
 
         const jvNumber = `JV-${paymentNumber}`;
         const existingJV = await tx.journalEntry.findUnique({ where: { entryNumber: jvNumber } });
@@ -147,15 +164,15 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
           data: {
             entryNumber: jvNumber,
             date: parsedDate,
-            narration: `Uang Muka Vendor: ${paymentNumber} - ${party.name}`,
+            narration: `${narrationPrefix}: ${paymentNumber} - ${party.name}`,
             status: 'Submitted',
             fiscalYearId: fiscalYear.id,
             createdBy: req.user!.userId,
             submittedAt: new Date(),
             items: {
               create: [
-                { accountId: depositAccount.id, partyId: body.partyId, debit: numAmount, credit: 0, description: `Uang Muka: ${paymentNumber}` },
-                { accountId: body.accountId, debit: 0, credit: numAmount, description: `Uang Muka: ${paymentNumber}` },
+                { accountId: depositAccount.id, partyId: body.partyId, debit: numAmount, credit: 0, description: `${narrationPrefix}: ${paymentNumber}` },
+                { accountId: creditAccountId, debit: 0, credit: numAmount, description: `${narrationPrefix}: ${paymentNumber}` },
               ],
             },
           },
@@ -163,13 +180,13 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
 
         await tx.accountingLedgerEntry.createMany({
           data: [
-            { date: parsedDate, accountId: depositAccount.id, partyId: body.partyId, debit: numAmount, credit: 0, referenceType: 'JournalEntry', referenceId: journalEntry.id, description: `Uang Muka: ${paymentNumber}`, fiscalYearId: fiscalYear.id },
-            { date: parsedDate, accountId: body.accountId, debit: 0, credit: numAmount, referenceType: 'JournalEntry', referenceId: journalEntry.id, description: `Uang Muka: ${paymentNumber}`, fiscalYearId: fiscalYear.id },
+            { date: parsedDate, accountId: depositAccount.id, partyId: body.partyId, debit: numAmount, credit: 0, referenceType: 'JournalEntry', referenceId: journalEntry.id, description: `${narrationPrefix}: ${paymentNumber}`, fiscalYearId: fiscalYear.id },
+            { date: parsedDate, accountId: creditAccountId, debit: 0, credit: numAmount, referenceType: 'JournalEntry', referenceId: journalEntry.id, description: `${narrationPrefix}: ${paymentNumber}`, fiscalYearId: fiscalYear.id },
           ],
         });
 
         await updateAccountBalance(tx, depositAccount.id, numAmount, 0);
-        await updateAccountBalance(tx, body.accountId, 0, numAmount);
+        await updateAccountBalance(tx, creditAccountId, 0, numAmount);
 
         await tx.party.update({
           where: { id: body.partyId },
@@ -180,11 +197,20 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
       }
 
       // ── CustomerDeposit branch: DR Kas / CR Uang Muka Pelanggan ───────
+      // If isOpeningBalance: DR Ekuitas Saldo Awal (3.1) / CR Uang Muka Pelanggan
+      // Normal:              DR Kas/Bank             / CR Uang Muka Pelanggan
       if (body.paymentType === 'CustomerDeposit') {
         if (party.partyType !== 'Customer' && party.partyType !== 'Both') {
           throw new BusinessError('Uang muka pelanggan hanya dapat dibuat untuk Customer.');
         }
         const depositAccount = await systemAccounts.getAccount('CUSTOMER_DEPOSIT');
+
+        // Determine debit account: Kas/Bank or Ekuitas Saldo Awal
+        const isOpening = body.isOpeningBalance === true;
+        const debitAccountId = isOpening
+          ? (await systemAccounts.getAccount('OPENING_EQUITY')).id
+          : body.accountId;
+        const narrationPrefix = isOpening ? 'Saldo Awal Uang Muka Pelanggan' : 'Uang Muka Pelanggan';
 
         const jvNumber = `JV-${paymentNumber}`;
         const existingJV = await tx.journalEntry.findUnique({ where: { entryNumber: jvNumber } });
@@ -194,15 +220,15 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
           data: {
             entryNumber: jvNumber,
             date: parsedDate,
-            narration: `Uang Muka Pelanggan: ${paymentNumber} - ${party.name}`,
+            narration: `${narrationPrefix}: ${paymentNumber} - ${party.name}`,
             status: 'Submitted',
             fiscalYearId: fiscalYear.id,
             createdBy: req.user!.userId,
             submittedAt: new Date(),
             items: {
               create: [
-                { accountId: body.accountId, debit: numAmount, credit: 0, description: `Uang Muka Pelanggan: ${paymentNumber}` },
-                { accountId: depositAccount.id, partyId: body.partyId, debit: 0, credit: numAmount, description: `Uang Muka Pelanggan: ${paymentNumber}` },
+                { accountId: debitAccountId, debit: numAmount, credit: 0, description: `${narrationPrefix}: ${paymentNumber}` },
+                { accountId: depositAccount.id, partyId: body.partyId, debit: 0, credit: numAmount, description: `${narrationPrefix}: ${paymentNumber}` },
               ],
             },
           },
@@ -210,12 +236,12 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
 
         await tx.accountingLedgerEntry.createMany({
           data: [
-            { date: parsedDate, accountId: body.accountId, debit: numAmount, credit: 0, referenceType: 'JournalEntry', referenceId: journalEntry.id, description: `Uang Muka Pelanggan: ${paymentNumber}`, fiscalYearId: fiscalYear.id },
-            { date: parsedDate, accountId: depositAccount.id, partyId: body.partyId, debit: 0, credit: numAmount, referenceType: 'JournalEntry', referenceId: journalEntry.id, description: `Uang Muka Pelanggan: ${paymentNumber}`, fiscalYearId: fiscalYear.id },
+            { date: parsedDate, accountId: debitAccountId, debit: numAmount, credit: 0, referenceType: 'JournalEntry', referenceId: journalEntry.id, description: `${narrationPrefix}: ${paymentNumber}`, fiscalYearId: fiscalYear.id },
+            { date: parsedDate, accountId: depositAccount.id, partyId: body.partyId, debit: 0, credit: numAmount, referenceType: 'JournalEntry', referenceId: journalEntry.id, description: `${narrationPrefix}: ${paymentNumber}`, fiscalYearId: fiscalYear.id },
           ],
         });
 
-        await updateAccountBalance(tx, body.accountId, numAmount, 0);      // DR Kas/Bank
+        await updateAccountBalance(tx, debitAccountId, numAmount, 0);      // DR Kas/Bank or Ekuitas
         await updateAccountBalance(tx, depositAccount.id, 0, numAmount);   // CR Liability
 
         await tx.party.update({

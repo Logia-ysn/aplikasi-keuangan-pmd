@@ -22,6 +22,7 @@ const CustomerDepositModal: React.FC<CustomerDepositModalProps> = ({ isOpen, onC
   const [notes, setNotes] = useState('');
   const [error, setError] = useState('');
   const [savedId, setSavedId] = useState<string | null>(null);
+  const [isOpeningBalance, setIsOpeningBalance] = useState(false);
 
   const queryClient = useQueryClient();
 
@@ -35,6 +36,7 @@ const CustomerDepositModal: React.FC<CustomerDepositModalProps> = ({ isOpen, onC
       setNotes('');
       setError('');
       setSavedId(null);
+      setIsOpeningBalance(false);
     }
   }, [isOpen]);
 
@@ -81,7 +83,7 @@ const CustomerDepositModal: React.FC<CustomerDepositModalProps> = ({ isOpen, onC
   });
 
   const numAmount = Number(amount) || 0;
-  const canSubmit = partyId && numAmount > 0 && accountId && !mutation.isPending;
+  const canSubmit = partyId && numAmount > 0 && (isOpeningBalance || accountId) && !mutation.isPending;
 
   const handleSubmit = () => {
     mutation.mutate({
@@ -89,9 +91,10 @@ const CustomerDepositModal: React.FC<CustomerDepositModalProps> = ({ isOpen, onC
       partyId,
       amount: numAmount,
       paymentType: 'CustomerDeposit',
-      accountId,
+      accountId: isOpeningBalance ? 'opening-equity' : accountId,
       referenceNo: referenceNo || null,
       notes: notes || null,
+      isOpeningBalance,
     });
   };
 
@@ -163,8 +166,35 @@ const CustomerDepositModal: React.FC<CustomerDepositModalProps> = ({ isOpen, onC
             </div>
           )}
 
+          {/* Opening balance toggle */}
+          <label className="flex items-center gap-3 cursor-pointer group">
+            <div className="relative">
+              <input
+                type="checkbox"
+                checked={isOpeningBalance}
+                onChange={e => setIsOpeningBalance(e.target.checked)}
+                className="sr-only peer"
+              />
+              <div className="w-9 h-5 bg-gray-200 rounded-full peer-checked:bg-teal-500 transition-colors" />
+              <div className="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-transform peer-checked:translate-x-4" />
+            </div>
+            <div>
+              <span className="text-sm font-medium text-gray-700 group-hover:text-gray-900">Saldo Awal / Koreksi</span>
+              <p className="text-[10px] text-gray-400">Catat deposit tanpa mempengaruhi kas (offset ke Ekuitas Saldo Awal)</p>
+            </div>
+          </label>
+
+          {isOpeningBalance && (
+            <div className="bg-blue-50 border border-blue-100 rounded-lg p-3">
+              <p className="text-xs text-blue-700">
+                Jurnal: <span className="font-mono font-medium">DR Ekuitas Saldo Awal / CR Uang Muka Pelanggan</span>
+              </p>
+              <p className="text-[10px] text-blue-500 mt-0.5">Kas/Bank tidak terpengaruh. Gunakan untuk deposit yang uangnya sudah masuk sebelum sistem digunakan.</p>
+            </div>
+          )}
+
           {/* Amount & Account */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className={isOpeningBalance ? '' : 'grid grid-cols-2 gap-4'}>
             <div>
               <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">Jumlah (Rp)</label>
               <input
@@ -176,19 +206,21 @@ const CustomerDepositModal: React.FC<CustomerDepositModalProps> = ({ isOpen, onC
                 className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm text-gray-900 font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
               />
             </div>
-            <div>
-              <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">Akun Kas/Bank</label>
-              <select
-                value={accountId}
-                onChange={e => setAccountId(e.target.value)}
-                className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">— Pilih Akun —</option>
-                {cashAccounts?.map((a: any) => (
-                  <option key={a.id} value={a.id}>{a.accountNumber} — {a.name}</option>
-                ))}
-              </select>
-            </div>
+            {!isOpeningBalance && (
+              <div>
+                <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">Akun Kas/Bank</label>
+                <select
+                  value={accountId}
+                  onChange={e => setAccountId(e.target.value)}
+                  className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">— Pilih Akun —</option>
+                  {cashAccounts?.map((a: any) => (
+                    <option key={a.id} value={a.id}>{a.accountNumber} — {a.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
 
           {/* Reference & Notes */}

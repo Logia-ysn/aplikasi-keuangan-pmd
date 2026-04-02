@@ -91,6 +91,7 @@ export const CreatePaymentSchema = z.object({
   allocations: z.array(AllocationSchema).optional(),
   referenceNo: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
+  isOpeningBalance: z.boolean().optional(),
 });
 
 // ─── Vendor Deposit Application ───────────────────────────────────────────────
