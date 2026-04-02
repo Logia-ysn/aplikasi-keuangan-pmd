@@ -32,18 +32,18 @@ const typeConfig = {
   parties: {
     title: 'Import Mitra Bisnis',
     endpoint: '/import/parties',
-    columns: ['name', 'partyType', 'phone', 'email', 'address', 'taxId'],
-    templateHeaders: 'name,partyType,phone,email,address,taxId',
-    templateSample: 'PT ABC,Customer,081234567890,abc@example.com,Jl. Contoh No.1,1234567890',
-    queryKeys: ['parties', 'parties-all'],
+    columns: ['name', 'partyType', 'phone', 'email', 'address', 'taxId', 'openingBalance', 'depositBalance', 'customerDepositBalance'],
+    templateHeaders: 'name,partyType,phone,email,address,taxId,openingBalance,depositBalance,customerDepositBalance',
+    templateSample: 'PT ABC,Customer,081234567890,abc@example.com,Jl. Contoh No.1,1234567890,5000000,0,0',
+    queryKeys: ['parties', 'parties-all', 'coa', 'coa-all', 'balance-sheet', 'trial-balance', 'profit-loss', 'journals', 'dashboard-metrics'],
   },
   coa: {
     title: 'Import Bagan Akun',
     endpoint: '/import/coa',
-    columns: ['accountNumber', 'name', 'rootType', 'accountType', 'parentNumber', 'isGroup'],
-    templateHeaders: 'accountNumber,name,rootType,accountType,parentNumber,isGroup',
-    templateSample: '1100,Kas,ASSET,ASSET,,false',
-    queryKeys: ['coa', 'coa-all'],
+    columns: ['accountNumber', 'name', 'rootType', 'accountType', 'parentNumber', 'isGroup', 'openingBalance'],
+    templateHeaders: 'accountNumber,name,rootType,accountType,parentNumber,isGroup,openingBalance',
+    templateSample: '1.1.1,Kas,ASSET,ASSET,,false,5000000',
+    queryKeys: ['coa', 'coa-all', 'balance-sheet', 'trial-balance', 'profit-loss', 'journals', 'dashboard-metrics'],
   },
   journals: {
     title: 'Import Jurnal',
@@ -51,7 +51,7 @@ const typeConfig = {
     columns: ['date', 'narration', 'accountNumber', 'debit', 'credit', 'description'],
     templateHeaders: 'date,narration,accountNumber,debit,credit,description',
     templateSample: '2026-03-22,Penjualan tunai,1100,1000000,0,Kas masuk',
-    queryKeys: ['journals', 'gl'],
+    queryKeys: ['journals', 'gl', 'coa', 'coa-all', 'balance-sheet', 'trial-balance', 'profit-loss', 'dashboard-metrics'],
   },
   inventory: {
     title: 'Import Master Item',
@@ -59,7 +59,7 @@ const typeConfig = {
     columns: ['code', 'name', 'unit', 'category', 'description', 'minimumStock', 'openingQty', 'openingPrice'],
     templateHeaders: 'code,name,unit,category,description,minimumStock,openingQty,openingPrice',
     templateSample: 'GKP,Gabah Kering Panen,Kg,Bahan Baku,,1000,500,10000',
-    queryKeys: ['inventory-items'],
+    queryKeys: ['inventory-items', 'coa', 'coa-all', 'balance-sheet', 'trial-balance', 'profit-loss', 'journals', 'dashboard-metrics'],
   },
 };
 

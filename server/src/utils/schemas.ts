@@ -175,6 +175,17 @@ export const CreateStockMovementSchema = z.object({
   notes: z.string().nullable().optional(),
 });
 
+export const UpdateStockMovementSchema = z.object({
+  movementType: z.enum(['In', 'Out', 'AdjustmentIn', 'AdjustmentOut']),
+  quantity: z.coerce.number().positive('Kuantitas harus lebih dari 0.'),
+  unitCost: z.coerce.number().min(0).optional(),
+  date: z.string().min(1, 'Tanggal wajib diisi.'),
+  offsetAccountId: z.string().nullable().optional(),
+  referenceType: z.string().nullable().optional(),
+  referenceNumber: z.string().nullable().optional(),
+  notes: z.string().nullable().optional(),
+});
+
 // ─── User Management ─────────────────────────────────────────────────────────
 const UserRoleEnum = z.enum(['Admin', 'Accountant', 'StaffProduksi', 'Viewer'], {
   message: "Role harus salah satu dari: Admin, Accountant, StaffProduksi, Viewer",

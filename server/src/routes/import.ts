@@ -5,7 +5,7 @@ import { parse } from 'csv-parse/sync';
 import ExcelJS from 'exceljs';
 import { prisma } from '../lib/prisma';
 import { AuthRequest, roleMiddleware } from '../middleware/auth';
-import { updateAccountBalance, updateBalancesForItems } from '../utils/accountBalance';
+import { computeImpact, updateAccountBalance, updateBalancesForItems } from '../utils/accountBalance';
 import { generateDocumentNumber } from '../utils/documentNumber';
 import { getOpenFiscalYear } from '../utils/fiscalYear';
 import { systemAccounts } from '../services/systemAccounts';
@@ -219,6 +219,43 @@ router.post(
             {
               const now = new Date();
               const fiscalYear = await getOpenFiscalYear(prisma as any, now);
+
+              // Delete existing opening balance journals for this party to prevent duplicates on re-import
+              const existingPartyJournals = await prisma.journalEntry.findMany({
+                where: {
+                  narration: { contains: row.name },
+                  status: 'Submitted',
+                  OR: [
+                    { narration: { startsWith: 'Saldo awal piutang:' } },
+                    { narration: { startsWith: 'Saldo awal hutang:' } },
+                    { narration: { startsWith: 'Saldo awal uang muka vendor:' } },
+                    { narration: { startsWith: 'Saldo awal uang muka pelanggan:' } },
+                  ],
+                },
+                select: { id: true, items: { select: { accountId: true, debit: true, credit: true } } },
+              });
+              for (const ej of existingPartyJournals) {
+                await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+                  for (const item of ej.items) {
+                    const acc = await tx.account.findUnique({ where: { id: item.accountId }, select: { rootType: true } });
+                    if (acc) {
+                      const reverseImpact = computeImpact(acc.rootType, item.debit, item.credit);
+                      await tx.account.update({ where: { id: item.accountId }, data: { balance: { decrement: reverseImpact } } });
+                    }
+                  }
+                  await tx.accountingLedgerEntry.deleteMany({ where: { referenceId: ej.id } });
+                  await tx.journalItem.deleteMany({ where: { journalEntryId: ej.id } });
+                  await tx.journalEntry.delete({ where: { id: ej.id } });
+                });
+              }
+              // Also delete existing vendor deposit payments for this party
+              const existingDepositPayments = await prisma.payment.findMany({
+                where: { partyId: party.id, notes: { contains: 'Saldo awal uang muka' } },
+                select: { id: true },
+              });
+              for (const ep of existingDepositPayments) {
+                await prisma.payment.delete({ where: { id: ep.id } });
+              }
 
               // 1) AR/AP opening balance journal
               if (openingBalance > 0) {
@@ -553,7 +590,6 @@ router.post(
             if (account.id !== openingEquity.id) {
               const now = new Date();
               const fiscalYear = await getOpenFiscalYear(prisma as any, now);
-              const jvNumber = await generateDocumentNumber(prisma as any, 'JV', now, fiscalYear.id);
               const absAmount = Math.abs(row.openingBalance);
 
               // ASSET/EXPENSE normal balance = debit, LIABILITY/EQUITY/REVENUE normal balance = credit
@@ -566,6 +602,29 @@ router.post(
               const accountCredit = (isDebitNormal === isPositive) ? 0 : absAmount;
 
               await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+                // Delete existing opening balance journals for this account to prevent duplicates on re-import
+                const existingJournals = await tx.journalEntry.findMany({
+                  where: {
+                    narration: { startsWith: `Saldo awal akun: ${row.accountNumber}` },
+                    status: 'Submitted',
+                  },
+                  select: { id: true, items: { select: { accountId: true, debit: true, credit: true } } },
+                });
+                for (const ej of existingJournals) {
+                  // Reverse the balance impact of old entries
+                  for (const item of ej.items) {
+                    const acc = await tx.account.findUnique({ where: { id: item.accountId }, select: { rootType: true } });
+                    if (acc) {
+                      const reverseImpact = computeImpact(acc.rootType, item.debit, item.credit);
+                      await tx.account.update({ where: { id: item.accountId }, data: { balance: { decrement: reverseImpact } } });
+                    }
+                  }
+                  await tx.accountingLedgerEntry.deleteMany({ where: { referenceId: ej.id } });
+                  await tx.journalItem.deleteMany({ where: { journalEntryId: ej.id } });
+                  await tx.journalEntry.delete({ where: { id: ej.id } });
+                }
+
+                const jvNumber = await generateDocumentNumber(tx, 'JV', now, fiscalYear.id);
                 const journal = await tx.journalEntry.create({
                   data: {
                     entryNumber: jvNumber,

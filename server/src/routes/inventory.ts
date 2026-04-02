@@ -3,7 +3,7 @@ import Decimal from 'decimal.js';
 import { prisma } from '../lib/prisma';
 import { AuthRequest, roleMiddleware } from '../middleware/auth';
 import { validateBody } from '../utils/validate';
-import { CreateInventoryItemSchema, UpdateInventoryItemSchema, CreateStockMovementSchema, CreateProductionRunSchema } from '../utils/schemas';
+import { CreateInventoryItemSchema, UpdateInventoryItemSchema, CreateStockMovementSchema, UpdateStockMovementSchema, CreateProductionRunSchema } from '../utils/schemas';
 import { BusinessError, handleRouteError } from '../utils/errors';
 import { generateDocumentNumber } from '../utils/documentNumber';
 import { updateAccountBalance } from '../utils/accountBalance';
@@ -349,6 +349,202 @@ router.post('/movements', roleMiddleware(['Admin', 'Accountant', 'StaffProduksi'
     return res.status(201).json(result);
   } catch (error: any) {
     return handleRouteError(res, error, 'POST /inventory/movements', 'Gagal mencatat gerakan stok.');
+  }
+});
+
+// GET /api/inventory/movements/:id — single movement for edit
+router.get('/movements/:id', async (req, res) => {
+  try {
+    const id = req.params.id as string;
+    const movement = await prisma.stockMovement.findUnique({
+      where: { id },
+      include: {
+        item: { select: { id: true, name: true, code: true, unit: true } },
+        offsetAccount: { select: { id: true, name: true, accountNumber: true } },
+      },
+    });
+    if (!movement) return res.status(404).json({ error: 'Gerakan stok tidak ditemukan.' });
+    return res.json(movement);
+  } catch (error) {
+    return handleRouteError(res, error, 'GET /inventory/movements/:id', 'Gagal mengambil data gerakan stok.');
+  }
+});
+
+// PUT /api/inventory/movements/:id — edit movement (cancel old + create new)
+router.put('/movements/:id', roleMiddleware(['Admin', 'Accountant']), async (req: AuthRequest, res) => {
+  const id = req.params.id as string;
+  const body = validateBody(UpdateStockMovementSchema, req.body, res);
+  if (!body) return;
+
+  try {
+    const result = await prisma.$transaction(async (tx) => {
+      // 1. Load existing movement
+      const oldMov = await tx.stockMovement.findUnique({
+        where: { id },
+        include: { item: true },
+      });
+      if (!oldMov) throw new BusinessError('Gerakan stok tidak ditemukan.');
+      if (oldMov.isCancelled) throw new BusinessError('Gerakan stok sudah dibatalkan, tidak bisa diedit.');
+
+      // Reject if movement is linked to ProductionRun
+      if (oldMov.referenceType === 'ProductionRun') {
+        throw new BusinessError('Gerakan stok dari proses produksi tidak dapat diedit secara langsung.');
+      }
+
+      // 2. Reverse old stock impact
+      const oldIsIn = oldMov.movementType === 'In' || oldMov.movementType === 'AdjustmentIn';
+      const oldQty = Number(oldMov.quantity);
+      const oldReverseDelta = oldIsIn ? -oldQty : oldQty;
+
+      // Check if reversal would cause negative stock
+      const currentStock = Number(oldMov.item.currentStock);
+      if (currentStock + oldReverseDelta < 0) {
+        throw new BusinessError('Tidak dapat mengedit: pembalikan stok lama menyebabkan stok negatif.');
+      }
+
+      await tx.inventoryItem.update({
+        where: { id: oldMov.itemId },
+        data: { currentStock: { increment: oldReverseDelta } },
+      });
+
+      // 3. Reverse old GL entries if exist
+      if (oldMov.journalEntryId) {
+        const oldJe = await tx.journalEntry.findUnique({
+          where: { id: oldMov.journalEntryId },
+          include: { items: true },
+        });
+        if (oldJe) {
+          for (const jeItem of oldJe.items) {
+            await updateAccountBalance(tx, jeItem.accountId, -Number(jeItem.debit), -Number(jeItem.credit));
+          }
+          await tx.accountingLedgerEntry.updateMany({
+            where: { referenceId: oldMov.journalEntryId },
+            data: { isCancelled: true },
+          });
+          await tx.journalEntry.update({
+            where: { id: oldMov.journalEntryId },
+            data: { status: 'Cancelled', cancelledAt: new Date() },
+          });
+        }
+      }
+
+      // 4. Apply new stock impact
+      const newIsIn = body.movementType === 'In' || body.movementType === 'AdjustmentIn';
+      const newIsOut = body.movementType === 'Out' || body.movementType === 'AdjustmentOut';
+      const newQty = body.quantity;
+
+      // Re-fetch stock after reversal
+      const itemAfterReversal = await tx.inventoryItem.findUnique({ where: { id: oldMov.itemId } });
+      if (!itemAfterReversal) throw new BusinessError('Item stok tidak ditemukan.');
+
+      if (newIsOut && Number(itemAfterReversal.currentStock) < newQty) {
+        throw new BusinessError(
+          `Stok tidak cukup. Stok saat ini (setelah pembalikan): ${Number(itemAfterReversal.currentStock).toLocaleString('id-ID', { maximumFractionDigits: 3 })} ${itemAfterReversal.unit}`
+        );
+      }
+
+      const newStockDelta = newIsIn ? newQty : -newQty;
+      await tx.inventoryItem.update({
+        where: { id: oldMov.itemId },
+        data: { currentStock: { increment: newStockDelta } },
+      });
+
+      // 5. Create new GL entries if needed
+      const newUnitCost = body.unitCost ?? 0;
+      const newTotalValue = newQty * newUnitCost;
+      let newJournalEntryId: string | null = null;
+
+      if (body.offsetAccountId && newTotalValue > 0) {
+        let inventoryAccountId = itemAfterReversal.accountId;
+        if (!inventoryAccountId) {
+          const defaultInvAccount = await systemAccounts.getAccount('INVENTORY');
+          inventoryAccountId = defaultInvAccount.id;
+        }
+
+        const typeLabels: Record<string, string> = {
+          In: 'Stok Masuk',
+          Out: 'Stok Keluar',
+          AdjustmentIn: 'Penyesuaian Stok +',
+          AdjustmentOut: 'Penyesuaian Stok −',
+        };
+
+        let debitAccountId: string;
+        let creditAccountId: string;
+
+        if (newIsIn) {
+          debitAccountId = inventoryAccountId;
+          creditAccountId = body.offsetAccountId;
+        } else {
+          debitAccountId = body.offsetAccountId;
+          creditAccountId = inventoryAccountId;
+        }
+
+        const movementDate = new Date(body.date);
+        const fiscalYear = await tx.fiscalYear.findFirst({
+          where: { isClosed: false, startDate: { lte: movementDate }, endDate: { gte: movementDate } },
+        });
+        if (!fiscalYear) throw new BusinessError('Tidak ada tahun fiskal aktif untuk tanggal transaksi ini.');
+
+        const entryNumber = await generateDocumentNumber(tx, 'JV', movementDate, fiscalYear.id);
+
+        const je = await tx.journalEntry.create({
+          data: {
+            entryNumber,
+            date: movementDate,
+            status: 'Submitted',
+            submittedAt: new Date(),
+            narration: `${typeLabels[body.movementType]}: ${itemAfterReversal.name} ${newQty} ${itemAfterReversal.unit}${body.notes ? ' - ' + body.notes : ''} (Edit)`,
+            fiscalYearId: fiscalYear.id,
+            createdBy: req.user!.userId,
+            items: {
+              create: [
+                { accountId: debitAccountId, debit: newTotalValue, credit: 0 },
+                { accountId: creditAccountId, debit: 0, credit: newTotalValue },
+              ],
+            },
+          },
+          include: { items: true },
+        });
+
+        await tx.accountingLedgerEntry.createMany({
+          data: [
+            { accountId: debitAccountId, date: movementDate, debit: newTotalValue, credit: 0, referenceType: 'StockMovement', referenceId: je.id, fiscalYearId: fiscalYear.id },
+            { accountId: creditAccountId, date: movementDate, debit: 0, credit: newTotalValue, referenceType: 'StockMovement', referenceId: je.id, fiscalYearId: fiscalYear.id },
+          ],
+        });
+
+        await updateAccountBalance(tx, debitAccountId, newTotalValue, 0);
+        await updateAccountBalance(tx, creditAccountId, 0, newTotalValue);
+
+        newJournalEntryId = je.id;
+      }
+
+      // 6. Update the movement record
+      const updated = await tx.stockMovement.update({
+        where: { id },
+        data: {
+          date: new Date(body.date),
+          movementType: body.movementType as any,
+          quantity: newQty,
+          unitCost: newUnitCost,
+          totalValue: newTotalValue,
+          notes: body.notes || null,
+          referenceType: body.referenceType || null,
+          referenceNumber: body.referenceNumber || null,
+          offsetAccountId: body.offsetAccountId || null,
+          journalEntryId: newJournalEntryId,
+        },
+        include: {
+          item: { select: { id: true, name: true, code: true, unit: true } },
+        },
+      });
+
+      return updated;
+    }, { timeout: 15000 });
+
+    return res.json(result);
+  } catch (error: any) {
+    return handleRouteError(res, error, 'PUT /inventory/movements/:id', 'Gagal mengupdate gerakan stok.');
   }
 });
 

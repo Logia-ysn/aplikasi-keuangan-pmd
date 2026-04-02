@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 interface StockMovementModalProps {
   isOpen: boolean;
   onClose: () => void;
+  editMovement?: any | null;
 }
 
 const today = () => new Date().toISOString().split('T')[0];
@@ -23,18 +24,33 @@ const defaultForm = {
   notes: '',
 };
 
-export function StockMovementModal({ isOpen, onClose }: StockMovementModalProps) {
+export function StockMovementModal({ isOpen, onClose, editMovement }: StockMovementModalProps) {
   const [form, setForm] = useState({ ...defaultForm, date: today() });
   const [error, setError] = useState('');
   const queryClient = useQueryClient();
+  const isEdit = !!editMovement;
 
-  // Reset form on open
+  // Reset form on open / populate when editing
   useEffect(() => {
     if (isOpen) {
-      setForm({ ...defaultForm, date: today() });
+      if (editMovement) {
+        setForm({
+          date: editMovement.date ? new Date(editMovement.date).toISOString().split('T')[0] : today(),
+          itemId: editMovement.itemId || '',
+          movementType: editMovement.movementType || 'In',
+          quantity: editMovement.quantity != null ? String(Number(editMovement.quantity)) : '',
+          unitCost: editMovement.unitCost != null ? String(Number(editMovement.unitCost)) : '',
+          offsetAccountId: editMovement.offsetAccountId || '',
+          referenceType: editMovement.referenceType || '',
+          referenceNumber: editMovement.referenceNumber || '',
+          notes: editMovement.notes || '',
+        });
+      } else {
+        setForm({ ...defaultForm, date: today() });
+      }
       setError('');
     }
-  }, [isOpen]);
+  }, [isOpen, editMovement]);
 
   // Escape key handler
   useEffect(() => {
@@ -66,14 +82,18 @@ export function StockMovementModal({ isOpen, onClose }: StockMovementModalProps)
   const unitCost = Number(form.unitCost) || 0;
   const totalValue = qty * unitCost;
 
-  const mutation = useMutation({
+  const invalidateAll = () => {
+    queryClient.invalidateQueries({ queryKey: ['stock-movements'] });
+    queryClient.invalidateQueries({ queryKey: ['inventory-items'] });
+    queryClient.invalidateQueries({ queryKey: ['inventory-items-active'] });
+    queryClient.invalidateQueries({ queryKey: ['coa'] });
+    queryClient.invalidateQueries({ queryKey: ['journals'] });
+  };
+
+  const createMutation = useMutation({
     mutationFn: (data: any) => api.post('/inventory/movements', data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['stock-movements'] });
-      queryClient.invalidateQueries({ queryKey: ['inventory-items'] });
-      queryClient.invalidateQueries({ queryKey: ['inventory-items-active'] });
-      queryClient.invalidateQueries({ queryKey: ['coa'] });
-      queryClient.invalidateQueries({ queryKey: ['journals'] });
+      invalidateAll();
       toast.success('Gerakan stok berhasil dicatat.');
       onClose();
     },
@@ -84,12 +104,28 @@ export function StockMovementModal({ isOpen, onClose }: StockMovementModalProps)
     },
   });
 
+  const updateMutation = useMutation({
+    mutationFn: (data: any) => api.put(`/inventory/movements/${editMovement?.id}`, data),
+    onSuccess: () => {
+      invalidateAll();
+      toast.success('Gerakan stok berhasil diperbarui.');
+      onClose();
+    },
+    onError: (err: any) => {
+      const msg = err.response?.data?.error || 'Gagal mengupdate gerakan stok.';
+      setError(msg);
+      toast.error(msg);
+    },
+  });
+
+  const mutation = isEdit ? updateMutation : createMutation;
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    mutation.mutate({
+
+    const payload: any = {
       date: form.date,
-      itemId: form.itemId,
       movementType: form.movementType,
       quantity: Number(form.quantity),
       unitCost: unitCost,
@@ -97,10 +133,18 @@ export function StockMovementModal({ isOpen, onClose }: StockMovementModalProps)
       referenceType: form.referenceType || undefined,
       referenceNumber: form.referenceNumber || undefined,
       notes: form.notes || undefined,
-    });
+    };
+
+    if (!isEdit) {
+      payload.itemId = form.itemId;
+    }
+
+    mutation.mutate(payload);
   };
 
   if (!isOpen) return null;
+
+  const isProductionLinked = editMovement?.referenceType === 'ProductionRun';
 
   return (
     <div
@@ -114,7 +158,7 @@ export function StockMovementModal({ isOpen, onClose }: StockMovementModalProps)
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <h2 id="movement-modal-title" className="text-base font-semibold text-gray-900">
-            Catat Gerakan Stok
+            {isEdit ? 'Edit Gerakan Stok' : 'Catat Gerakan Stok'}
           </h2>
           <button
             type="button"
@@ -129,6 +173,13 @@ export function StockMovementModal({ isOpen, onClose }: StockMovementModalProps)
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
           <div className="p-6 space-y-4">
 
+            {isProductionLinked && (
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-center gap-2 text-amber-700 text-sm">
+                <AlertCircle size={15} />
+                <span>Gerakan stok dari proses produksi tidak dapat diedit langsung.</span>
+              </div>
+            )}
+
             {/* Tanggal */}
             <div>
               <label htmlFor="mov-date" className="block text-xs font-semibold text-gray-500 mb-1.5">
@@ -140,29 +191,39 @@ export function StockMovementModal({ isOpen, onClose }: StockMovementModalProps)
                 required
                 value={form.date}
                 onChange={e => setForm(f => ({ ...f, date: e.target.value }))}
-                className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                disabled={isProductionLinked}
+                className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-400"
               />
             </div>
 
-            {/* Item */}
+            {/* Item — read-only during edit */}
             <div>
               <label htmlFor="mov-item" className="block text-xs font-semibold text-gray-500 mb-1.5">
                 Item <span className="text-red-500">*</span>
               </label>
-              <select
-                id="mov-item"
-                required
-                value={form.itemId}
-                onChange={e => setForm(f => ({ ...f, itemId: e.target.value, offsetAccountId: '' }))}
-                className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">— Pilih Item —</option>
-                {items.map((item: any) => (
-                  <option key={item.id} value={item.id}>
-                    {item.code} — {item.name} ({item.unit})
-                  </option>
-                ))}
-              </select>
+              {isEdit ? (
+                <input
+                  type="text"
+                  readOnly
+                  value={editMovement?.item ? `${editMovement.item.code} — ${editMovement.item.name} (${editMovement.item.unit})` : ''}
+                  className="w-full border border-gray-100 rounded-lg py-2 px-3 text-sm text-gray-500 bg-gray-50 cursor-not-allowed"
+                />
+              ) : (
+                <select
+                  id="mov-item"
+                  required
+                  value={form.itemId}
+                  onChange={e => setForm(f => ({ ...f, itemId: e.target.value, offsetAccountId: '' }))}
+                  className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">— Pilih Item —</option>
+                  {items.map((item: any) => (
+                    <option key={item.id} value={item.id}>
+                      {item.code} — {item.name} ({item.unit})
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
 
             {/* Tipe Gerakan */}
@@ -175,7 +236,8 @@ export function StockMovementModal({ isOpen, onClose }: StockMovementModalProps)
                 required
                 value={form.movementType}
                 onChange={e => setForm(f => ({ ...f, movementType: e.target.value as typeof form.movementType }))}
-                className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                disabled={isProductionLinked}
+                className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-400"
               >
                 <option value="In">Masuk (In)</option>
                 <option value="Out">Keluar (Out)</option>
@@ -197,12 +259,13 @@ export function StockMovementModal({ isOpen, onClose }: StockMovementModalProps)
                 step="any"
                 value={form.quantity}
                 onChange={e => setForm(f => ({ ...f, quantity: e.target.value }))}
+                disabled={isProductionLinked}
                 placeholder="0"
-                className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none disabled:bg-gray-50 disabled:text-gray-400"
               />
-              {selectedItem && (
+              {(selectedItem || editMovement?.item) && (
                 <p className="text-[11px] text-gray-400 mt-1">
-                  Stok saat ini: {Number(selectedItem.currentStock).toLocaleString('id-ID', { maximumFractionDigits: 3 })} {selectedItem.unit}
+                  Stok saat ini: {Number((selectedItem || editMovement?.item)?.currentStock ?? 0).toLocaleString('id-ID', { maximumFractionDigits: 3 })} {(selectedItem || editMovement?.item)?.unit}
                 </p>
               )}
             </div>
@@ -219,8 +282,9 @@ export function StockMovementModal({ isOpen, onClose }: StockMovementModalProps)
                 step="any"
                 value={form.unitCost}
                 onChange={e => setForm(f => ({ ...f, unitCost: e.target.value }))}
+                disabled={isProductionLinked}
                 placeholder="0"
-                className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none disabled:bg-gray-50 disabled:text-gray-400"
               />
             </div>
 
@@ -238,7 +302,7 @@ export function StockMovementModal({ isOpen, onClose }: StockMovementModalProps)
               />
             </div>
 
-            {/* Akun Lawan — wajib jika ada nilai untuk posting GL */}
+            {/* Akun Lawan */}
             <div>
               <label htmlFor="mov-offset-account" className="block text-xs font-semibold text-gray-500 mb-1.5">
                 Akun Lawan {totalValue > 0 && <span className="text-red-500">*</span>}
@@ -249,7 +313,8 @@ export function StockMovementModal({ isOpen, onClose }: StockMovementModalProps)
                 required={totalValue > 0}
                 value={form.offsetAccountId}
                 onChange={e => setForm(f => ({ ...f, offsetAccountId: e.target.value }))}
-                className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                disabled={isProductionLinked}
+                className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-400"
               >
                 <option value="">— Pilih Akun Lawan —</option>
                 {nonGroupAccounts.map((a: any) => (
@@ -274,7 +339,8 @@ export function StockMovementModal({ isOpen, onClose }: StockMovementModalProps)
                 id="mov-ref-type"
                 value={form.referenceType}
                 onChange={e => setForm(f => ({ ...f, referenceType: e.target.value, referenceNumber: '' }))}
-                className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                disabled={isProductionLinked}
+                className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-400"
               >
                 <option value="">— Tidak Ada —</option>
                 <option value="PurchaseInvoice">Invoice Pembelian</option>
@@ -282,7 +348,7 @@ export function StockMovementModal({ isOpen, onClose }: StockMovementModalProps)
               </select>
             </div>
 
-            {/* Nomor Referensi — show when refType selected */}
+            {/* Nomor Referensi */}
             {form.referenceType && (
               <div>
                 <label htmlFor="mov-ref-number" className="block text-xs font-semibold text-gray-500 mb-1.5">
@@ -293,8 +359,9 @@ export function StockMovementModal({ isOpen, onClose }: StockMovementModalProps)
                   type="text"
                   value={form.referenceNumber}
                   onChange={e => setForm(f => ({ ...f, referenceNumber: e.target.value }))}
+                  disabled={isProductionLinked}
                   placeholder="Nomor dokumen referensi"
-                  className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-400"
                 />
               </div>
             )}
@@ -309,8 +376,9 @@ export function StockMovementModal({ isOpen, onClose }: StockMovementModalProps)
                 rows={3}
                 value={form.notes}
                 onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
+                disabled={isProductionLinked}
                 placeholder="Catatan opsional tentang gerakan stok ini"
-                className="w-full border border-gray-200 rounded-lg py-2.5 px-3 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none placeholder:text-gray-300"
+                className="w-full border border-gray-200 rounded-lg py-2.5 px-3 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none placeholder:text-gray-300 disabled:bg-gray-50 disabled:text-gray-400"
               />
             </div>
 
@@ -327,13 +395,15 @@ export function StockMovementModal({ isOpen, onClose }: StockMovementModalProps)
             <button type="button" onClick={onClose} className="btn-secondary">
               Batal
             </button>
-            <button
-              type="submit"
-              disabled={mutation.isPending}
-              className="btn-primary disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              {mutation.isPending ? <Loader2 size={15} className="animate-spin" /> : 'Simpan Gerakan'}
-            </button>
+            {!isProductionLinked && (
+              <button
+                type="submit"
+                disabled={mutation.isPending}
+                className="btn-primary disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {mutation.isPending ? <Loader2 size={15} className="animate-spin" /> : isEdit ? 'Simpan Perubahan' : 'Simpan Gerakan'}
+              </button>
+            )}
           </div>
         </form>
 

@@ -9,10 +9,15 @@ import { compareAccountNumber } from '../utils/accountSort';
 
 const router = Router();
 
-function parseQueryDate(value: unknown): Date | undefined {
+function parseQueryDate(value: unknown, endOfDay = false): Date | undefined {
   if (typeof value !== 'string' || !value) return undefined;
   const d = new Date(value);
   if (isNaN(d.getTime())) return undefined;
+  // When used as an upper bound (endDate / date), set to end of day
+  // so entries created during the day are included
+  if (endOfDay) {
+    d.setHours(23, 59, 59, 999);
+  }
   return d;
 }
 
@@ -20,7 +25,7 @@ function parseQueryDate(value: unknown): Date | undefined {
 router.get('/trial-balance', async (req, res) => {
   const { startDate: rawStart, endDate: rawEnd } = req.query;
   const startDate = parseQueryDate(rawStart);
-  const endDate = parseQueryDate(rawEnd);
+  const endDate = parseQueryDate(rawEnd, true);
   if (rawStart && typeof rawStart === 'string' && rawStart !== '' && !startDate) {
     return res.status(400).json({ error: 'Parameter startDate tidak valid.' });
   }
@@ -71,7 +76,7 @@ router.get('/trial-balance', async (req, res) => {
 router.get('/profit-loss', async (req, res) => {
   const { startDate: rawStart, endDate: rawEnd } = req.query;
   const startDate = parseQueryDate(rawStart);
-  const endDate = parseQueryDate(rawEnd);
+  const endDate = parseQueryDate(rawEnd, true);
   if (rawStart && typeof rawStart === 'string' && rawStart !== '' && !startDate) {
     return res.status(400).json({ error: 'Parameter startDate tidak valid.' });
   }
@@ -179,7 +184,7 @@ router.get('/profit-loss', async (req, res) => {
 
 // GET /api/reports/balance-sheet
 router.get('/balance-sheet', async (req, res) => {
-  const parsedDate = parseQueryDate(req.query.date);
+  const parsedDate = parseQueryDate(req.query.date, true);
   if (req.query.date && typeof req.query.date === 'string' && req.query.date !== '' && !parsedDate) {
     return res.status(400).json({ error: 'Parameter date tidak valid.' });
   }
@@ -290,7 +295,7 @@ router.get('/balance-sheet', async (req, res) => {
 router.get('/cash-flow', async (req, res) => {
   const { startDate: rawStart, endDate: rawEnd } = req.query;
   const parsedStart = parseQueryDate(rawStart);
-  const parsedEnd = parseQueryDate(rawEnd);
+  const parsedEnd = parseQueryDate(rawEnd, true);
   if (rawStart && typeof rawStart === 'string' && rawStart !== '' && !parsedStart) {
     return res.status(400).json({ error: 'Parameter startDate tidak valid.' });
   }
@@ -419,7 +424,7 @@ router.get('/ledger-detail', async (req, res) => {
   }
 
   const startDate = parseQueryDate(rawStart);
-  const endDate = parseQueryDate(rawEnd);
+  const endDate = parseQueryDate(rawEnd, true);
   if (rawStart && typeof rawStart === 'string' && rawStart !== '' && !startDate) {
     return res.status(400).json({ error: 'Parameter startDate tidak valid.' });
   }

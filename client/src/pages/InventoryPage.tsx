@@ -37,6 +37,7 @@ export function InventoryPage() {
 
   // --- Movements tab state ---
   const [movementModalOpen, setMovementModalOpen] = useState(false);
+  const [editMovement, setEditMovement] = useState<any | null>(null);
   const [filterItemId, setFilterItemId] = useState('');
   const [filterMovementType, setFilterMovementType] = useState('');
   const [filterStartDate, setFilterStartDate] = useState('');
@@ -277,7 +278,7 @@ export function InventoryPage() {
             </button>
           </div>
         ) : activeTab === 'movements' ? (
-          <button onClick={() => setMovementModalOpen(true)} className="btn-primary">
+          <button onClick={() => { setEditMovement(null); setMovementModalOpen(true); }} className="btn-primary">
             <Plus size={15} /> Catat Gerakan
           </button>
         ) : activeTab === 'services' ? (
@@ -599,14 +600,25 @@ export function InventoryPage() {
                           {mov.notes ?? '—'}
                         </td>
                         <td>
-                          {!isCancelled && userRole === 'Admin' && (
-                            <button
-                              onClick={() => setCancelTarget(mov.id)}
-                              className="p-1.5 hover:bg-red-50 rounded text-gray-300 hover:text-red-500 transition-colors"
-                              title="Batalkan gerakan"
-                            >
-                              <XCircle size={15} />
-                            </button>
+                          {!isCancelled && ['Admin', 'Accountant'].includes(userRole) && (
+                            <div className="flex items-center gap-0.5">
+                              <button
+                                onClick={() => { setEditMovement(mov); setMovementModalOpen(true); }}
+                                className="p-1.5 hover:bg-blue-50 rounded text-gray-300 hover:text-blue-500 transition-colors"
+                                title="Edit gerakan"
+                              >
+                                <Edit2 size={14} />
+                              </button>
+                              {userRole === 'Admin' && (
+                                <button
+                                  onClick={() => setCancelTarget(mov.id)}
+                                  className="p-1.5 hover:bg-red-50 rounded text-gray-300 hover:text-red-500 transition-colors"
+                                  title="Batalkan gerakan"
+                                >
+                                  <XCircle size={15} />
+                                </button>
+                              )}
+                            </div>
                           )}
                         </td>
                       </tr>
@@ -901,7 +913,8 @@ export function InventoryPage() {
 
       <StockMovementModal
         isOpen={movementModalOpen}
-        onClose={() => setMovementModalOpen(false)}
+        onClose={() => { setMovementModalOpen(false); setEditMovement(null); }}
+        editMovement={editMovement}
       />
 
       <ProductionRunModal
