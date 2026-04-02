@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../lib/api';
-import { X, Loader2, AlertCircle, TrendingUp } from 'lucide-react';
+import { X, Loader2, AlertCircle, TrendingUp, CheckCircle2, Paperclip } from 'lucide-react';
 import { formatRupiah } from '../lib/formatters';
+import AttachmentUpload from './AttachmentUpload';
+import AttachmentPreview from './AttachmentPreview';
 
 interface ExpenseModalProps {
   isOpen: boolean;
@@ -30,6 +32,7 @@ const ExpenseModal: React.FC<ExpenseModalProps> = ({ isOpen, onClose }) => {
   const [notes, setNotes] = useState('');
   const [description, setDescription] = useState('');
   const [error, setError] = useState('');
+  const [savedId, setSavedId] = useState<string | null>(null);
 
   const queryClient = useQueryClient();
 
@@ -45,6 +48,7 @@ const ExpenseModal: React.FC<ExpenseModalProps> = ({ isOpen, onClose }) => {
       setNotes('');
       setDescription('');
       setError('');
+      setSavedId(null);
     }
   }, [isOpen]);
 
@@ -100,14 +104,14 @@ const ExpenseModal: React.FC<ExpenseModalProps> = ({ isOpen, onClose }) => {
 
   const mutation = useMutation({
     mutationFn: (data: any) => api.post('/journals', data),
-    onSuccess: () => {
+    onSuccess: (res: any) => {
       queryClient.invalidateQueries({ queryKey: ['payments'] });
       queryClient.invalidateQueries({ queryKey: ['cash-journals'] });
       queryClient.invalidateQueries({ queryKey: ['journals'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-metrics'] });
       queryClient.invalidateQueries({ queryKey: ['coa'] });
       queryClient.invalidateQueries({ queryKey: ['parties'] });
-      onClose();
+      setSavedId(res.data?.id);
     },
     onError: (err: any) => setError(err.response?.data?.error || 'Gagal menyimpan pengeluaran.'),
   });
@@ -337,18 +341,39 @@ const ExpenseModal: React.FC<ExpenseModalProps> = ({ isOpen, onClose }) => {
               <AlertCircle size={15} /> <span>{error}</span>
             </div>
           )}
+
+          {/* Attachment section — shown after save */}
+          {savedId && (
+            <div className="space-y-3 pt-2 border-t" style={{ borderColor: 'var(--color-border)' }}>
+              <div className="flex items-center gap-2">
+                <CheckCircle2 size={14} className="text-green-500" />
+                <span className="text-xs font-semibold text-green-600">Tersimpan</span>
+                <span className="text-[10px] ml-auto flex items-center gap-1" style={{ color: 'var(--color-text-muted)' }}>
+                  <Paperclip size={10} /> Lampiran Bukti
+                </span>
+              </div>
+              <AttachmentPreview referenceType="journal" referenceId={savedId} />
+              <AttachmentUpload referenceType="journal" referenceId={savedId} />
+            </div>
+          )}
         </div>
 
         {/* Footer */}
         <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3">
-          <button onClick={onClose} className="btn-secondary">Batal</button>
-          <button
-            onClick={handleSubmit}
-            disabled={!canSubmit}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-medium bg-orange-500 hover:bg-orange-600 text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            {mutation.isPending ? <Loader2 size={15} className="animate-spin" /> : 'Simpan Pengeluaran'}
-          </button>
+          {savedId ? (
+            <button onClick={onClose} className="btn-primary">Selesai</button>
+          ) : (
+            <>
+              <button onClick={onClose} className="btn-secondary">Batal</button>
+              <button
+                onClick={handleSubmit}
+                disabled={!canSubmit}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-medium bg-orange-500 hover:bg-orange-600 text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {mutation.isPending ? <Loader2 size={15} className="animate-spin" /> : 'Simpan Pengeluaran'}
+              </button>
+            </>
+          )}
         </div>
 
       </div>

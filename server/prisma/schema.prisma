@@ -360,6 +360,7 @@ model User {
   vendorDepositApplications    VendorDepositApplication[]
   customerDepositApplications  CustomerDepositApplication[]
   tokenBlacklist               TokenBlacklist[]
+  attachments                  TransactionAttachment[]
   createdAt            DateTime              @default(now()) @map("created_at")
   updatedAt            DateTime              @updatedAt @map("updated_at")
 
@@ -696,4 +697,22 @@ model ServiceItem {
 
   @@index([accountId])
   @@map("service_items")
+}
+
+model TransactionAttachment {
+  id            String   @id @default(uuid())
+  referenceType String   @map("reference_type")
+  referenceId   String   @map("reference_id")
+  fileName      String   @map("file_name")
+  storedName    String   @map("stored_name")
+  mimeType      String   @map("mime_type")
+  fileSize      Int      @map("file_size")
+  filePath      String   @map("file_path")
+  uploadedBy    String   @map("uploaded_by")
+  user          User     @relation(fields: [uploadedBy], references: [id])
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@index([referenceType, referenceId])
+  @@index([uploadedBy])
+  @@map("transaction_attachments")
 }

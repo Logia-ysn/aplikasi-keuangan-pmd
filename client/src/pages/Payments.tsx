@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Search, MoreHorizontal, CreditCard, Loader2, TrendingDown, TrendingUp, ArrowRightLeft, FileText, Wallet } from 'lucide-react';
+import { Search, MoreHorizontal, CreditCard, Loader2, TrendingDown, TrendingUp, ArrowRightLeft, FileText, Wallet, Paperclip } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useQuery } from '@tanstack/react-query';
 import api from '../lib/api';
@@ -46,6 +46,28 @@ export const Payments = () => {
   });
 
   const isLoading = loadingPayments || loadingJournals;
+
+  // Fetch attachment counts for all payments + journals
+  const paymentIds = useMemo(() => (payments || []).map((p: any) => p.id), [payments]);
+  const journalIds = useMemo(() => (cashJournals || []).map((j: any) => j.id), [cashJournals]);
+
+  const { data: paymentAttCounts } = useQuery({
+    queryKey: ['attachment-counts', 'payment', paymentIds],
+    queryFn: async () => {
+      const res = await api.post('/attachments/counts', { referenceType: 'payment', referenceIds: paymentIds });
+      return res.data as Record<string, number>;
+    },
+    enabled: paymentIds.length > 0,
+  });
+
+  const { data: journalAttCounts } = useQuery({
+    queryKey: ['attachment-counts', 'journal', journalIds],
+    queryFn: async () => {
+      const res = await api.post('/attachments/counts', { referenceType: 'journal', referenceIds: journalIds });
+      return res.data as Record<string, number>;
+    },
+    enabled: journalIds.length > 0,
+  });
 
   // Merge payments + cash-affecting journals into unified list
   const allTransactions: CashTransaction[] = useMemo(() => {
@@ -189,6 +211,16 @@ export const Payments = () => {
                     <td className="text-gray-500 whitespace-nowrap">{formatDate(txn.date)}</td>
                     <td className="whitespace-nowrap">
                       <span className="font-mono text-xs text-gray-800 bg-gray-50 px-1.5 py-0.5 rounded">{txn.number}</span>
+                      {(() => {
+                        const counts = txn.source === 'payment' ? paymentAttCounts : journalAttCounts;
+                        const count = counts?.[txn.id] ?? 0;
+                        return count > 0 ? (
+                          <span className="inline-flex items-center gap-0.5 ml-1.5 text-blue-500" title={`${count} lampiran`}>
+                            <Paperclip size={11} />
+                            <span className="text-[10px] font-medium">{count}</span>
+                          </span>
+                        ) : null;
+                      })()}
                     </td>
                     <td>
                       <span className="font-medium text-gray-800">{txn.partyName ?? '—'}</span>

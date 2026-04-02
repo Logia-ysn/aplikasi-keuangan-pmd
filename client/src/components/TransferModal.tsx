@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../lib/api';
-import { X, Loader2, AlertCircle, ArrowRightLeft } from 'lucide-react';
+import { X, Loader2, AlertCircle, ArrowRightLeft, CheckCircle2, Paperclip } from 'lucide-react';
 import { formatRupiah } from '../lib/formatters';
+import AttachmentUpload from './AttachmentUpload';
+import AttachmentPreview from './AttachmentPreview';
 
 interface TransferModalProps {
   isOpen: boolean;
@@ -19,6 +21,7 @@ const TransferModal: React.FC<TransferModalProps> = ({ isOpen, onClose }) => {
   const [referenceNo, setReferenceNo] = useState('');
   const [notes, setNotes] = useState('');
   const [error, setError] = useState('');
+  const [savedId, setSavedId] = useState<string | null>(null);
 
   const queryClient = useQueryClient();
 
@@ -31,6 +34,7 @@ const TransferModal: React.FC<TransferModalProps> = ({ isOpen, onClose }) => {
       setReferenceNo('');
       setNotes('');
       setError('');
+      setSavedId(null);
     }
   }, [isOpen]);
 
@@ -50,12 +54,12 @@ const TransferModal: React.FC<TransferModalProps> = ({ isOpen, onClose }) => {
 
   const mutation = useMutation({
     mutationFn: (data: any) => api.post('/journals', data),
-    onSuccess: () => {
+    onSuccess: (res: any) => {
       queryClient.invalidateQueries({ queryKey: ['payments'] });
       queryClient.invalidateQueries({ queryKey: ['journals'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-metrics'] });
       queryClient.invalidateQueries({ queryKey: ['coa'] });
-      onClose();
+      setSavedId(res.data?.id);
     },
     onError: (err: any) => setError(err.response?.data?.error || 'Gagal menyimpan transfer.'),
   });
@@ -250,18 +254,39 @@ const TransferModal: React.FC<TransferModalProps> = ({ isOpen, onClose }) => {
               <AlertCircle size={15} /> <span>{error}</span>
             </div>
           )}
+
+          {/* Attachment section — shown after save */}
+          {savedId && (
+            <div className="space-y-3 pt-2 border-t" style={{ borderColor: 'var(--color-border)' }}>
+              <div className="flex items-center gap-2">
+                <CheckCircle2 size={14} className="text-green-500" />
+                <span className="text-xs font-semibold text-green-600">Tersimpan</span>
+                <span className="text-[10px] ml-auto flex items-center gap-1" style={{ color: 'var(--color-text-muted)' }}>
+                  <Paperclip size={10} /> Lampiran Bukti Transfer
+                </span>
+              </div>
+              <AttachmentPreview referenceType="journal" referenceId={savedId} />
+              <AttachmentUpload referenceType="journal" referenceId={savedId} />
+            </div>
+          )}
         </div>
 
         {/* Footer */}
         <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3">
-          <button onClick={onClose} className="btn-secondary">Batal</button>
-          <button
-            onClick={handleSubmit}
-            disabled={!canSubmit}
-            className="btn-primary disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            {mutation.isPending ? <Loader2 size={15} className="animate-spin" /> : 'Simpan Transfer'}
-          </button>
+          {savedId ? (
+            <button onClick={onClose} className="btn-primary">Selesai</button>
+          ) : (
+            <>
+              <button onClick={onClose} className="btn-secondary">Batal</button>
+              <button
+                onClick={handleSubmit}
+                disabled={!canSubmit}
+                className="btn-primary disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {mutation.isPending ? <Loader2 size={15} className="animate-spin" /> : 'Simpan Transfer'}
+              </button>
+            </>
+          )}
         </div>
 
       </div>

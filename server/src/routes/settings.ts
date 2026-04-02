@@ -843,6 +843,7 @@ router.post('/reset-data', roleMiddleware(['Admin']), async (req, res) => {
       // Use raw SQL TRUNCATE CASCADE — deletes all data respecting FKs in one shot
       await tx.$executeRawUnsafe(`
         TRUNCATE TABLE
+          transaction_attachments,
           token_blacklist,
           notifications,
           audit_trail,

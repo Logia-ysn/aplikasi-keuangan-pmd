@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../lib/api';
-import { X, Loader2, AlertCircle, TrendingDown, TrendingUp } from 'lucide-react';
+import { X, Loader2, AlertCircle, TrendingDown, TrendingUp, CheckCircle2, Paperclip } from 'lucide-react';
 import { formatRupiah, formatDate } from '../lib/formatters';
+import AttachmentUpload from './AttachmentUpload';
+import AttachmentPreview from './AttachmentPreview';
 
 type PaymentType = 'Receive' | 'Pay';
 
@@ -23,6 +25,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, defaultTyp
   const [referenceNo, setReferenceNo] = useState('');
   const [notes, setNotes] = useState('');
   const [error, setError] = useState('');
+  const [savedId, setSavedId] = useState<string | null>(null);
 
   const queryClient = useQueryClient();
 
@@ -37,6 +40,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, defaultTyp
       setReferenceNo('');
       setNotes('');
       setError('');
+      setSavedId(null);
     }
   }, [isOpen, defaultType]);
 
@@ -86,13 +90,13 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, defaultTyp
 
   const mutation = useMutation({
     mutationFn: (data: any) => api.post('/payments', data),
-    onSuccess: () => {
+    onSuccess: (res: any) => {
       queryClient.invalidateQueries({ queryKey: ['payments'] });
       queryClient.invalidateQueries({ queryKey: ['sales-invoices'] });
       queryClient.invalidateQueries({ queryKey: ['purchase-invoices'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-metrics'] });
       queryClient.invalidateQueries({ queryKey: ['parties'] });
-      onClose();
+      setSavedId(res.data?.id || res.data?.payment?.id);
     },
     onError: (err: any) => setError(err.response?.data?.error || 'Gagal menyimpan pembayaran.'),
   });
@@ -295,18 +299,39 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, defaultTyp
               <AlertCircle size={15} /> <span>{error}</span>
             </div>
           )}
+
+          {/* Attachment section — shown after save */}
+          {savedId && (
+            <div className="space-y-3 pt-2 border-t" style={{ borderColor: 'var(--color-border)' }}>
+              <div className="flex items-center gap-2">
+                <CheckCircle2 size={14} className="text-green-500" />
+                <span className="text-xs font-semibold text-green-600">Tersimpan</span>
+                <span className="text-[10px] ml-auto flex items-center gap-1" style={{ color: 'var(--color-text-muted)' }}>
+                  <Paperclip size={10} /> Lampiran Bukti Transfer
+                </span>
+              </div>
+              <AttachmentPreview referenceType="payment" referenceId={savedId} />
+              <AttachmentUpload referenceType="payment" referenceId={savedId} />
+            </div>
+          )}
         </div>
 
         {/* Footer */}
         <div className="px-6 py-4 border-t flex justify-end gap-3" style={{ borderColor: 'var(--color-border)' }}>
-          <button onClick={onClose} className="btn-secondary">Batal</button>
-          <button
-            onClick={handleSubmit}
-            disabled={!canSubmit}
-            className={`btn-primary disabled:opacity-40 disabled:cursor-not-allowed ${!isReceive ? 'bg-orange-500 hover:bg-orange-600' : ''}`}
-          >
-            {mutation.isPending ? <Loader2 size={15} className="animate-spin" /> : 'Simpan'}
-          </button>
+          {savedId ? (
+            <button onClick={onClose} className="btn-primary">Selesai</button>
+          ) : (
+            <>
+              <button onClick={onClose} className="btn-secondary">Batal</button>
+              <button
+                onClick={handleSubmit}
+                disabled={!canSubmit}
+                className={`btn-primary disabled:opacity-40 disabled:cursor-not-allowed ${!isReceive ? 'bg-orange-500 hover:bg-orange-600' : ''}`}
+              >
+                {mutation.isPending ? <Loader2 size={15} className="animate-spin" /> : 'Simpan'}
+              </button>
+            </>
+          )}
         </div>
 
       </div>
