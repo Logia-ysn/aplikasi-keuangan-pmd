@@ -967,46 +967,4 @@ router.get('/check-update', roleMiddleware(['Admin']), async (_req, res) => {
   }
 });
 
-// POST /api/settings/trigger-update — Trigger app rebuild via updater container
-router.post('/trigger-update', roleMiddleware(['Admin']), async (_req, res) => {
-  try {
-    const { execFile } = await import('child_process');
-    const { promisify } = await import('util');
-    const execFileAsync = promisify(execFile);
-
-    // Check if updater container exists
-    try {
-      const { stdout } = await execFileAsync(
-        'docker', ['ps', '--filter', 'name=updater', '--format', '{{.Names}}'],
-        { timeout: 5000 }
-      );
-
-      if (!stdout.trim()) {
-        return res.status(400).json({ error: 'Updater container tidak berjalan. Jalankan: docker compose up -d updater' });
-      }
-    } catch {
-      // Docker not accessible from this container
-    }
-
-    // Send response first, then trigger update in background
-    res.json({ message: 'Update sedang diproses. Aplikasi akan restart dalam beberapa saat.' });
-
-    // Trigger rebuild via updater container (non-blocking)
-    const projectDir = path.resolve(__dirname, '../../..');
-    execFile('docker', [
-      'exec', 'finance-pmd-updater-1', 'sh', '-c',
-      'cd /project && git pull origin main && docker compose up -d --build app'
-    ], { timeout: 300000, cwd: projectDir }, (error, stdout, stderr) => {
-      if (error) {
-        logger.error({ error: error.message, stderr }, 'Update trigger failed');
-      } else {
-        logger.info({ stdout: stdout.trim() }, 'Update trigger completed');
-      }
-    });
-  } catch (error) {
-    logger.error({ error }, 'POST /settings/trigger-update error');
-    return res.status(500).json({ error: 'Gagal trigger update.' });
-  }
-});
-
 export default router;

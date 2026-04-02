@@ -50,37 +50,6 @@ services:
       db:
         condition: service_healthy
 
-  # ── Auto-Updater (checks GitHub & rebuilds) ────────────────────────────────
-  updater:
-    image: docker:27-cli
-    restart: unless-stopped
-    working_dir: /project
-    environment:
-      UPDATE_INTERVAL: "${UPDATE_INTERVAL:-300}"
-      APP_SERVICE: "app"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - .:/project
-    entrypoint: /bin/sh
-    command:
-      - -c
-      - |
-        apk add --no-cache git >/dev/null 2>&1
-        echo "[UPDATER] Auto-updater started (interval: $${UPDATE_INTERVAL}s)"
-        while true; do
-          sleep $${UPDATE_INTERVAL}
-          cd /project
-          git fetch origin main --quiet 2>/dev/null || continue
-          LOCAL=$$(git rev-parse HEAD)
-          REMOTE=$$(git rev-parse origin/main)
-          if [ "$$LOCAL" != "$$REMOTE" ]; then
-            echo "[UPDATER] Update found! $$LOCAL -> $$REMOTE"
-            git pull origin main 2>&1
-            docker compose up -d --build $${APP_SERVICE} 2>&1
-            echo "[UPDATER] Rebuild complete at $$(date)"
-          fi
-        done
-
 volumes:
   pgdata:
   backups:

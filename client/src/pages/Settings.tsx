@@ -431,7 +431,6 @@ interface RuntimeInfo {
 
 const AboutTab: React.FC = () => {
   const [checking, setChecking] = useState(false);
-  const [updating, setUpdating] = useState(false);
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
   const [runtime, setRuntime] = useState<RuntimeInfo | null>(null);
 
@@ -586,31 +585,8 @@ const AboutTab: React.FC = () => {
                   </div>
                 )}
 
-                <div className="flex items-center gap-3">
-                  <button
-                    onClick={async () => {
-                      setUpdating(true);
-                      try {
-                        await api.post('/settings/trigger-update');
-                        // Poll until new version responds or timeout
-                        setTimeout(() => window.location.reload(), 60000);
-                      } catch {
-                        setUpdating(false);
-                      }
-                    }}
-                    disabled={updating}
-                    className="btn-primary text-xs py-2"
-                  >
-                    {updating ? <Loader2 size={13} className="animate-spin" /> : <ArrowUpCircle size={13} />}
-                    {updating ? 'Sedang mengupdate...' : 'Update Sekarang'}
-                  </button>
-                  {updating && (
-                    <span className="text-[11px] text-blue-600">Aplikasi akan restart otomatis. Halaman akan reload dalam 1 menit.</span>
-                  )}
-                </div>
-
                 <div className="bg-white/60 rounded-lg p-3 text-xs text-gray-600 space-y-1">
-                  <p className="font-semibold text-gray-700">Atau update manual di server:</p>
+                  <p className="font-semibold text-gray-700">Cara update di server:</p>
                   <pre className="bg-gray-900 text-green-300 rounded-lg p-2.5 text-[11px] font-mono overflow-x-auto">
 {`cd ~/aplikasi-keuangan-pmd
 git pull origin main
