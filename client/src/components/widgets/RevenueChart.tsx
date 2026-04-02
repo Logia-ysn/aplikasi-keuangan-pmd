@@ -56,7 +56,7 @@ const RevenueChart: React.FC<RevenueChartProps> = ({ data, loading }) => (
                 <stop offset="95%" stopColor="#9ca3af" stopOpacity={0} />
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--color-border)" />
             <XAxis
               dataKey="name"
               axisLine={false}
@@ -73,11 +73,12 @@ const RevenueChart: React.FC<RevenueChartProps> = ({ data, loading }) => (
             />
             <Tooltip
               contentStyle={{
-                backgroundColor: '#fff',
-                border: '1px solid #e5e7eb',
+                backgroundColor: 'var(--color-bg-primary)',
+                border: '1px solid var(--color-border)',
                 borderRadius: '8px',
                 fontSize: 12,
                 boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+                color: 'var(--color-text-primary)',
               }}
               formatter={(value: any) => [formatRupiah(value), '']}
             />

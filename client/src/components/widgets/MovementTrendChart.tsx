@@ -100,7 +100,7 @@ export default function MovementTrendChart() {
         ) : (
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={data} margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--color-border)" />
               <XAxis
                 dataKey="month"
                 axisLine={false}
@@ -116,11 +116,12 @@ export default function MovementTrendChart() {
               />
               <Tooltip
                 contentStyle={{
-                  backgroundColor: '#fff',
-                  border: '1px solid #e5e7eb',
+                  backgroundColor: 'var(--color-bg-primary)',
+                  border: '1px solid var(--color-border)',
                   borderRadius: '8px',
                   fontSize: 12,
                   boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+                  color: 'var(--color-text-primary)',
                 }}
                 formatter={(value, name) => {
                   const labels: Record<string, string> = { masuk: 'Masuk', keluar: 'Keluar', net: 'Net Change' };

@@ -46,12 +46,12 @@ interface KPICardsProps {
 
 const KPICards: React.FC<KPICardsProps> = ({ data, loading }) => (
   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-    <MetricCard title="Total Kas & Bank" value={data?.cashBalance || 0} loading={loading} icon={Wallet} />
-    <MetricCard title="Piutang Usaha" value={data?.accountsReceivable || 0} loading={loading} icon={TrendingUp} />
-    <MetricCard title="Hutang Usaha" value={data?.accountsPayable || 0} loading={loading} icon={TrendingDown} />
-    <MetricCard title="Deposit Supplier" value={data?.vendorDeposit || 0} loading={loading} icon={HandCoins} />
-    <MetricCard title="Nilai Persediaan" value={data?.inventoryValue || 0} loading={loading} icon={Package} />
-    <MetricCard title="Laba Bersih (Bulan Ini)" value={data?.netProfit || 0} loading={loading} icon={CreditCard} />
+    <MetricCard title="Total Kas & Bank" value={data?.cashBalance ?? 0} loading={loading} icon={Wallet} />
+    <MetricCard title="Piutang Usaha" value={data?.accountsReceivable ?? 0} loading={loading} icon={TrendingUp} />
+    <MetricCard title="Hutang Usaha" value={data?.accountsPayable ?? 0} loading={loading} icon={TrendingDown} />
+    <MetricCard title="Deposit Supplier" value={data?.vendorDeposit ?? 0} loading={loading} icon={HandCoins} />
+    <MetricCard title="Nilai Persediaan" value={data?.inventoryValue ?? 0} loading={loading} icon={Package} />
+    <MetricCard title="Laba Bersih (Bulan Ini)" value={data?.netProfit ?? 0} loading={loading} icon={CreditCard} />
   </div>
 );
 
