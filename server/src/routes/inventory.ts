@@ -415,7 +415,7 @@ router.put('/movements/:id', roleMiddleware(['Admin', 'Accountant']), async (req
         });
         if (oldJe) {
           for (const jeItem of oldJe.items) {
-            await updateAccountBalance(tx, jeItem.accountId, -Number(jeItem.debit), -Number(jeItem.credit));
+            await updateAccountBalance(tx, jeItem.accountId, Number(jeItem.credit), Number(jeItem.debit));
           }
           await tx.accountingLedgerEntry.updateMany({
             where: { referenceId: oldMov.journalEntryId },
@@ -594,7 +594,7 @@ router.put('/movements/:id/cancel', roleMiddleware(['Admin']), async (req: AuthR
         });
         if (je) {
           for (const jeItem of je.items) {
-            await updateAccountBalance(tx, jeItem.accountId, -Number(jeItem.debit), -Number(jeItem.credit));
+            await updateAccountBalance(tx, jeItem.accountId, Number(jeItem.credit), Number(jeItem.debit));
           }
         }
       }

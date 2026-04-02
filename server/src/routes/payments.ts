@@ -414,8 +414,9 @@ router.post('/:id/cancel', roleMiddleware(['Admin']), async (req: AuthRequest, r
 
         const depositAccount = await systemAccounts.getAccount('VENDOR_DEPOSIT');
         const numAmountVal = numAmount.toNumber();
-        await updateAccountBalance(tx, depositAccount.id, 0, numAmountVal);
-        await updateAccountBalance(tx, payment.accountId, numAmountVal, 0);
+        // Reverse: original was DR Deposit / CR Cash → now DR Cash / CR Deposit
+        await updateAccountBalance(tx, depositAccount.id, 0, numAmountVal);  // CR Deposit (reverse DR)
+        await updateAccountBalance(tx, payment.accountId, numAmountVal, 0);  // DR Cash (reverse CR)
 
         await tx.party.update({
           where: { id: payment.partyId },

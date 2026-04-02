@@ -372,12 +372,11 @@ router.post('/:id/cancel', roleMiddleware(['Admin']), async (req: AuthRequest, r
         });
       }
 
-      // Reverse account balances from journal entry items
+      // Reverse account balances from journal entry items (swap debit/credit)
       if (journal) {
         const jeItems = await tx.journalItem.findMany({ where: { journalEntryId: journal.id } });
         for (const jeItem of jeItems) {
-          // Reverse: swap debit/credit
-          await updateAccountBalance(tx, jeItem.accountId, -Number(jeItem.debit), -Number(jeItem.credit));
+          await updateAccountBalance(tx, jeItem.accountId, Number(jeItem.credit), Number(jeItem.debit));
         }
       } else {
         // Fallback: reverse generic accounts
