@@ -69,6 +69,8 @@ const CustomerDepositModal: React.FC<CustomerDepositModalProps> = ({ isOpen, onC
       queryClient.invalidateQueries({ queryKey: ['customer-deposits'] });
       queryClient.invalidateQueries({ queryKey: ['parties'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-metrics'] });
+      queryClient.invalidateQueries({ queryKey: ['journals'] });
+      queryClient.invalidateQueries({ queryKey: ['coa'] });
       onClose();
     },
     onError: (err: any) => setError(err.response?.data?.error || 'Gagal menyimpan uang muka.'),

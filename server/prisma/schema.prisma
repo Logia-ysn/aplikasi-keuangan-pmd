@@ -130,6 +130,7 @@ model JournalEntry {
   createdAt     DateTime         @default(now()) @map("created_at")
   updatedAt     DateTime         @updatedAt @map("updated_at")
 
+  @@index([status])
   @@index([date])
   @@index([fiscalYearId])
   @@map("journal_entries")
@@ -296,6 +297,8 @@ model Payment {
   updatedAt     DateTime            @updatedAt @map("updated_at")
 
   @@index([partyId])
+  @@index([accountId])
+  @@index([status])
   @@index([date])
   @@index([fiscalYearId])
   @@map("payments")

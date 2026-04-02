@@ -94,50 +94,80 @@ router.get('/report', async (req, res) => {
     const end = new Date(endDate);
     end.setHours(23, 59, 59, 999);
 
-    // Get all submitted/paid sales invoices in range with tax > 0
+    // Get sales invoices with per-item tax data
     const salesInvoices = await prisma.salesInvoice.findMany({
       where: {
         date: { gte: start, lte: end },
         status: { in: ['Submitted', 'Paid', 'PartiallyPaid', 'Overdue'] },
-        taxPct: { gt: 0 },
       },
-      select: { date: true, grandTotal: true, taxPct: true },
+      select: {
+        date: true,
+        grandTotal: true,
+        taxPct: true,
+        items: { select: { amount: true, taxPct: true } },
+      },
     });
 
-    // Get all submitted/paid purchase invoices in range with tax > 0
+    // Get purchase invoices with per-item tax data
     const purchaseInvoices = await prisma.purchaseInvoice.findMany({
       where: {
         date: { gte: start, lte: end },
         status: { in: ['Submitted', 'Paid', 'PartiallyPaid', 'Overdue'] },
-        taxPct: { gt: 0 },
       },
-      select: { date: true, grandTotal: true, taxPct: true },
+      select: {
+        date: true,
+        grandTotal: true,
+        taxPct: true,
+        items: { select: { amount: true, taxPct: true } },
+      },
     });
 
     // Group by month using Decimal for precision
     const monthMap = new Map<string, { ppnKeluaran: Decimal; ppnMasukan: Decimal; pph: Decimal }>();
 
     for (const inv of salesInvoices) {
+      // Calculate tax: per-item tax if any item has taxPct > 0, else fallback to invoice-level
+      const hasPerItemTax = inv.items.some(i => new Decimal(i.taxPct.toString()).gt(0));
+      let taxAmount: Decimal;
+      if (hasPerItemTax) {
+        taxAmount = inv.items.reduce((sum, item) => {
+          return sum.plus(new Decimal(item.amount.toString()).mul(new Decimal(item.taxPct.toString())).div(100));
+        }, new Decimal(0));
+      } else {
+        const invoiceTaxPct = new Decimal(inv.taxPct.toString());
+        if (invoiceTaxPct.lte(0)) continue;
+        const grandTotal = new Decimal(inv.grandTotal.toString());
+        taxAmount = grandTotal.mul(invoiceTaxPct).div(new Decimal(100).plus(invoiceTaxPct));
+      }
+
+      if (taxAmount.lte(0)) continue;
+
       const d = new Date(inv.date);
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
       const entry = monthMap.get(key) || { ppnKeluaran: new Decimal(0), ppnMasukan: new Decimal(0), pph: new Decimal(0) };
-
-      // Calculate tax amount: grandTotal already includes tax, so tax = grandTotal * taxPct / (100 + taxPct)
-      const grandTotal = new Decimal(inv.grandTotal.toString());
-      const taxPct = new Decimal(inv.taxPct.toString());
-      const taxAmount = grandTotal.mul(taxPct).div(new Decimal(100).plus(taxPct));
       entry.ppnKeluaran = entry.ppnKeluaran.plus(taxAmount);
       monthMap.set(key, entry);
     }
 
     for (const inv of purchaseInvoices) {
+      const hasPerItemTax = inv.items.some(i => new Decimal(i.taxPct.toString()).gt(0));
+      let taxAmount: Decimal;
+      if (hasPerItemTax) {
+        taxAmount = inv.items.reduce((sum, item) => {
+          return sum.plus(new Decimal(item.amount.toString()).mul(new Decimal(item.taxPct.toString())).div(100));
+        }, new Decimal(0));
+      } else {
+        const invoiceTaxPct = new Decimal(inv.taxPct.toString());
+        if (invoiceTaxPct.lte(0)) continue;
+        const grandTotal = new Decimal(inv.grandTotal.toString());
+        taxAmount = grandTotal.mul(invoiceTaxPct).div(new Decimal(100).plus(invoiceTaxPct));
+      }
+
+      if (taxAmount.lte(0)) continue;
+
       const d = new Date(inv.date);
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
       const entry = monthMap.get(key) || { ppnKeluaran: new Decimal(0), ppnMasukan: new Decimal(0), pph: new Decimal(0) };
-
-      const grandTotal = new Decimal(inv.grandTotal.toString());
-      const taxPct = new Decimal(inv.taxPct.toString());
-      const taxAmount = grandTotal.mul(taxPct).div(new Decimal(100).plus(taxPct));
       entry.ppnMasukan = entry.ppnMasukan.plus(taxAmount);
       monthMap.set(key, entry);
     }

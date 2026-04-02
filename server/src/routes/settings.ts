@@ -866,6 +866,7 @@ router.post('/reset-data', roleMiddleware(['Admin']), async (req, res) => {
           journal_entry_accounts,
           journal_entries,
           parties,
+          system_account_mappings,
           accounts,
           tax_configs,
           fiscal_years,
@@ -884,7 +885,7 @@ router.post('/reset-data', roleMiddleware(['Admin']), async (req, res) => {
       await execFileAsync('npx', ['tsx', 'prisma/seed.ts'], {
         cwd: path.resolve(__dirname, '../..'),
         env: { ...process.env },
-        timeout: 30000,
+        timeout: 120000,
       });
     } catch (seedError) {
       logger.error({ error: seedError }, 'Seed failed after reset');
