@@ -1,11 +1,9 @@
 import { Router, Response } from 'express';
 import multer from 'multer';
-import path from 'path';
 import { prisma } from '../lib/prisma';
 import { AuthRequest, roleMiddleware } from '../middleware/auth';
 import { saveAttachment, deleteAttachment, getFullPath } from '../utils/fileStorage';
 import { handleRouteError } from '../utils/errors';
-import { logger } from '../lib/logger';
 
 const router = Router();
 
@@ -80,7 +78,7 @@ router.post(
             mimeType: saved.mimeType,
             fileSize: saved.fileSize,
             filePath: saved.filePath,
-            uploadedBy: req.user!.id,
+            uploadedBy: req.user!.userId,
           },
         });
         results.push(record);
@@ -99,7 +97,8 @@ router.post(
 // ─── GET /api/attachments/:referenceType/:referenceId ────────────────────────
 router.get('/:referenceType/:referenceId', async (req: AuthRequest, res: Response) => {
   try {
-    const { referenceType, referenceId } = req.params;
+    const referenceType = req.params.referenceType as string;
+    const referenceId = req.params.referenceId as string;
     const attachments = await prisma.transactionAttachment.findMany({
       where: { referenceType, referenceId },
       orderBy: { createdAt: 'asc' },
@@ -117,8 +116,9 @@ router.get('/:referenceType/:referenceId', async (req: AuthRequest, res: Respons
 // ─── GET /api/attachments/file/:id — serve file (auth-gated) ─────────────────
 router.get('/file/:id', async (req: AuthRequest, res: Response) => {
   try {
+    const id = req.params.id as string;
     const attachment = await prisma.transactionAttachment.findUnique({
-      where: { id: req.params.id },
+      where: { id },
     });
 
     if (!attachment) {
@@ -142,8 +142,9 @@ router.get('/file/:id', async (req: AuthRequest, res: Response) => {
 // ─── DELETE /api/attachments/:id ─────────────────────────────────────────────
 router.delete('/:id', async (req: AuthRequest, res: Response) => {
   try {
+    const id = req.params.id as string;
     const attachment = await prisma.transactionAttachment.findUnique({
-      where: { id: req.params.id },
+      where: { id },
     });
 
     if (!attachment) {
@@ -151,7 +152,7 @@ router.delete('/:id', async (req: AuthRequest, res: Response) => {
     }
 
     // Only Admin, Accountant, or uploader can delete
-    const isOwner = attachment.uploadedBy === req.user!.id;
+    const isOwner = attachment.uploadedBy === req.user!.userId;
     const isPrivileged = ['Admin', 'Accountant'].includes(req.user!.role);
     if (!isOwner && !isPrivileged) {
       return res.status(403).json({ error: 'Tidak memiliki akses untuk menghapus lampiran ini.' });
@@ -159,7 +160,7 @@ router.delete('/:id', async (req: AuthRequest, res: Response) => {
 
     // Delete file first, then DB record
     await deleteAttachment(attachment.filePath);
-    await prisma.transactionAttachment.delete({ where: { id: req.params.id } });
+    await prisma.transactionAttachment.delete({ where: { id } });
 
     return res.json({ message: 'Lampiran berhasil dihapus.' });
   } catch (error) {
