@@ -85,7 +85,7 @@ const AccountTreeRow: React.FC<{
         </div>
         <div
           className={cn(
-            'text-sm tabular-nums font-medium text-right px-4',
+            'text-sm tabular-nums font-medium text-right px-4 shrink-0 whitespace-nowrap',
             valueColWidth,
             account.balance < 0 ? 'text-red-600' : 'text-gray-900',
             isClickable ? 'cursor-pointer hover:underline text-blue-600 dark:text-blue-400' : ''
@@ -120,7 +120,7 @@ const AccountTreeRow: React.FC<{
 const AccountTreeTable: React.FC<TreeTableProps> = ({
   data,
   indentPx = 24,
-  valueColWidth = 'w-44',
+  valueColWidth = 'w-48',
   formatValue = formatRupiah,
   showAccountNumber = true,
   highlightGroups = true,

@@ -86,16 +86,16 @@ const BalanceSheet: React.FC = () => {
           <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
             <div className="section-header flex justify-between">
               <span>Aset</span>
-              <span className="font-semibold text-gray-700 tracking-normal normal-case">{formatRupiah(report?.totalAssets || 0)}</span>
+              <span className="font-semibold text-gray-700 tracking-normal normal-case whitespace-nowrap">{formatRupiah(report?.totalAssets || 0)}</span>
             </div>
             <div className="overflow-y-auto max-h-[500px]">
               {report?.assets?.map((a: any) => (
-                <AccountTreeTable key={a.id} data={[a]} indentPx={20} valueColWidth="w-36" onAccountClick={handleAccountClick} />
+                <AccountTreeTable key={a.id} data={[a]} indentPx={20} valueColWidth="w-48" onAccountClick={handleAccountClick} />
               ))}
             </div>
             <div className="px-4 py-3 border-t border-gray-100 flex justify-between bg-gray-50/60">
               <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Total Aset</span>
-              <span className="text-sm font-semibold text-gray-900 tabular-nums">{formatRupiah(report?.totalAssets || 0)}</span>
+              <span className="text-sm font-semibold text-gray-900 tabular-nums whitespace-nowrap">{formatRupiah(report?.totalAssets || 0)}</span>
             </div>
           </div>
 
@@ -104,39 +104,39 @@ const BalanceSheet: React.FC = () => {
             <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
               <div className="section-header flex justify-between">
                 <span>Kewajiban</span>
-                <span className="font-semibold text-gray-700 tracking-normal normal-case">{formatRupiah(report?.totalLiabilities || 0)}</span>
+                <span className="font-semibold text-gray-700 tracking-normal normal-case whitespace-nowrap">{formatRupiah(report?.totalLiabilities || 0)}</span>
               </div>
               <div className="overflow-y-auto max-h-[240px]">
                 {report?.liabilities?.map((a: any) => (
-                  <AccountTreeTable key={a.id} data={[a]} indentPx={20} valueColWidth="w-36" onAccountClick={handleAccountClick} />
+                  <AccountTreeTable key={a.id} data={[a]} indentPx={20} valueColWidth="w-48" onAccountClick={handleAccountClick} />
                 ))}
               </div>
               <div className="px-4 py-3 border-t border-gray-100 flex justify-between bg-gray-50/60">
                 <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Total Kewajiban</span>
-                <span className="text-sm font-semibold text-gray-900 tabular-nums">{formatRupiah(report?.totalLiabilities || 0)}</span>
+                <span className="text-sm font-semibold text-gray-900 tabular-nums whitespace-nowrap">{formatRupiah(report?.totalLiabilities || 0)}</span>
               </div>
             </div>
 
             <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
               <div className="section-header flex justify-between">
                 <span>Ekuitas</span>
-                <span className="font-semibold text-gray-700 tracking-normal normal-case">{formatRupiah(report?.totalEquity || 0)}</span>
+                <span className="font-semibold text-gray-700 tracking-normal normal-case whitespace-nowrap">{formatRupiah(report?.totalEquity || 0)}</span>
               </div>
               <div className="overflow-y-auto max-h-[240px]">
                 {report?.equity?.map((a: any) => (
-                  <AccountTreeTable key={a.id} data={[a]} indentPx={20} valueColWidth="w-36" onAccountClick={handleAccountClick} />
+                  <AccountTreeTable key={a.id} data={[a]} indentPx={20} valueColWidth="w-48" onAccountClick={handleAccountClick} />
                 ))}
               </div>
               <div className="px-4 py-3 border-t border-gray-100 flex justify-between bg-gray-50/60">
                 <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Total Ekuitas</span>
-                <span className="text-sm font-semibold text-gray-900 tabular-nums">{formatRupiah(report?.totalEquity || 0)}</span>
+                <span className="text-sm font-semibold text-gray-900 tabular-nums whitespace-nowrap">{formatRupiah(report?.totalEquity || 0)}</span>
               </div>
             </div>
 
             {/* Pasiva Total */}
             <div className="bg-blue-600 text-white rounded-xl px-4 py-4 flex justify-between items-center">
               <span className="text-sm font-semibold">Total Pasiva (L + E)</span>
-              <span className="text-lg font-bold tabular-nums">{formatRupiah((report?.totalLiabilities || 0) + (report?.totalEquity || 0))}</span>
+              <span className="text-lg font-bold tabular-nums whitespace-nowrap">{formatRupiah((report?.totalLiabilities || 0) + (report?.totalEquity || 0))}</span>
             </div>
           </div>
         </div>

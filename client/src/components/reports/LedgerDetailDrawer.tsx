@@ -157,7 +157,7 @@ const LedgerDetailDrawer: React.FC<LedgerDetailDrawerProps> = ({
                       </td>
                       <td
                         className={cn(
-                          'px-3 py-2.5 text-right tabular-nums',
+                          'px-3 py-2.5 text-right tabular-nums whitespace-nowrap',
                           entry.debit > 0 ? 'text-blue-600' : ''
                         )}
                         style={entry.debit <= 0 ? { color: 'var(--color-text-muted)' } : undefined}
@@ -166,7 +166,7 @@ const LedgerDetailDrawer: React.FC<LedgerDetailDrawerProps> = ({
                       </td>
                       <td
                         className={cn(
-                          'px-3 py-2.5 text-right tabular-nums',
+                          'px-3 py-2.5 text-right tabular-nums whitespace-nowrap',
                           entry.credit > 0 ? 'text-green-600' : ''
                         )}
                         style={entry.credit <= 0 ? { color: 'var(--color-text-muted)' } : undefined}
@@ -175,7 +175,7 @@ const LedgerDetailDrawer: React.FC<LedgerDetailDrawerProps> = ({
                       </td>
                       <td
                         className={cn(
-                          'px-3 py-2.5 text-right tabular-nums font-medium',
+                          'px-3 py-2.5 text-right tabular-nums whitespace-nowrap font-medium',
                           entry.runningBalance < 0 ? 'text-red-600' : ''
                         )}
                         style={entry.runningBalance >= 0 ? { color: 'var(--color-text-primary)' } : undefined}

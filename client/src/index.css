@@ -141,6 +141,9 @@ body {
   color: var(--color-text-secondary);
   @apply px-4 py-3;
 }
+.data-table .tabular-nums {
+  @apply whitespace-nowrap;
+}
 
 /* ─── Drawer animation ──────────────── */
 @keyframes slide-in-right {

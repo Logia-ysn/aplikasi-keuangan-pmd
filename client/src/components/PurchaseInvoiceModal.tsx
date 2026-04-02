@@ -20,7 +20,7 @@ interface InvoiceItem {
 const UNITS = ['Kg', 'Ton', 'Sak', 'Liter', 'Pcs', 'Box', 'Unit', 'Set', 'Meter', 'Jasa'];
 
 const defaultItem = (): InvoiceItem => ({
-  id: crypto.randomUUID(), itemName: '', inventoryItemId: '', description: '', quantity: 1, unit: 'Kg', rate: 0, discount: 0, taxPct: 11
+  id: crypto.randomUUID(), itemName: '', inventoryItemId: '', description: '', quantity: 1, unit: 'Kg', rate: 0, discount: 0, taxPct: 0
 });
 
 const PurchaseInvoiceModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, onClose }) => {

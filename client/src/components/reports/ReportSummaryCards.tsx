@@ -31,7 +31,7 @@ const ReportSummaryCards: React.FC<Props> = ({ cards, accentCard }) => {
             </div>
             <span className="text-xs text-gray-500 font-medium">{card.label}</span>
           </div>
-          <p className={cn('text-xl font-semibold tabular-nums', card.color)}>
+          <p className={cn('text-lg sm:text-xl font-semibold tabular-nums truncate', card.color)} title={fmt({ ...card, value: Math.abs(card.value) })}>
             {card.value < 0 ? '- ' : ''}{fmt({ ...card, value: Math.abs(card.value) })}
           </p>
         </div>
@@ -45,7 +45,7 @@ const ReportSummaryCards: React.FC<Props> = ({ cards, accentCard }) => {
             </div>
             <span className="text-xs font-medium text-blue-100">{accentCard.label}</span>
           </div>
-          <p className={cn('text-xl font-semibold tabular-nums', accentCard.value >= 0 ? 'text-white' : 'text-red-200')}>
+          <p className={cn('text-lg sm:text-xl font-semibold tabular-nums truncate', accentCard.value >= 0 ? 'text-white' : 'text-red-200')} title={fmt({ ...accentCard, value: Math.abs(accentCard.value) })}>
             {accentCard.value < 0 ? '- ' : ''}{fmt({ ...accentCard, value: Math.abs(accentCard.value) })}
           </p>
         </div>

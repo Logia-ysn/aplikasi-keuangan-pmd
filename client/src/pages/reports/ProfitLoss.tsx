@@ -90,7 +90,7 @@ const ProfitLoss: React.FC = () => {
           )}
           <div className="flex justify-between items-center px-4 py-3 bg-green-50/60 border-b border-gray-100">
             <span className="text-xs font-semibold text-green-700 uppercase tracking-wide">Total Pendapatan</span>
-            <span className="text-sm font-semibold text-green-700 tabular-nums pr-6">{formatRupiah(report?.totalRevenue || 0)}</span>
+            <span className="text-sm font-semibold text-green-700 tabular-nums whitespace-nowrap pr-6">{formatRupiah(report?.totalRevenue || 0)}</span>
           </div>
 
           {/* Expenses */}
@@ -102,13 +102,13 @@ const ProfitLoss: React.FC = () => {
           )}
           <div className="flex justify-between items-center px-4 py-3 bg-red-50/60 border-b border-gray-100">
             <span className="text-xs font-semibold text-red-700 uppercase tracking-wide">Total Beban</span>
-            <span className="text-sm font-semibold text-red-700 tabular-nums pr-6">{formatRupiah(Math.abs(report?.totalExpense || 0))}</span>
+            <span className="text-sm font-semibold text-red-700 tabular-nums whitespace-nowrap pr-6">{formatRupiah(Math.abs(report?.totalExpense || 0))}</span>
           </div>
 
           {/* Net Profit */}
           <div className={`flex justify-between items-center px-4 py-4 ${(report?.netProfit || 0) >= 0 ? 'bg-blue-600' : 'bg-red-600'}`}>
             <span className="text-sm font-semibold text-white uppercase tracking-wide">Laba (Rugi) Bersih</span>
-            <span className="text-lg font-bold text-white tabular-nums pr-6">{formatRupiah(report?.netProfit || 0)}</span>
+            <span className="text-lg font-bold text-white tabular-nums whitespace-nowrap pr-6">{formatRupiah(report?.netProfit || 0)}</span>
           </div>
         </div>
       </ReportLayout>

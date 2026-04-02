@@ -110,9 +110,9 @@ const CashFlow: React.FC = () => {
             </div>
             <div className="divide-y divide-gray-50 px-4">
               {s.items.length > 0 ? s.items.map((item, idx) => (
-                <div key={idx} className="flex justify-between items-center py-3">
-                  <span className="text-sm text-gray-600">{item.name}</span>
-                  <span className={cn('text-sm font-medium tabular-nums', item.amount >= 0 ? 'text-green-600' : 'text-red-500')}>
+                <div key={idx} className="flex justify-between items-center gap-2 py-3">
+                  <span className="text-sm text-gray-600 min-w-0 truncate">{item.name}</span>
+                  <span className={cn('text-sm font-medium tabular-nums whitespace-nowrap shrink-0', item.amount >= 0 ? 'text-green-600' : 'text-red-500')}>
                     {formatRupiah(item.amount)}
                   </span>
                 </div>
@@ -122,7 +122,7 @@ const CashFlow: React.FC = () => {
             </div>
             <div className="px-4 py-3 border-t border-gray-100 bg-gray-50/60 flex justify-between">
               <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Subtotal</span>
-              <span className={cn('text-sm font-semibold tabular-nums', s.value >= 0 ? 'text-green-600' : 'text-red-500')}>
+              <span className={cn('text-sm font-semibold tabular-nums whitespace-nowrap', s.value >= 0 ? 'text-green-600' : 'text-red-500')}>
                 {formatRupiah(s.value)}
               </span>
             </div>

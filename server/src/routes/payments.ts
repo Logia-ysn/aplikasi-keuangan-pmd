@@ -340,17 +340,38 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
       // Auto-allocate payment to oldest outstanding invoices
       const unallocatedAmount = await autoAllocatePayment(tx, payment.id, body.partyId, body.paymentType, numAmount);
 
-      // Update party outstanding by the amount actually allocated (not full payment)
-      const allocatedAmount = new Decimal(numAmount).minus(new Decimal(unallocatedAmount)).toNumber();
-      if (allocatedAmount > 0) {
-        await tx.party.update({
-          where: { id: body.partyId },
-          data: { outstandingAmount: { decrement: allocatedAmount } },
-        });
-      }
+      // Update party outstanding:
+      // 1. Decrement by invoice-allocated amount
+      // 2. If there's unallocated remainder AND party still has outstanding
+      //    (e.g. opening balance piutang without a formal invoice), also decrement that
+      const allocatedToInvoices = new Decimal(numAmount).minus(new Decimal(unallocatedAmount)).toNumber();
+      let totalDecrement = allocatedToInvoices;
 
       if (unallocatedAmount > 0.01) {
-        logger.warn({ paymentId: payment.id, unallocatedAmount }, 'Overpayment: sisa pembayaran tidak teralokasi');
+        const currentParty = await tx.party.findUnique({
+          where: { id: body.partyId },
+          select: { outstandingAmount: true },
+        });
+        const partyOutstanding = new Decimal(currentParty?.outstandingAmount?.toString() ?? '0');
+        const remainingOutstanding = partyOutstanding.minus(new Decimal(allocatedToInvoices));
+        if (remainingOutstanding.gt(0)) {
+          // Party still has outstanding not covered by invoices (e.g. opening balance)
+          const extraDecrement = Decimal.min(new Decimal(unallocatedAmount), remainingOutstanding).toNumber();
+          totalDecrement += extraDecrement;
+          const finalUnallocated = new Decimal(unallocatedAmount).minus(new Decimal(extraDecrement)).toNumber();
+          if (finalUnallocated > 0.01) {
+            logger.warn({ paymentId: payment.id, unallocatedAmount: finalUnallocated }, 'Overpayment: sisa pembayaran tidak teralokasi');
+          }
+        } else {
+          logger.warn({ paymentId: payment.id, unallocatedAmount }, 'Overpayment: sisa pembayaran tidak teralokasi');
+        }
+      }
+
+      if (totalDecrement > 0) {
+        await tx.party.update({
+          where: { id: body.partyId },
+          data: { outstandingAmount: { decrement: totalDecrement } },
+        });
       }
 
       return { ...payment, party, unallocatedAmount };
@@ -506,14 +527,11 @@ router.post('/:id/cancel', roleMiddleware(['Admin']), async (req: AuthRequest, r
         await updateAccountBalance(tx, payment.accountId, numAmountVal, 0); // reverse bank credit
       }
 
-      // Reverse party outstanding — use sum of actual reversed allocations, not full payment amount
-      const totalAllocated = allocations.reduce(
-        (sum, a) => sum.plus(new Decimal(a.allocatedAmount.toString())),
-        new Decimal(0)
-      );
+      // Reverse party outstanding — full payment amount (matches GL reversal)
+      // Covers both invoice-allocated and non-invoice portions (e.g. opening balance)
       await tx.party.update({
         where: { id: payment.partyId },
-        data: { outstandingAmount: { increment: totalAllocated.toNumber() } },
+        data: { outstandingAmount: { increment: numAmountVal } },
       });
 
       // Mark payment as cancelled
