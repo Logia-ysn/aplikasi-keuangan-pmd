@@ -334,8 +334,13 @@ const SetBalanceModal: React.FC<{ isOpen: boolean; onClose: () => void; account:
 
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Saldo Saat Ini</label>
-            <div className="text-sm font-mono text-gray-500 bg-gray-50 border border-gray-200 rounded-lg py-2 px-3">
-              {formatRupiah(account.balance)}
+            <div className="text-sm font-mono text-gray-500 bg-gray-50 border border-gray-200 rounded-lg py-2 px-3 flex items-center gap-2">
+              {formatRupiah(Math.abs(account.balance))}
+              {account.balance !== 0 && (() => {
+                const isDebitNature = account.rootType === 'ASSET' || account.rootType === 'EXPENSE';
+                const isDebitBalance = account.balance > 0 ? isDebitNature : !isDebitNature;
+                return <span className={cn('text-[10px] font-bold px-1 py-0.5 rounded', isDebitBalance ? 'text-blue-600 bg-blue-50' : 'text-emerald-600 bg-emerald-50')}>{isDebitBalance ? 'D' : 'K'}</span>;
+              })()}
             </div>
           </div>
 
@@ -418,9 +423,18 @@ const AccountNode: React.FC<{
           </div>
 
           <div className="flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
-            {!account.isGroup && (
-              <span className="text-xs font-mono text-gray-500 tabular-nums">{formatRupiah(account.balance)}</span>
-            )}
+            {!account.isGroup && account.balance !== 0 && (() => {
+              const isDebitNature = account.rootType === 'ASSET' || account.rootType === 'EXPENSE';
+              const isDebitBalance = account.balance > 0 ? isDebitNature : !isDebitNature;
+              return (
+                <span className="text-xs font-mono tabular-nums flex items-center gap-1">
+                  <span style={{ color: 'var(--color-text-muted)' }}>{formatRupiah(Math.abs(account.balance))}</span>
+                  <span className={cn('text-[10px] font-bold px-1 py-0.5 rounded', isDebitBalance ? 'text-blue-600 bg-blue-50' : 'text-emerald-600 bg-emerald-50')}>
+                    {isDebitBalance ? 'D' : 'K'}
+                  </span>
+                </span>
+              );
+            })()}
             <div className="flex items-center gap-0.5">
               {account.isGroup && (
                 <button

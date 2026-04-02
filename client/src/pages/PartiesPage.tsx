@@ -97,6 +97,7 @@ export const PartiesPage = () => {
                   taxId: p.taxId ?? '',
                   outstandingAmount: Number(p.outstandingAmount ?? 0),
                   depositBalance: Number(p.depositBalance ?? 0),
+                  customerDepositBalance: Number(p.customerDepositBalance ?? 0),
                 })),
                 'pelanggan-vendor'
               )
@@ -253,9 +254,17 @@ export const PartiesPage = () => {
                 </div>
                 {Number(party.depositBalance) > 0 && (
                   <div>
-                    <p className="text-[10px] text-gray-400 uppercase tracking-wider font-medium mb-0.5">Uang Muka</p>
+                    <p className="text-[10px] text-gray-400 uppercase tracking-wider font-medium mb-0.5">UM Vendor</p>
                     <p className="text-sm font-semibold font-mono tabular-nums text-amber-600">
                       {formatRupiah(Number(party.depositBalance))}
+                    </p>
+                  </div>
+                )}
+                {Number(party.customerDepositBalance) > 0 && (
+                  <div>
+                    <p className="text-[10px] text-gray-400 uppercase tracking-wider font-medium mb-0.5">UM Pelanggan</p>
+                    <p className="text-sm font-semibold font-mono tabular-nums text-teal-600">
+                      {formatRupiah(Number(party.customerDepositBalance))}
                     </p>
                   </div>
                 )}

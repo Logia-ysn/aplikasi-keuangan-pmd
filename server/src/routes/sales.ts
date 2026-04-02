@@ -102,7 +102,7 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
       const resolvedItems: Array<{
         itemName: string; itemType: string; inventoryItemId: string | null;
         serviceItemId: string | null; quantity: number; unit: string;
-        rate: number; discount: number; amount: number; taxPct: number;
+        rate: number; discount: number; amount: number; taxPct: number; pphPct: number;
         accountId: string; description: string | null;
       }> = [];
 
@@ -134,18 +134,24 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
           discount: item.discount ?? 0,
           amount: itemAmount,
           taxPct: item.taxPct ?? 0,
+          pphPct: item.pphPct ?? 0,
           accountId: lineAccountId,
           description: item.description || null,
         });
       }
 
       const subtotal = resolvedItems.reduce((sum, item) => sum.plus(new Decimal(item.amount)), new Decimal(0));
-      // Per-item tax: sum each item's tax amount
+      // Per-item PPN
       const taxAmount = resolvedItems.reduce((sum, item) => {
         return sum.plus(new Decimal(item.amount).mul(new Decimal(item.taxPct).div(100)));
       }, new Decimal(0)).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
+      // Per-item PPh (withheld — reduces amount receivable)
+      const pphAmount = resolvedItems.reduce((sum, item) => {
+        return sum.plus(new Decimal(item.amount).mul(new Decimal(item.pphPct).div(100)));
+      }, new Decimal(0)).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
       const grandTotal = subtotal
         .plus(taxAmount)
+        .minus(pphAmount)
         .minus(new Decimal(body.potongan ?? 0))
         .plus(new Decimal(body.biayaLain ?? 0))
         .toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
@@ -217,6 +223,22 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
         });
       }
 
+      // PPh debit entries (withheld by customer → DR PPh 23 Penjualan)
+      const debitJournalItems: Array<{ accountId: string; debit: number; credit: number; description: string; partyId?: string }> = [
+        { accountId: arAccount.id, partyId: body.partyId, debit: grandTotalNum, credit: 0, description: `Piutang: ${invoice.invoiceNumber}` },
+      ];
+      const pphAmountNum = pphAmount.toNumber();
+      if (pphAmountNum > 0) {
+        // Find PPh 23 Penjualan account (1.5.4)
+        const pphAccount = await tx.account.findFirst({ where: { accountNumber: '1.5.4' } });
+        if (pphAccount) {
+          debitJournalItems.push({
+            accountId: pphAccount.id, debit: pphAmountNum, credit: 0,
+            description: `PPh Penjualan: ${invoice.invoiceNumber}`,
+          });
+        }
+      }
+
       const jvNumber = `JV-${invoice.invoiceNumber}`;
       const journalEntry = await tx.journalEntry.create({
         data: {
@@ -229,16 +251,20 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
           submittedAt: new Date(),
           items: {
             create: [
-              { accountId: arAccount.id, partyId: body.partyId, debit: grandTotalNum, credit: 0, description: `Piutang: ${invoice.invoiceNumber}` },
+              ...debitJournalItems,
               ...creditJournalItems,
             ],
           },
         },
       });
 
-      // Ledger entries: 1 DR + N CR
+      // Ledger entries: N DR + N CR
       const ledgerData = [
-        { date: parsedDate, accountId: arAccount.id, partyId: body.partyId, debit: grandTotalNum, credit: 0, referenceType: 'JournalEntry', referenceId: journalEntry.id, description: `Piutang: ${invoice.invoiceNumber}`, fiscalYearId: fiscalYear.id },
+        ...debitJournalItems.map((di) => ({
+          date: parsedDate, accountId: di.accountId, partyId: di.partyId, debit: di.debit, credit: 0,
+          referenceType: 'JournalEntry', referenceId: journalEntry.id,
+          description: di.description, fiscalYearId: fiscalYear.id,
+        })),
         ...creditJournalItems.map((ci) => ({
           date: parsedDate, accountId: ci.accountId, debit: 0, credit: ci.credit,
           referenceType: 'JournalEntry', referenceId: journalEntry.id,
@@ -247,8 +273,10 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
       ];
       await tx.accountingLedgerEntry.createMany({ data: ledgerData });
 
-      // Update account balances: DR AR + CR each revenue account
-      await updateAccountBalance(tx, arAccount.id, grandTotalNum, 0);
+      // Update account balances: DR entries + CR entries
+      for (const di of debitJournalItems) {
+        await updateAccountBalance(tx, di.accountId, di.debit, 0);
+      }
       for (const ci of creditJournalItems) {
         await updateAccountBalance(tx, ci.accountId, 0, ci.credit);
       }

@@ -23,7 +23,11 @@ router.get('/', async (req, res) => {
     if (startDate || endDate) {
       where.date = {};
       if (startDate) (where.date as any).gte = new Date(startDate as string);
-      if (endDate) (where.date as any).lte = new Date(endDate as string);
+      if (endDate) {
+        const end = new Date(endDate as string);
+        end.setHours(23, 59, 59, 999);
+        (where.date as any).lte = end;
+      }
     }
 
     const [entries, total] = await Promise.all([

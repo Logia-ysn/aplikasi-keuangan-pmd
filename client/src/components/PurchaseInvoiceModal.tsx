@@ -276,7 +276,7 @@ const PurchaseInvoiceModal: React.FC<{ isOpen: boolean; onClose: () => void }> =
                       <td className="pr-3 py-3 text-center">
                         {items.length > 1 && (
                           <button onClick={() => removeItem(idx)}
-                            className="p-1 rounded text-gray-200 hover:text-red-400 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all">
+                            className="p-1 rounded text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors">
                             <Trash2 size={13} />
                           </button>
                         )}

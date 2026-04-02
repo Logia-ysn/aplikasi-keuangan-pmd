@@ -25,7 +25,7 @@ const S = StyleSheet.create({
     fontSize: 8.5,
     color: C.dark,
     paddingTop: 36,
-    paddingBottom: 44,
+    paddingBottom: 56,
     paddingHorizontal: 36,
     backgroundColor: C.white,
   },
@@ -38,7 +38,6 @@ const S = StyleSheet.create({
   reportPeriod: { fontSize: 8, color: C.muted, textAlign: 'right', marginTop: 2 },
   reportDate: { fontSize: 7.5, color: C.faint, textAlign: 'right', marginTop: 1 },
   divider: { height: 1.5, backgroundColor: C.primary, marginBottom: 14, marginTop: 8 },
-  dividerThin: { height: 0.5, backgroundColor: C.border, marginVertical: 5 },
 
   // ── Section header ──
   sectionHeader: { backgroundColor: C.primary, paddingVertical: 5, paddingHorizontal: 8, marginBottom: 0 },
@@ -68,16 +67,6 @@ const S = StyleSheet.create({
   summaryBox: {
     marginTop: 12, flexDirection: 'row', justifyContent: 'flex-end',
   },
-  summaryCard: {
-    width: 220, backgroundColor: C.bgLight, borderRadius: 4,
-    borderWidth: 0.5, borderColor: C.border, overflow: 'hidden',
-  },
-  summaryItem: { flexDirection: 'row', justifyContent: 'space-between', padding: 7, borderBottomWidth: 0.5, borderBottomColor: C.border },
-  summaryLabel: { fontSize: 8, color: C.mid },
-  summaryVal: { fontSize: 8, fontFamily: 'Helvetica-Bold', color: C.dark, textAlign: 'right' },
-  summaryTotal: { flexDirection: 'row', justifyContent: 'space-between', padding: 7, backgroundColor: C.primary },
-  summaryTotalLabel: { fontSize: 9, fontFamily: 'Helvetica-Bold', color: C.white },
-  summaryTotalVal: { fontSize: 9, fontFamily: 'Helvetica-Bold', color: C.white },
 
   // ── Footer ──
   footer: { position: 'absolute', bottom: 18, left: 36, right: 36 },
@@ -113,9 +102,9 @@ export const TrialBalancePDF: React.FC<TrialBalancePDFProps> = ({ company, perio
   const totalCredit = rows.reduce((s, r) => s + Number(r.credit), 0);
   return (
     <Document>
-      <Page size="A4" style={S.page}>
+      <Page size="A4" style={S.page} wrap>
         <ReportHeader company={company} title="NERACA SALDO" period={period} />
-        <View style={S.sectionHeader}>
+        <View style={S.sectionHeader} wrap={false}>
           <View style={{ flexDirection: 'row' }}>
             <Text style={[S.sectionHeaderText, { width: 52 }]}>Kode</Text>
             <Text style={[S.sectionHeaderText, { flex: 1 }]}>Nama Akun</Text>
@@ -124,20 +113,20 @@ export const TrialBalancePDF: React.FC<TrialBalancePDFProps> = ({ company, perio
           </View>
         </View>
         {rows.map((r, i) => (
-          <View key={i} style={[S.row, i % 2 === 1 ? S.rowAlt : {}]}>
+          <View key={i} style={[S.row, i % 2 === 1 ? S.rowAlt : {}]} wrap={false}>
             <Text style={S.colAccNumber}>{r.accountNumber}</Text>
             <Text style={S.colLabel}>{r.accountName}</Text>
             <Text style={[S.colDebit, Number(r.debit)  > 0 ? {} : { color: C.faint }]}>{Number(r.debit)  > 0 ? idr(Number(r.debit))  : '—'}</Text>
             <Text style={[S.colCredit, Number(r.credit) > 0 ? {} : { color: C.faint }]}>{Number(r.credit) > 0 ? idr(Number(r.credit)) : '—'}</Text>
           </View>
         ))}
-        <View style={S.rowGrandTotal}>
+        <View style={S.rowGrandTotal} wrap={false}>
           <Text style={{ width: 52, fontSize: 8, color: C.white }}>TOTAL</Text>
           <Text style={[S.colGTLabel, { fontSize: 8 }]}> </Text>
           <Text style={S.colTotalWhite}>{idr(totalDebit)}</Text>
           <Text style={S.colTotalWhite}>{idr(totalCredit)}</Text>
         </View>
-        <View style={[S.summaryBox, { marginTop: 8 }]}>
+        <View style={[S.summaryBox, { marginTop: 8 }]} wrap={false}>
           <Text style={{ fontSize: 7.5, color: totalDebit === totalCredit ? C.green : C.red, fontFamily: 'Helvetica-Bold' }}>
             {totalDebit === totalCredit ? '✓ Neraca Saldo Seimbang' : '⚠ Neraca Saldo Tidak Seimbang'}
           </Text>
@@ -158,13 +147,13 @@ interface PLPDFProps {
 }
 export const ProfitLossPDF: React.FC<PLPDFProps> = ({ company, period, revenue, expense, totalRevenue, totalExpense, netProfit }) => (
   <Document>
-    <Page size="A4" style={S.page}>
+    <Page size="A4" style={S.page} wrap>
       <ReportHeader company={company} title="LAPORAN LABA RUGI" period={period} />
 
       {/* Revenue */}
-      <View style={S.sectionHeader}><Text style={S.sectionHeaderText}>PENDAPATAN</Text></View>
+      <View style={S.sectionHeader} wrap={false}><Text style={S.sectionHeaderText}>PENDAPATAN</Text></View>
       {revenue.map((r, i) => <PLRow key={i} item={r} depth={0} alt={i % 2 === 1} />)}
-      <View style={S.rowTotal}>
+      <View style={S.rowTotal} wrap={false}>
         <Text style={S.colLabelBold}>Total Pendapatan</Text>
         <Text style={[S.colTotalBold, { color: C.green }]}>{idr(Number(totalRevenue))}</Text>
       </View>
@@ -172,15 +161,15 @@ export const ProfitLossPDF: React.FC<PLPDFProps> = ({ company, period, revenue, 
       <View style={{ height: 10 }} />
 
       {/* Expense */}
-      <View style={S.sectionHeader}><Text style={S.sectionHeaderText}>BEBAN</Text></View>
+      <View style={S.sectionHeader} wrap={false}><Text style={S.sectionHeaderText}>BEBAN</Text></View>
       {expense.map((r, i) => <PLRow key={i} item={r} depth={0} alt={i % 2 === 1} />)}
-      <View style={S.rowTotal}>
+      <View style={S.rowTotal} wrap={false}>
         <Text style={S.colLabelBold}>Total Beban</Text>
         <Text style={[S.colTotalBold, { color: C.red }]}>{idr(Number(totalExpense))}</Text>
       </View>
 
       {/* Net profit */}
-      <View style={S.rowGrandTotal}>
+      <View style={S.rowGrandTotal} wrap={false}>
         <Text style={S.colGTLabel}>LABA BERSIH</Text>
         <Text style={[S.colTotalWhite, { color: Number(netProfit) >= 0 ? '#86efac' : '#fca5a5' }]}>
           {idr(Number(netProfit))}
@@ -196,7 +185,7 @@ function PLRow({ item, depth, alt }: { item: PLSection; depth: number; alt: bool
   const hasChildren = item.children && item.children.length > 0;
   return (
     <>
-      <View style={hasChildren ? S.rowGroup : [S.row, alt ? S.rowAlt : {}]}>
+      <View style={hasChildren ? S.rowGroup : [S.row, alt ? S.rowAlt : {}]} wrap={false}>
         <Text style={indent}>{item.name}</Text>
         {!hasChildren && <Text style={S.colTotalBold}>{idr(Number(item.balance))}</Text>}
         {hasChildren && <Text style={[S.colTotalBold, { color: C.primary }]}> </Text>}
@@ -218,44 +207,50 @@ interface BSPDFProps {
 }
 export const BalanceSheetPDF: React.FC<BSPDFProps> = ({ company, asOf, assets, totalAssets, liabilities, equity, totalLiabilities, totalEquity }) => (
   <Document>
-    <Page size="A4" style={S.page}>
+    <Page size="A4" style={S.page} wrap>
       <ReportHeader company={company} title="NERACA" period={`Per ${asOf}`} />
 
-      <View style={{ flexDirection: 'row', gap: 16 }}>
-        {/* ASSETS */}
-        <View style={{ flex: 1 }}>
-          <View style={S.sectionHeader}><Text style={S.sectionHeaderText}>ASET</Text></View>
-          {assets.map((a, i) => <BSRow key={i} item={a} depth={0} alt={i % 2 === 1} />)}
-          <View style={S.rowTotal}>
-            <Text style={S.colLabelBold}>Total Aset</Text>
-            <Text style={S.colTotalBold}>{idr(Number(totalAssets))}</Text>
-          </View>
-        </View>
-
-        {/* LIABILITIES + EQUITY */}
-        <View style={{ flex: 1 }}>
-          <View style={S.sectionHeader}><Text style={S.sectionHeaderText}>LIABILITAS</Text></View>
-          {liabilities.map((a, i) => <BSRow key={i} item={a} depth={0} alt={i % 2 === 1} />)}
-          <View style={S.rowTotal}>
-            <Text style={S.colLabelBold}>Total Liabilitas</Text>
-            <Text style={S.colTotalBold}>{idr(Number(totalLiabilities))}</Text>
-          </View>
-
-          <View style={{ height: 8 }} />
-
-          <View style={S.sectionHeader}><Text style={S.sectionHeaderText}>EKUITAS</Text></View>
-          {equity.map((a, i) => <BSRow key={i} item={a} depth={0} alt={i % 2 === 1} />)}
-          <View style={S.rowTotal}>
-            <Text style={S.colLabelBold}>Total Ekuitas</Text>
-            <Text style={S.colTotalBold}>{idr(Number(totalEquity))}</Text>
-          </View>
-
-          <View style={S.rowGrandTotal}>
-            <Text style={S.colGTLabel}>Total Liab. + Ekuitas</Text>
-            <Text style={S.colTotalWhite}>{idr(Number(totalLiabilities) + Number(totalEquity))}</Text>
-          </View>
-        </View>
+      {/* ASSETS */}
+      <View style={S.sectionHeader} wrap={false}><Text style={S.sectionHeaderText}>ASET</Text></View>
+      {assets.map((a, i) => <BSRow key={i} item={a} depth={0} alt={i % 2 === 1} />)}
+      <View style={S.rowTotal} wrap={false}>
+        <Text style={S.colLabelBold}>Total Aset</Text>
+        <Text style={S.colTotalBold}>{idr(Number(totalAssets))}</Text>
       </View>
+
+      <View style={{ height: 12 }} />
+
+      {/* LIABILITIES */}
+      <View style={S.sectionHeader} wrap={false}><Text style={S.sectionHeaderText}>LIABILITAS</Text></View>
+      {liabilities.map((a, i) => <BSRow key={i} item={a} depth={0} alt={i % 2 === 1} />)}
+      <View style={S.rowTotal} wrap={false}>
+        <Text style={S.colLabelBold}>Total Liabilitas</Text>
+        <Text style={S.colTotalBold}>{idr(Number(totalLiabilities))}</Text>
+      </View>
+
+      <View style={{ height: 8 }} />
+
+      {/* EQUITY */}
+      <View style={S.sectionHeader} wrap={false}><Text style={S.sectionHeaderText}>EKUITAS</Text></View>
+      {equity.map((a, i) => <BSRow key={i} item={a} depth={0} alt={i % 2 === 1} />)}
+      <View style={S.rowTotal} wrap={false}>
+        <Text style={S.colLabelBold}>Total Ekuitas</Text>
+        <Text style={S.colTotalBold}>{idr(Number(totalEquity))}</Text>
+      </View>
+
+      {/* Grand total */}
+      <View style={S.rowGrandTotal} wrap={false}>
+        <Text style={S.colGTLabel}>Total Liabilitas + Ekuitas</Text>
+        <Text style={S.colTotalWhite}>{idr(Number(totalLiabilities) + Number(totalEquity))}</Text>
+      </View>
+
+      {/* Balance check */}
+      <View style={[S.summaryBox, { marginTop: 8 }]} wrap={false}>
+        <Text style={{ fontSize: 7.5, color: Math.abs(Number(totalAssets) - (Number(totalLiabilities) + Number(totalEquity))) < 1 ? C.green : C.red, fontFamily: 'Helvetica-Bold' }}>
+          {Math.abs(Number(totalAssets) - (Number(totalLiabilities) + Number(totalEquity))) < 1 ? '✓ Neraca Seimbang' : '⚠ Neraca Tidak Seimbang'}
+        </Text>
+      </View>
+
       <ReportFooter company={company} title="Neraca" />
     </Page>
   </Document>
@@ -266,7 +261,7 @@ function BSRow({ item, depth, alt }: { item: BSSection; depth: number; alt: bool
   const hasChildren = item.children && item.children.length > 0;
   return (
     <>
-      <View style={hasChildren ? S.rowGroup : [S.row, alt ? S.rowAlt : {}]}>
+      <View style={hasChildren ? S.rowGroup : [S.row, alt ? S.rowAlt : {}]} wrap={false}>
         <Text style={indent}>{item.name}</Text>
         {!hasChildren && <Text style={S.colBalance}>{idr(Number(item.balance))}</Text>}
       </View>
@@ -294,7 +289,7 @@ export const CashFlowPDF: React.FC<CFPDFProps> = ({
   const closing = closingBalance ?? (Number(openingBalance) + Number(netChange));
   return (
     <Document>
-      <Page size="A4" style={S.page}>
+      <Page size="A4" style={S.page} wrap>
         <ReportHeader company={company} title="LAPORAN ARUS KAS" period={period} />
 
         <CFSection title="AKTIVITAS OPERASIONAL" items={operatingItems} total={operating} />
@@ -304,17 +299,17 @@ export const CashFlowPDF: React.FC<CFPDFProps> = ({
         <CFSection title="AKTIVITAS PENDANAAN" items={financingItems} total={financing} />
 
         <View style={{ marginTop: 12 }}>
-          <View style={S.rowTotal}>
+          <View style={S.rowTotal} wrap={false}>
             <Text style={S.colLabelBold}>Perubahan Kas Bersih</Text>
             <Text style={[S.colTotalBold, { color: Number(netChange) >= 0 ? C.green : C.red }]}>{idr(Number(netChange), true)}</Text>
           </View>
           {openingBalance !== undefined && (
-            <View style={[S.row, S.rowAlt]}>
+            <View style={[S.row, S.rowAlt]} wrap={false}>
               <Text style={S.colLabel}>Saldo Awal Periode</Text>
               <Text style={S.colBalance}>{idr(Number(openingBalance))}</Text>
             </View>
           )}
-          <View style={S.rowGrandTotal}>
+          <View style={S.rowGrandTotal} wrap={false}>
             <Text style={S.colGTLabel}>SALDO AKHIR KAS & BANK</Text>
             <Text style={S.colTotalWhite}>{idr(Number(closing))}</Text>
           </View>
@@ -329,16 +324,16 @@ export const CashFlowPDF: React.FC<CFPDFProps> = ({
 function CFSection({ title, items, total }: { title: string; items: CFItem[]; total: number }) {
   return (
     <>
-      <View style={S.sectionHeader}><Text style={S.sectionHeaderText}>{title}</Text></View>
+      <View style={S.sectionHeader} wrap={false}><Text style={S.sectionHeaderText}>{title}</Text></View>
       {items.length === 0 ? (
-        <View style={S.row}><Text style={[S.colLabel, { color: C.faint, fontStyle: 'italic' }]}>Tidak ada transaksi</Text><Text style={S.colBalance}>Rp 0</Text></View>
+        <View style={S.row} wrap={false}><Text style={[S.colLabel, { color: C.faint, fontStyle: 'italic' }]}>Tidak ada transaksi</Text><Text style={S.colBalance}>Rp 0</Text></View>
       ) : items.map((it, i) => (
-        <View key={i} style={[S.row, i % 2 === 1 ? S.rowAlt : {}]}>
+        <View key={i} style={[S.row, i % 2 === 1 ? S.rowAlt : {}]} wrap={false}>
           <Text style={S.colLabel}>{it.description}</Text>
           <Text style={[S.colBalance, { color: Number(it.amount) < 0 ? C.red : C.mid }]}>{idr(Number(it.amount), true)}</Text>
         </View>
       ))}
-      <View style={S.rowTotal}>
+      <View style={S.rowTotal} wrap={false}>
         <Text style={S.colLabelBold}>Subtotal {title.split(' ').slice(1).join(' ')}</Text>
         <Text style={[S.colTotalBold, { color: Number(total) >= 0 ? C.green : C.red }]}>{idr(Number(total), true)}</Text>
       </View>
@@ -368,9 +363,9 @@ export const AgingPDF: React.FC<AgingPDFProps> = ({ company, type, rows, totals 
   const w = 68;
   return (
     <Document>
-      <Page size="A4" orientation="landscape" style={S.page}>
+      <Page size="A4" orientation="landscape" style={S.page} wrap>
         <ReportHeader company={company} title={title} period={`Per ${today()}`} />
-        <View style={S.sectionHeader}>
+        <View style={S.sectionHeader} wrap={false}>
           <View style={{ flexDirection: 'row' }}>
             <Text style={[S.sectionHeaderText, { flex: 1 }]}>Nama Mitra</Text>
             {cols.map((c) => (
@@ -379,7 +374,7 @@ export const AgingPDF: React.FC<AgingPDFProps> = ({ company, type, rows, totals 
           </View>
         </View>
         {rows.map((r, i) => (
-          <View key={i} style={[S.row, i % 2 === 1 ? S.rowAlt : {}]}>
+          <View key={i} style={[S.row, i % 2 === 1 ? S.rowAlt : {}]} wrap={false}>
             <Text style={[S.colLabel, { flex: 1 }]}>{r.name}</Text>
             <Text style={[S.colBalance, { width: w }]}>{idr(r.current)}</Text>
             <Text style={[S.colBalance, { width: w }]}>{idr(r.d1_30)}</Text>
@@ -389,7 +384,7 @@ export const AgingPDF: React.FC<AgingPDFProps> = ({ company, type, rows, totals 
             <Text style={[S.colTotalBold, { width: w }]}>{idr(r.total)}</Text>
           </View>
         ))}
-        <View style={S.rowGrandTotal}>
+        <View style={S.rowGrandTotal} wrap={false}>
           <Text style={[S.colGTLabel, { flex: 1 }]}>TOTAL</Text>
           <Text style={[S.colTotalWhite, { width: w }]}>{idr(totals.current)}</Text>
           <Text style={[S.colTotalWhite, { width: w }]}>{idr(totals.d1_30)}</Text>
@@ -420,7 +415,7 @@ function ReportHeader({ company, title, period }: { company: CompanyInfo; title:
           <Text style={S.reportDate}>Dicetak: {today()}</Text>
         </View>
       </View>
-      <View style={S.divider} />
+      <View style={S.divider} fixed />
     </>
   );
 }

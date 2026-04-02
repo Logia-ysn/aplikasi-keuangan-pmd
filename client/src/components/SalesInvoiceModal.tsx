@@ -18,12 +18,13 @@ interface InvoiceItem {
   rate: number;
   discount: number; // percent
   taxPct: number;   // PPN % per item
+  pphPct: number;   // PPh % per item
 }
 
 const UNITS = ['Kg', 'Ton', 'Sak', 'Liter', 'Pcs', 'Box', 'Unit', 'Set', 'Meter', 'Jasa'];
 
 const defaultItem = (): InvoiceItem => ({
-  id: crypto.randomUUID(), itemName: '', itemType: 'product', inventoryItemId: '', serviceItemId: '', accountId: '', description: '', quantity: 1, unit: 'Kg', rate: 0, discount: 0, taxPct: 11
+  id: crypto.randomUUID(), itemName: '', itemType: 'product', inventoryItemId: '', serviceItemId: '', accountId: '', description: '', quantity: 1, unit: 'Kg', rate: 0, discount: 0, taxPct: 11, pphPct: 0
 });
 
 const SalesInvoiceModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, onClose }) => {
@@ -154,10 +155,12 @@ const SalesInvoiceModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
     return base - (base * (item.discount / 100));
   };
   const lineTax = (item: InvoiceItem) => lineTotal(item) * (item.taxPct / 100);
+  const linePph = (item: InvoiceItem) => lineTotal(item) * (item.pphPct / 100);
   const subtotal = items.reduce((s, it) => s + lineTotal(it), 0);
   const taxAmount = items.reduce((s, it) => s + lineTax(it), 0);
-  const grandTotal = subtotal + taxAmount - potongan + biayaLain;
-  const canSubmit = partyId && items.some(i => i.itemName && i.rate > 0) && grandTotal > 0 && !mutation.isPending;
+  const pphAmount = items.reduce((s, it) => s + linePph(it), 0);
+  const grandTotal = subtotal + taxAmount - pphAmount - potongan + biayaLain;
+  const canSubmit = partyId && items.some(i => i.itemName) && grandTotal > 0 && !mutation.isPending;
 
   if (!isOpen) return null;
 
@@ -227,7 +230,7 @@ const SalesInvoiceModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
               </div>
               <div>
                 <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">Info</label>
-                <p className="text-xs text-gray-400 mt-1">PPN diatur per baris item</p>
+                <p className="text-xs text-gray-400 mt-1">PPN & PPh diatur per baris item</p>
               </div>
             </div>
           </div>
@@ -252,6 +255,7 @@ const SalesInvoiceModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
                     <th className="text-right px-3 py-3 w-36">Harga Satuan</th>
                     <th className="text-right px-3 py-3 w-20">Diskon %</th>
                     <th className="text-right px-3 py-3 w-20">PPN %</th>
+                    <th className="text-right px-3 py-3 w-20">PPh %</th>
                     <th className="text-right px-4 py-3 w-36">Jumlah</th>
                     <th className="w-8"></th>
                   </tr>
@@ -387,6 +391,16 @@ const SalesInvoiceModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
                           className="w-full bg-transparent text-sm text-blue-600 text-right font-mono border-none focus:ring-0 focus:outline-none p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                         />
                       </td>
+                      <td className="px-3 py-3 text-right">
+                        <input
+                          type="number"
+                          value={item.pphPct || ''}
+                          onChange={e => updateItem(idx, 'pphPct', Math.max(0, Math.min(100, Number(e.target.value))))}
+                          placeholder="0"
+                          min={0} max={100}
+                          className="w-full bg-transparent text-sm text-orange-600 text-right font-mono border-none focus:ring-0 focus:outline-none p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        />
+                      </td>
                       <td className="px-4 py-3 text-right">
                         <span className="font-mono text-sm font-medium text-gray-900 tabular-nums">
                           {formatRupiah(lineTotal(item))}
@@ -395,7 +409,7 @@ const SalesInvoiceModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
                       <td className="pr-3 py-3 text-center">
                         {items.length > 1 && (
                           <button onClick={() => removeItem(idx)}
-                            className="p-1 rounded text-gray-200 hover:text-red-400 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all">
+                            className="p-1 rounded text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors">
                             <Trash2 size={13} />
                           </button>
                         )}
@@ -435,7 +449,15 @@ const SalesInvoiceModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
                 {taxAmount > 0 && (
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-500">PPN (per item)</span>
-                    <span className="font-mono text-gray-800 tabular-nums">{formatRupiah(taxAmount)}</span>
+                    <span className="font-mono text-gray-800 tabular-nums">+ {formatRupiah(taxAmount)}</span>
+                  </div>
+                )}
+
+                {/* PPh (total per-item) */}
+                {pphAmount > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">PPh (per item)</span>
+                    <span className="font-mono text-orange-600 tabular-nums">− {formatRupiah(pphAmount)}</span>
                   </div>
                 )}
 
@@ -514,6 +536,7 @@ const SalesInvoiceModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
                   serviceItemId: i.serviceItemId || null,
                   accountId: i.accountId || null,
                   taxPct: i.taxPct,
+                  pphPct: i.pphPct,
                 })),
               })}
               disabled={!canSubmit}

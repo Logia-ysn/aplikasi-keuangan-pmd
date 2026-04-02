@@ -14,6 +14,19 @@ import { compareAccountNumber } from '../utils/accountSort';
 
 const router = Router();
 
+/** Derive rootType from account number prefix. Overrides user-supplied value to prevent mismatch. */
+function deriveRootType(accountNumber: string, fallback: string) {
+  const prefix = accountNumber.split('.')[0];
+  switch (prefix) {
+    case '1': return 'ASSET' as const;
+    case '2': return 'LIABILITY' as const;
+    case '3': return 'EQUITY' as const;
+    case '4': return 'REVENUE' as const;
+    case '5': case '6': case '7': case '8': return 'EXPENSE' as const;
+    default: return fallback as any;
+  }
+}
+
 // GET /api/coa — hierarchical account tree
 router.get('/', async (req, res) => {
   try {
@@ -62,12 +75,15 @@ router.post('/', roleMiddleware(['Admin']), async (req, res) => {
   if (!body) return;
 
   try {
+    // Auto-detect rootType from account number prefix to prevent mismatch
+    const rootType = deriveRootType(body.accountNumber, body.rootType);
+
     const account = await prisma.account.create({
       data: {
         accountNumber: body.accountNumber,
         name: body.name,
         accountType: body.accountType,
-        rootType: body.rootType,
+        rootType,
         isGroup: body.isGroup ?? false,
         parentId: body.parentId || null,
       },
@@ -103,6 +119,9 @@ router.put('/:id', roleMiddleware(['Admin']), async (req, res) => {
       if (childCount > 0) return res.status(400).json({ error: 'Tidak dapat mengubah akun grup yang masih memiliki sub-akun.' });
     }
 
+    // Auto-fix rootType if accountNumber changes
+    const newRootType = body.accountNumber ? deriveRootType(body.accountNumber, '') : null;
+
     const account = await prisma.account.update({
       where: { id },
       data: {
@@ -110,6 +129,7 @@ router.put('/:id', roleMiddleware(['Admin']), async (req, res) => {
         ...(body.name && { name: body.name }),
         ...(body.isGroup !== undefined && { isGroup: body.isGroup }),
         ...(body.isActive !== undefined && { isActive: body.isActive }),
+        ...(newRootType && { rootType: newRootType, accountType: newRootType }),
       },
     });
     return res.json(account);

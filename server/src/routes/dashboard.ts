@@ -15,9 +15,8 @@ router.get('/metrics', async (req, res) => {
     });
     const cashBalance = cashAccountRecords.reduce((sum, acc) => sum + Number(acc.balance), 0);
 
-    const [arMapping, apMapping, vendorDepositMapping, inventoryValueResult] = await Promise.all([
+    const [arMapping, vendorDepositMapping, inventoryValueResult, totalLiabilities] = await Promise.all([
       systemAccounts.getAccount('AR'),
-      systemAccounts.getAccount('AP'),
       systemAccounts.getAccount('VENDOR_DEPOSIT'),
       prisma.$queryRaw<[{ total: bigint }]>`
         SELECT COALESCE(SUM(
@@ -28,11 +27,15 @@ router.get('/metrics', async (req, res) => {
         JOIN inventory_items ii ON sm.item_id = ii.id
         WHERE ii.is_active = true AND sm.is_cancelled = false
       `,
+      // Sum all LIABILITY account balances for total hutang
+      prisma.account.aggregate({
+        where: { rootType: 'LIABILITY' as any, isGroup: false, isActive: true },
+        _sum: { balance: true },
+      }),
     ]);
 
-    const [arAcc, apAcc, vendorDepositAcc] = await Promise.all([
+    const [arAcc, vendorDepositAcc] = await Promise.all([
       prisma.account.findUnique({ where: { id: arMapping.id }, select: { balance: true } }),
-      prisma.account.findUnique({ where: { id: apMapping.id }, select: { balance: true } }),
       prisma.account.findUnique({ where: { id: vendorDepositMapping.id }, select: { balance: true } }),
     ]);
 
@@ -57,7 +60,7 @@ router.get('/metrics', async (req, res) => {
     return res.json({
       cashBalance,
       accountsReceivable: Math.max(0, Number(arAcc?.balance || 0)),
-      accountsPayable: Math.max(0, Number(apAcc?.balance || 0)),
+      accountsPayable: Math.max(0, Number(totalLiabilities._sum?.balance || 0)),
       vendorDeposit: Math.max(0, Number(vendorDepositAcc?.balance || 0)),
       inventoryValue: Math.max(0, Number(inventoryValueResult[0]?.total || 0)),
       netProfit,
