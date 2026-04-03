@@ -11,45 +11,39 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'pwa-192x192.png', 'pwa-512x512.png'],
       manifest: {
-        name: 'Keuangan PMD',
+        name: 'Keuangan - PT Pangan Masa Depan',
         short_name: 'Keuangan',
         description: 'Aplikasi Keuangan PT Pangan Masa Depan',
         theme_color: '#1e40af',
-        background_color: '#ffffff',
+        background_color: '#f8fafc',
         display: 'standalone',
         orientation: 'any',
-        start_url: '/',
+        start_url: '/dashboard',
+        categories: ['business', 'productivity'],
         icons: [
           {
             src: 'pwa-192x192.png',
             sizes: '192x192',
             type: 'image/png',
+            purpose: 'any maskable',
           },
           {
             src: 'pwa-512x512.png',
             sizes: '512x512',
             type: 'image/png',
-          },
-          {
-            src: 'pwa-maskable-512x512.png',
-            sizes: '512x512',
-            type: 'image/png',
-            purpose: 'maskable',
+            purpose: 'any maskable',
           },
         ],
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        navigateFallback: 'index.html',
         runtimeCaching: [
           {
             urlPattern: /^https?:\/\/.*\/api\/.*/i,
             handler: 'NetworkFirst',
             options: {
               cacheName: 'api-cache',
-              expiration: {
-                maxEntries: 100,
-                maxAgeSeconds: 60 * 5, // 5 minutes
-              },
               cacheableResponse: {
                 statuses: [0, 200],
               },
