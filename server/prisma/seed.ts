@@ -355,6 +355,10 @@ async function main() {
     // Pendapatan & Beban Lain-lain
     { role: 'OTHER_INCOME', accountNumber: '7.4', sortOrder: 0 },
     { role: 'OTHER_EXPENSE', accountNumber: '8.7', sortOrder: 0 },
+    // Biaya Konversi Produksi
+    { role: 'PRODUCTION_CONVERSION', accountNumber: '6.39', sortOrder: 0 },
+    // Selisih Persediaan
+    { role: 'INVENTORY_VARIANCE', accountNumber: '6.38', sortOrder: 0 },
     // Pembulatan
     { role: 'ROUNDING_ACCOUNT', accountNumber: '8.8', sortOrder: 0 },
   ];
