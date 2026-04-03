@@ -284,6 +284,7 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
 
       // Auto-deduct inventory for items linked to InventoryItem
       let totalCogs = new Decimal(0);
+      const cogsByAccount = new Map<string, { amount: number; names: string[] }>();
       for (const item of invoice.items) {
         const invItemId = item.inventoryItemId;
         if (!invItemId) continue;
@@ -324,6 +325,17 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
         });
 
         totalCogs = totalCogs.plus(new Decimal(cogsAmount));
+
+        // Track COGS per inventory account
+        const invAcctId = inventoryItem.accountId || inventoryAccount.id;
+        const existing = cogsByAccount.get(invAcctId);
+        if (existing) {
+          existing.amount += cogsAmount;
+          existing.names.push(item.itemName);
+        } else {
+          cogsByAccount.set(invAcctId, { amount: cogsAmount, names: [item.itemName] });
+        }
+
         logger.info({ invoiceId: invoice.id, itemId: inventoryItem.id, qty }, 'Auto stock deduction from sales');
       }
 
@@ -331,6 +343,19 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
       const totalCogsNum = totalCogs.toDecimalPlaces(2).toNumber();
       if (totalCogsNum > 0) {
         const cogsJvNumber = `JV-COGS-${invoice.invoiceNumber}`;
+
+        // Build journal items: DR COGS + CR each inventory account
+        const cogsJournalItems: { accountId: string; debit: number; credit: number; description: string }[] = [
+          { accountId: cogsAccount.id, debit: totalCogsNum, credit: 0, description: `HPP: ${invoice.invoiceNumber}` },
+        ];
+        for (const [acctId, data] of cogsByAccount) {
+          cogsJournalItems.push({
+            accountId: acctId,
+            debit: 0, credit: data.amount,
+            description: `Persediaan keluar ${data.names.join(', ')}: ${invoice.invoiceNumber}`,
+          });
+        }
+
         const cogsJournal = await tx.journalEntry.create({
           data: {
             entryNumber: cogsJvNumber,
@@ -340,24 +365,28 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
             fiscalYearId: fiscalYear.id,
             createdBy: req.user!.userId,
             submittedAt: new Date(),
-            items: {
-              create: [
-                { accountId: cogsAccount.id, debit: totalCogsNum, credit: 0, description: `HPP: ${invoice.invoiceNumber}` },
-                { accountId: inventoryAccount.id, debit: 0, credit: totalCogsNum, description: `Persediaan keluar: ${invoice.invoiceNumber}` },
-              ],
-            },
+            items: { create: cogsJournalItems },
           },
         });
 
         await tx.accountingLedgerEntry.createMany({
-          data: [
-            { date: parsedDate, accountId: cogsAccount.id, debit: totalCogsNum, credit: 0, referenceType: 'JournalEntry', referenceId: cogsJournal.id, description: `HPP: ${invoice.invoiceNumber}`, fiscalYearId: fiscalYear.id },
-            { date: parsedDate, accountId: inventoryAccount.id, debit: 0, credit: totalCogsNum, referenceType: 'JournalEntry', referenceId: cogsJournal.id, description: `Persediaan keluar: ${invoice.invoiceNumber}`, fiscalYearId: fiscalYear.id },
-          ],
+          data: cogsJournalItems.map(ji => ({
+            date: parsedDate,
+            accountId: ji.accountId,
+            debit: ji.debit,
+            credit: ji.credit,
+            referenceType: 'JournalEntry',
+            referenceId: cogsJournal.id,
+            description: ji.description,
+            fiscalYearId: fiscalYear.id,
+          })),
         });
 
-        await updateAccountBalance(tx, cogsAccount.id, totalCogsNum, 0);        // EXPENSE: debit → +balance
-        await updateAccountBalance(tx, inventoryAccount.id, 0, totalCogsNum);    // ASSET: credit → -balance
+        // Update balances per account
+        await updateAccountBalance(tx, cogsAccount.id, totalCogsNum, 0);
+        for (const [acctId, data] of cogsByAccount) {
+          await updateAccountBalance(tx, acctId, 0, data.amount);
+        }
       }
 
       return invoice;

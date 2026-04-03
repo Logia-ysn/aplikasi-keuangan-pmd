@@ -31,17 +31,18 @@ router.get('/items', async (req, res) => {
       ];
     }
 
-    const [items, total] = await Promise.all([
+    const [allItems, total] = await Promise.all([
       prisma.inventoryItem.findMany({
         where,
         include: { account: { select: { id: true, name: true, accountNumber: true } } },
-        orderBy: { code: 'asc' },
-        skip,
-        take,
       }),
       prisma.inventoryItem.count({ where }),
     ]);
 
+    // Sort by current stock quantity descending
+    allItems.sort((a, b) => Number(b.currentStock) - Number(a.currentStock));
+
+    const items = allItems.slice(skip, skip + take);
     return res.json({ data: items, total, page: Number(page), limit: take });
   } catch (error) {
     logger.error({ error }, 'GET /inventory/items error');
@@ -169,7 +170,7 @@ router.get('/movements', async (req, res) => {
           item: { select: { id: true, name: true, code: true, unit: true } },
           offsetAccount: { select: { id: true, name: true, accountNumber: true } },
         },
-        orderBy: { date: 'desc' },
+        orderBy: [{ movementNumber: 'desc' }],
         skip,
         take,
       }),
@@ -720,10 +721,16 @@ router.post('/production-runs', roleMiddleware(['Admin', 'Accountant', 'StaffPro
         },
       });
 
-      // 7. Process inputs: reduce stock + create StockMovement Out
+      // 7. Process inputs: reduce stock + create StockMovement Out (with averageCost)
+      let totalInputValue = new Decimal(0);
       for (const input of body.inputs) {
         const item = itemMap.get(input.itemId);
         if (!item) continue;
+
+        const avgCost = Number(item.averageCost);
+        const inputUnitCost = avgCost > 0 ? avgCost : 0;
+        const inputTotalValue = new Decimal(input.quantity).mul(new Decimal(inputUnitCost)).toDecimalPlaces(2).toNumber();
+        totalInputValue = totalInputValue.plus(new Decimal(inputTotalValue));
 
         await tx.inventoryItem.update({
           where: { id: input.itemId },
@@ -738,8 +745,8 @@ router.post('/production-runs', roleMiddleware(['Admin', 'Accountant', 'StaffPro
             itemId: input.itemId,
             movementType: 'Out',
             quantity: input.quantity,
-            unitCost: 0,
-            totalValue: 0,
+            unitCost: inputUnitCost,
+            totalValue: inputTotalValue,
             referenceType: 'ProductionRun',
             referenceId: run.id,
             referenceNumber: runNumber,
@@ -750,7 +757,8 @@ router.post('/production-runs', roleMiddleware(['Admin', 'Accountant', 'StaffPro
         });
       }
 
-      // 8. Process outputs: increase stock + create StockMovement In (with unitPrice if provided)
+      // 8. Process outputs: increase stock + create StockMovement In (with user-entered HPP/kg)
+      let totalOutputValue = new Decimal(0);
       for (const output of body.outputs) {
         const outputItem = await tx.inventoryItem.findUnique({ where: { id: output.itemId } });
         const unitCost = output.unitPrice ?? 0;
@@ -767,6 +775,7 @@ router.post('/production-runs', roleMiddleware(['Admin', 'Accountant', 'StaffPro
           },
         });
         const totalValue = new Decimal(output.quantity).mul(new Decimal(unitCost)).toDecimalPlaces(2).toNumber();
+        totalOutputValue = totalOutputValue.plus(new Decimal(totalValue));
 
         const movNumber = await generateDocumentNumber(tx, 'SM', runDate, fiscalYear.id);
         await tx.stockMovement.create({
@@ -786,6 +795,84 @@ router.post('/production-runs', roleMiddleware(['Admin', 'Accountant', 'StaffPro
             createdById: req.user!.userId,
           },
         });
+      }
+
+      // 8b. GL posting per item account: DR output accounts / CR input accounts
+      const defaultInvAccount = await systemAccounts.getAccount('INVENTORY');
+      const inputNames = body.inputs.map(i => itemMap.get(i.itemId)?.name || '').join(', ');
+      const outputNames = body.outputs.map(o => itemMap.get(o.itemId)?.name || '').join(', ');
+
+      const jvNumber = `JV-${runNumber}`;
+      const journalItems: { accountId: string; debit: number; credit: number; description: string }[] = [];
+
+      // CR each input item's account
+      for (const input of body.inputs) {
+        const item = itemMap.get(input.itemId);
+        if (!item) continue;
+        const avgCost = Number(item.averageCost);
+        const val = new Decimal(input.quantity).mul(new Decimal(avgCost > 0 ? avgCost : 0)).toDecimalPlaces(2).toNumber();
+        if (val <= 0) continue;
+        const acctId = item.accountId || defaultInvAccount.id;
+        journalItems.push({
+          accountId: acctId,
+          debit: 0, credit: val,
+          description: `Bahan baku keluar ${item.name}: ${runNumber}`,
+        });
+      }
+
+      // DR each output item's account
+      for (const output of body.outputs) {
+        const unitCost = output.unitPrice ?? 0;
+        const val = new Decimal(output.quantity).mul(new Decimal(unitCost)).toDecimalPlaces(2).toNumber();
+        if (val <= 0) continue;
+        // Re-fetch item to get accountId (output items may not be in itemMap if different from inputs)
+        const outItem = await tx.inventoryItem.findUnique({ where: { id: output.itemId }, select: { accountId: true, name: true } });
+        const acctId = outItem?.accountId || defaultInvAccount.id;
+        journalItems.push({
+          accountId: acctId,
+          debit: val, credit: 0,
+          description: `Produksi masuk ${outItem?.name || ''}: ${runNumber}`,
+        });
+      }
+
+      if (journalItems.length > 0) {
+        const journalEntry = await tx.journalEntry.create({
+          data: {
+            entryNumber: jvNumber,
+            date: runDate,
+            narration: `Produksi: ${runNumber} — ${inputNames} → ${outputNames}`,
+            status: 'Submitted',
+            fiscalYearId: fiscalYear.id,
+            createdBy: req.user!.userId,
+            submittedAt: new Date(),
+            items: { create: journalItems },
+          },
+        });
+
+        await tx.accountingLedgerEntry.createMany({
+          data: journalItems.map(ji => ({
+            date: runDate,
+            accountId: ji.accountId,
+            debit: ji.debit,
+            credit: ji.credit,
+            referenceType: 'JournalEntry',
+            referenceId: journalEntry.id,
+            description: ji.description,
+            fiscalYearId: fiscalYear.id,
+          })),
+        });
+
+        // Update account balances per account
+        const balanceMap = new Map<string, { debit: number; credit: number }>();
+        for (const ji of journalItems) {
+          const entry = balanceMap.get(ji.accountId) || { debit: 0, credit: 0 };
+          entry.debit += ji.debit;
+          entry.credit += ji.credit;
+          balanceMap.set(ji.accountId, entry);
+        }
+        for (const [acctId, bal] of balanceMap) {
+          await updateAccountBalance(tx, acctId, bal.debit, bal.credit);
+        }
       }
 
       // 9. Create ProductionRunItems for record-keeping
@@ -854,6 +941,9 @@ router.put('/production-runs/:id/cancel', roleMiddleware(['Admin']), async (req:
         include: { item: true },
       });
 
+      // Collect output item IDs that need averageCost recalculation
+      const outputItemIds = new Set<string>();
+
       // Reverse each movement
       for (const mov of movements) {
         const isIn = mov.movementType === 'In' || mov.movementType === 'AdjustmentIn';
@@ -867,6 +957,8 @@ router.put('/production-runs/:id/cancel', roleMiddleware(['Admin']), async (req:
           );
         }
 
+        if (isIn) outputItemIds.add(mov.itemId);
+
         const reverseDelta = isOut ? qty : -qty;
         await tx.inventoryItem.update({
           where: { id: mov.itemId },
@@ -877,6 +969,62 @@ router.put('/production-runs/:id/cancel', roleMiddleware(['Admin']), async (req:
           where: { id: mov.id },
           data: { isCancelled: true },
         });
+      }
+
+      // Recalculate averageCost for output items from remaining active In movements
+      for (const itemId of outputItemIds) {
+        const activeInMovements = await tx.stockMovement.findMany({
+          where: {
+            itemId,
+            movementType: { in: ['In', 'AdjustmentIn'] },
+            isCancelled: false,
+          },
+          select: { quantity: true, unitCost: true },
+        });
+
+        if (activeInMovements.length === 0) {
+          await tx.inventoryItem.update({
+            where: { id: itemId },
+            data: { averageCost: 0 },
+          });
+        } else {
+          let totalQty = new Decimal(0);
+          let totalValue = new Decimal(0);
+          for (const m of activeInMovements) {
+            const q = new Decimal(Number(m.quantity));
+            const c = new Decimal(Number(m.unitCost));
+            totalQty = totalQty.plus(q);
+            totalValue = totalValue.plus(q.mul(c));
+          }
+          const newAvgCost = totalQty.gt(0)
+            ? totalValue.div(totalQty).toDecimalPlaces(2).toNumber()
+            : 0;
+          await tx.inventoryItem.update({
+            where: { id: itemId },
+            data: { averageCost: newAvgCost },
+          });
+        }
+      }
+
+      // Cancel related journal entry + ledger entries
+      const jvNumber = `JV-${run.runNumber}`;
+      const journal = await tx.journalEntry.findUnique({
+        where: { entryNumber: jvNumber },
+        include: { items: true },
+      });
+      if (journal) {
+        await tx.journalEntry.update({
+          where: { id: journal.id },
+          data: { status: 'Cancelled', cancelledAt: new Date() },
+        });
+        await tx.accountingLedgerEntry.updateMany({
+          where: { referenceId: journal.id },
+          data: { isCancelled: true },
+        });
+        // Reverse account balances
+        for (const ji of journal.items) {
+          await updateAccountBalance(tx, ji.accountId, Number(ji.credit), Number(ji.debit));
+        }
       }
 
       // Mark run as cancelled
