@@ -129,6 +129,7 @@ export interface InvoicePDFItem {
   rate: number | string;
   discount?: number | string;
   taxPct?: number | string;
+  pphPct?: number | string;
   amount: number | string;
   description?: string | null;
 }
@@ -199,7 +200,12 @@ const InvoicePDF: React.FC<InvoicePDFProps> = (props) => {
   const taxAmount = hasPerItemTax
     ? items.reduce((s, i) => s + Number(i.amount) * Number(i.taxPct ?? 0) / 100, 0)
     : (numTax > 0 ? subtotal * numTax / 100 : 0);
+  const hasPerItemPph = items.some(i => Number(i.pphPct ?? 0) > 0);
+  const pphAmount = hasPerItemPph
+    ? items.reduce((s, i) => s + Number(i.amount) * Number(i.pphPct ?? 0) / 100, 0)
+    : 0;
   const showTax = taxAmount > 0;
+  const showPph = pphAmount > 0;
   const showPot = numPot > 0;
   const showBiaya = numBiaya > 0;
 
@@ -282,6 +288,7 @@ const InvoicePDF: React.FC<InvoicePDFProps> = (props) => {
             <Text style={[S.tableHeaderText, S.colRate]}>Harga Sat.</Text>
             <Text style={[S.tableHeaderText, S.colDisc]}>Disk%</Text>
             <Text style={[S.tableHeaderText, S.colTax]}>PPN%</Text>
+            {hasPerItemPph && <Text style={[S.tableHeaderText, S.colTax]}>PPh%</Text>}
             <Text style={[S.tableHeaderText, S.colAmount]}>Jumlah</Text>
           </View>
 
@@ -308,6 +315,11 @@ const InvoicePDF: React.FC<InvoicePDFProps> = (props) => {
               <Text style={[S.tableCell, S.tableMono, S.colTax, { color: Number(item.taxPct) > 0 ? C.accent : C.faint }]}>
                 {Number(item.taxPct) > 0 ? `${Number(item.taxPct)}%` : '—'}
               </Text>
+              {hasPerItemPph && (
+                <Text style={[S.tableCell, S.tableMono, S.colTax, { color: Number(item.pphPct) > 0 ? C.orange : C.faint }]}>
+                  {Number(item.pphPct) > 0 ? `${Number(item.pphPct)}%` : '—'}
+                </Text>
+              )}
               <Text style={[S.tableCell, S.tableMono, S.colAmount, { fontFamily: 'Helvetica-Bold' }]}>
                 {idr(Number(item.amount))}
               </Text>
@@ -326,6 +338,12 @@ const InvoicePDF: React.FC<InvoicePDFProps> = (props) => {
               <View style={S.summaryRight}>
                 <Text style={S.summaryLabel}>{hasPerItemTax ? 'PPN (per item)' : `PPN ${numTax}%`}</Text>
                 <Text style={S.summaryValue}>{idr(taxAmount)}</Text>
+              </View>
+            )}
+            {showPph && (
+              <View style={S.summaryRight}>
+                <Text style={[S.summaryLabel, { color: C.orange }]}>PPh (per item) (−)</Text>
+                <Text style={[S.summaryValue, { color: C.orange }]}>({idr(pphAmount)})</Text>
               </View>
             )}
             {showPot && (
