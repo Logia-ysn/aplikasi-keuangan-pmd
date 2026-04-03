@@ -96,7 +96,9 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
       const salesAccount = await systemAccounts.getAccount('SALES');
 
       const inventoryAccount = await systemAccounts.getAccount('INVENTORY');
-      const cogsAccount = await systemAccounts.getAccount('COGS');
+      // Prefer HPP Beras (5.1) for COGS, fallback to parent (5)
+      const hppBerasAccount = await tx.account.findFirst({ where: { accountNumber: '5.1' } });
+      const cogsAccount = hppBerasAccount || await systemAccounts.getAccount('COGS');
 
       // Resolve per-item accountId (service items may have their own revenue account)
       const resolvedItems: Array<{
@@ -488,7 +490,8 @@ router.post('/:id/cancel', roleMiddleware(['Admin']), async (req: AuthRequest, r
         });
 
         // Reverse COGS and inventory balances
-        const cogsAccount = await systemAccounts.getAccount('COGS');
+        const hppBeras = await tx.account.findFirst({ where: { accountNumber: '5.1' } });
+        const cogsAccount = hppBeras || await systemAccounts.getAccount('COGS');
         const inventoryAccount = await systemAccounts.getAccount('INVENTORY');
         // Sum the COGS amount from journal items
         const cogsItems = await tx.journalItem.findMany({ where: { journalEntryId: cogsJournal.id } });
