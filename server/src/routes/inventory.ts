@@ -237,11 +237,11 @@ router.post('/movements', roleMiddleware(['Admin', 'Accountant', 'StaffProduksi'
         data: updateData,
       });
 
-      // 7. GL posting — skip for Adjustment types (stock opname corrections)
-      const isAdjustment = body.movementType === 'AdjustmentIn' || body.movementType === 'AdjustmentOut';
+      // 7. GL posting — always post if totalValue > 0
+      // Auto-resolve offsetAccountId: use provided value, or fall back to item's inventory account
       let resolvedOffsetAccountId = body.offsetAccountId || null;
       let journalEntryId: string | null = null;
-      if (totalValue > 0 && !isAdjustment) {
+      if (totalValue > 0) {
         // Use item's accountId or fall back to default INVENTORY account (1.4.0)
         let inventoryAccountId = item.accountId;
         if (!inventoryAccountId) {
@@ -463,14 +463,13 @@ router.put('/movements/:id', roleMiddleware(['Admin', 'Accountant']), async (req
         data: { currentStock: { increment: newStockDelta } },
       });
 
-      // 5. Create new GL entries if needed (skip for Adjustment types)
+      // 5. Create new GL entries if needed
       const newUnitCost = body.unitCost ?? 0;
       const newTotalValue = newQty * newUnitCost;
       let newJournalEntryId: string | null = null;
       let resolvedEditOffsetAccountId = body.offsetAccountId || null;
-      const newIsAdjustment = body.movementType === 'AdjustmentIn' || body.movementType === 'AdjustmentOut';
 
-      if (newTotalValue > 0 && !newIsAdjustment) {
+      if (newTotalValue > 0) {
         let inventoryAccountId = itemAfterReversal.accountId;
         if (!inventoryAccountId) {
           const defaultInvAccount = await systemAccounts.getAccount('INVENTORY');
