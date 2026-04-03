@@ -864,24 +864,23 @@ router.post('/production-runs', roleMiddleware(['Admin', 'Accountant', 'StaffPro
         });
       }
 
-      // Balance the journal: if output > input, CR the difference to conversion cost account
-      // if output < input, DR the difference (production loss)
+      // Balance the journal: difference goes to COGS (HPP Beras)
       const diff = totalOutputCost.minus(totalInputCost).toDecimalPlaces(2).toNumber();
       if (Math.abs(diff) > 0) {
-        const conversionAccount = await systemAccounts.getAccount('PRODUCTION_CONVERSION');
+        const cogsAccount = await systemAccounts.getAccount('COGS');
         if (diff > 0) {
-          // Output > Input: conversion cost absorbed (CR)
+          // Output > Input: HPP produksi (CR to balance)
           journalItems.push({
-            accountId: conversionAccount.id,
+            accountId: cogsAccount.id,
             debit: 0, credit: diff,
-            description: `Biaya konversi produksi: ${runNumber}`,
+            description: `HPP konversi produksi: ${runNumber}`,
           });
         } else {
-          // Output < Input: production loss (DR)
+          // Output < Input: rugi produksi (DR)
           journalItems.push({
-            accountId: conversionAccount.id,
+            accountId: cogsAccount.id,
             debit: Math.abs(diff), credit: 0,
-            description: `Rugi konversi produksi: ${runNumber}`,
+            description: `HPP rugi produksi: ${runNumber}`,
           });
         }
       }
