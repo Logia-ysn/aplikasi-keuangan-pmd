@@ -284,6 +284,16 @@ export const SYSTEM_ACCOUNT_ROLES = {
     expectedRootType: 'EXPENSE' as const,
   },
 
+  // ── Selisih Persediaan ──────────────────────────
+  INVENTORY_VARIANCE: {
+    key: 'INVENTORY_VARIANCE',
+    label: 'Selisih Persediaan',
+    description: 'Beban selisih stok opname (inventory variance expense)',
+    multiAccount: false,
+    required: false,
+    expectedRootType: 'EXPENSE' as const,
+  },
+
   // ── Pembulatan ─────────────────────────────────
   ROUNDING_ACCOUNT: {
     key: 'ROUNDING_ACCOUNT',
@@ -348,6 +358,8 @@ export const DEFAULT_ACCOUNT_NUMBERS: Record<SystemAccountRole, string | string[
   // Pendapatan & Beban Lain-lain
   OTHER_INCOME: '7.4',
   OTHER_EXPENSE: '8.7',
+  // Selisih Persediaan
+  INVENTORY_VARIANCE: '6.38',
   // Pembulatan
   ROUNDING_ACCOUNT: '8.8',
 };

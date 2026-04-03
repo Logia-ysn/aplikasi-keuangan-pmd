@@ -21,6 +21,7 @@ import {
   Scale,
   Wallet,
   X,
+  ClipboardCheck,
 } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '../lib/utils';
@@ -37,6 +38,7 @@ const allNavItems: NavItem[] = [
   { icon: ShoppingCart, label: 'Penjualan', href: '/sales', roles: ['Admin', 'Accountant', 'Viewer'] },
   { icon: Package, label: 'Pembelian', href: '/purchase', roles: ['Admin', 'Accountant', 'StaffProduksi'] },
   { icon: Warehouse, label: 'Stok & Gudang', href: '/inventory' },
+  { icon: ClipboardCheck, label: 'Stok Opname', href: '/stock-opname', roles: ['Admin', 'Accountant'] },
   { icon: CreditCard, label: 'Bank & Kas', href: '/payments', roles: ['Admin', 'Accountant', 'Viewer'] },
   { icon: Wallet, label: 'Uang Muka Vendor', href: '/vendor-deposits', roles: ['Admin', 'Accountant', 'StaffProduksi'] },
   { icon: Wallet, label: 'Uang Muka Pelanggan', href: '/customer-deposits', roles: ['Admin', 'Accountant'] },

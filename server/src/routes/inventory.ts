@@ -237,14 +237,28 @@ router.post('/movements', roleMiddleware(['Admin', 'Accountant', 'StaffProduksi'
         data: updateData,
       });
 
-      // 7. GL posting (if offsetAccountId provided and totalValue > 0)
+      // 7. GL posting — always post if totalValue > 0
+      // Auto-resolve offsetAccountId: use provided value, or fall back to item's inventory account
+      let resolvedOffsetAccountId = body.offsetAccountId || null;
       let journalEntryId: string | null = null;
-      if (body.offsetAccountId && totalValue > 0) {
+      if (totalValue > 0) {
         // Use item's accountId or fall back to default INVENTORY account (1.4.0)
         let inventoryAccountId = item.accountId;
         if (!inventoryAccountId) {
           const defaultInvAccount = await systemAccounts.getAccount('INVENTORY');
           inventoryAccountId = defaultInvAccount.id;
+        }
+
+        // If no offset account provided, use Ekuitas Saldo Awal as default for opening stock
+        if (!resolvedOffsetAccountId) {
+          const openingEquity = await systemAccounts.getAccount('OPENING_EQUITY');
+          resolvedOffsetAccountId = openingEquity.id;
+        }
+
+        // Prevent offset account being the same as inventory account (would cancel out)
+        if (resolvedOffsetAccountId === inventoryAccountId) {
+          const openingEquity = await systemAccounts.getAccount('OPENING_EQUITY');
+          resolvedOffsetAccountId = openingEquity.id;
         }
 
         const userId = req.user!.userId;
@@ -256,15 +270,14 @@ router.post('/movements', roleMiddleware(['Admin', 'Accountant', 'StaffProduksi'
         };
 
         // Determine DR/CR
-        const offsetAccountId = body.offsetAccountId;
         let debitAccountId: string;
         let creditAccountId: string;
 
         if (isIn) {
           debitAccountId = inventoryAccountId;
-          creditAccountId = offsetAccountId;
+          creditAccountId = resolvedOffsetAccountId!;
         } else {
-          debitAccountId = offsetAccountId;
+          debitAccountId = resolvedOffsetAccountId!;
           creditAccountId = inventoryAccountId;
         }
 
@@ -334,7 +347,7 @@ router.post('/movements', roleMiddleware(['Admin', 'Accountant', 'StaffProduksi'
           referenceType: body.referenceType || null,
           referenceId: body.referenceId || null,
           referenceNumber: body.referenceNumber || null,
-          offsetAccountId: body.offsetAccountId || null,
+          offsetAccountId: resolvedOffsetAccountId || body.offsetAccountId || null,
           journalEntryId,
           fiscalYearId: fiscalYear.id,
           createdById: req.user!.userId,
@@ -454,12 +467,25 @@ router.put('/movements/:id', roleMiddleware(['Admin', 'Accountant']), async (req
       const newUnitCost = body.unitCost ?? 0;
       const newTotalValue = newQty * newUnitCost;
       let newJournalEntryId: string | null = null;
+      let resolvedEditOffsetAccountId = body.offsetAccountId || null;
 
-      if (body.offsetAccountId && newTotalValue > 0) {
+      if (newTotalValue > 0) {
         let inventoryAccountId = itemAfterReversal.accountId;
         if (!inventoryAccountId) {
           const defaultInvAccount = await systemAccounts.getAccount('INVENTORY');
           inventoryAccountId = defaultInvAccount.id;
+        }
+
+        // Auto-resolve offset account if not provided
+        if (!resolvedEditOffsetAccountId) {
+          const openingEquity = await systemAccounts.getAccount('OPENING_EQUITY');
+          resolvedEditOffsetAccountId = openingEquity.id;
+        }
+
+        // Prevent offset account being the same as inventory account (would cancel out)
+        if (resolvedEditOffsetAccountId === inventoryAccountId) {
+          const openingEquity = await systemAccounts.getAccount('OPENING_EQUITY');
+          resolvedEditOffsetAccountId = openingEquity.id;
         }
 
         const typeLabels: Record<string, string> = {
@@ -474,9 +500,9 @@ router.put('/movements/:id', roleMiddleware(['Admin', 'Accountant']), async (req
 
         if (newIsIn) {
           debitAccountId = inventoryAccountId;
-          creditAccountId = body.offsetAccountId;
+          creditAccountId = resolvedEditOffsetAccountId;
         } else {
-          debitAccountId = body.offsetAccountId;
+          debitAccountId = resolvedEditOffsetAccountId;
           creditAccountId = inventoryAccountId;
         }
 
@@ -532,7 +558,7 @@ router.put('/movements/:id', roleMiddleware(['Admin', 'Accountant']), async (req
           notes: body.notes || null,
           referenceType: body.referenceType || null,
           referenceNumber: body.referenceNumber || null,
-          offsetAccountId: body.offsetAccountId || null,
+          offsetAccountId: resolvedEditOffsetAccountId || body.offsetAccountId || null,
           journalEntryId: newJournalEntryId,
         },
         include: {

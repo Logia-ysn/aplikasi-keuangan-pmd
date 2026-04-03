@@ -362,3 +362,20 @@ export const CreateServiceItemSchema = z.object({
 export const UpdateServiceItemSchema = CreateServiceItemSchema.partial().extend({
   isActive: z.boolean().optional(),
 });
+
+// ─── Stok Opname ──────────────────────────────────────────────────────────────
+const StockOpnameItemSchema = z.object({
+  itemId: z.string().uuid('Item ID harus UUID yang valid.'),
+  actualStock: z.coerce.number().min(0, 'Stok aktual tidak boleh negatif.'),
+  notes: z.string().nullable().optional(),
+});
+
+export const CreateStockOpnameSchema = z.object({
+  date: z.string().min(1, 'Tanggal wajib diisi.'),
+  notes: z.string().nullable().optional(),
+  items: z.array(StockOpnameItemSchema).min(1, 'Minimal satu item stok opname.'),
+});
+
+export const SubmitStockOpnameSchema = z.object({
+  items: z.array(StockOpnameItemSchema).min(1, 'Minimal satu item stok opname.'),
+});

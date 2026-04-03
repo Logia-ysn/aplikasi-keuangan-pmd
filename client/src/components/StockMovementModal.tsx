@@ -213,7 +213,10 @@ export function StockMovementModal({ isOpen, onClose, editMovement }: StockMovem
                   id="mov-item"
                   required
                   value={form.itemId}
-                  onChange={e => setForm(f => ({ ...f, itemId: e.target.value, offsetAccountId: '' }))}
+                  onChange={e => {
+                    const selectedItemId = e.target.value;
+                    setForm(f => ({ ...f, itemId: selectedItemId }));
+                  }}
                   className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">— Pilih Item —</option>

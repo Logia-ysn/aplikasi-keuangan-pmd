@@ -334,6 +334,7 @@ model FiscalYear {
   payments         Payment[]
   stockMovements   StockMovement[]
   productionRuns   ProductionRun[]
+  stockOpnames     StockOpname[]
   createdAt        DateTime                @default(now()) @map("created_at")
 
   @@map("fiscal_years")
@@ -362,6 +363,7 @@ model User {
   customerDepositApplications  CustomerDepositApplication[]
   tokenBlacklist               TokenBlacklist[]
   attachments                  TransactionAttachment[]
+  stockOpnames                 StockOpname[]                @relation("OpnameCreatedBy")
   createdAt            DateTime              @default(now()) @map("created_at")
   updatedAt            DateTime              @updatedAt @map("updated_at")
 
@@ -483,6 +485,7 @@ model InventoryItem {
   productionLines       ProductionRunItem[]    @relation("ProductionLines")
   salesInvoiceItems     SalesInvoiceItem[]     @relation("SalesInvoiceInventory")
   purchaseInvoiceItems  PurchaseInvoiceItem[]  @relation("PurchaseInvoiceInventory")
+  opnameLines           StockOpnameItem[]      @relation("OpnameLines")
   createdAt    DateTime        @default(now()) @map("created_at")
   updatedAt    DateTime        @updatedAt @map("updated_at")
 
@@ -559,6 +562,54 @@ model ProductionRunItem {
 
   @@index([productionRunId])
   @@map("production_run_items")
+}
+
+enum StockOpnameStatus {
+  Draft
+  Submitted
+  Cancelled
+}
+
+model StockOpname {
+  id           String             @id @default(uuid())
+  opnameNumber String             @unique @map("opname_number")
+  date         DateTime
+  status       StockOpnameStatus  @default(Draft)
+  notes        String?
+  items        StockOpnameItem[]
+  fiscalYearId String             @map("fiscal_year_id")
+  fiscalYear   FiscalYear         @relation(fields: [fiscalYearId], references: [id])
+  createdById  String             @map("created_by_id")
+  createdBy    User               @relation("OpnameCreatedBy", fields: [createdById], references: [id])
+  submittedAt  DateTime?          @map("submitted_at")
+  cancelledAt  DateTime?          @map("cancelled_at")
+  createdAt    DateTime           @default(now()) @map("created_at")
+  updatedAt    DateTime           @updatedAt @map("updated_at")
+
+  @@index([date])
+  @@index([status])
+  @@index([fiscalYearId])
+  @@map("stock_opnames")
+}
+
+model StockOpnameItem {
+  id            String        @id @default(uuid())
+  stockOpnameId String        @map("stock_opname_id")
+  stockOpname   StockOpname   @relation(fields: [stockOpnameId], references: [id], onDelete: Cascade)
+  itemId        String        @map("item_id")
+  item          InventoryItem @relation("OpnameLines", fields: [itemId], references: [id])
+  systemStock   Decimal       @db.Decimal(15, 3) @map("system_stock")
+  actualStock   Decimal       @db.Decimal(15, 3) @map("actual_stock")
+  difference    Decimal       @db.Decimal(15, 3)
+  unitCost      Decimal       @default(0) @db.Decimal(20, 2) @map("unit_cost")
+  totalValue    Decimal       @default(0) @db.Decimal(20, 2) @map("total_value")
+  movementId    String?       @map("movement_id")
+  notes         String?
+  createdAt     DateTime      @default(now()) @map("created_at")
+
+  @@index([stockOpnameId])
+  @@index([itemId])
+  @@map("stock_opname_items")
 }
 
 model Notification {
