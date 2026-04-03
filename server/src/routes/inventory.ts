@@ -211,8 +211,8 @@ router.post('/movements', roleMiddleware(['Admin', 'Accountant', 'StaffProduksi'
       const isOut = body.movementType === 'Out' || body.movementType === 'AdjustmentOut';
       const isIn = body.movementType === 'In' || body.movementType === 'AdjustmentIn';
 
-      // 3. Validate stock availability
-      if (isOut && Number(item.currentStock) < qty) {
+      // 3. Validate stock availability (only for regular Out, not AdjustmentOut which is a correction)
+      if (body.movementType === 'Out' && Number(item.currentStock) < qty) {
         throw new BusinessError(
           `Stok tidak cukup. Stok saat ini: ${Number(item.currentStock).toLocaleString('id-ID', { maximumFractionDigits: 3 })} ${item.unit}`
         );
@@ -451,7 +451,7 @@ router.put('/movements/:id', roleMiddleware(['Admin', 'Accountant']), async (req
       const itemAfterReversal = await tx.inventoryItem.findUnique({ where: { id: oldMov.itemId } });
       if (!itemAfterReversal) throw new BusinessError('Item stok tidak ditemukan.');
 
-      if (newIsOut && Number(itemAfterReversal.currentStock) < newQty) {
+      if (body.movementType === 'Out' && Number(itemAfterReversal.currentStock) < newQty) {
         throw new BusinessError(
           `Stok tidak cukup. Stok saat ini (setelah pembalikan): ${Number(itemAfterReversal.currentStock).toLocaleString('id-ID', { maximumFractionDigits: 3 })} ${itemAfterReversal.unit}`
         );
