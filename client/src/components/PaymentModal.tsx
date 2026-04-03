@@ -86,7 +86,11 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, defaultTyp
     enabled: isOpen && !!partyId,
   });
 
-  const totalOutstanding = openInvoices?.reduce((s: number, inv: any) => s + Number(inv.outstanding), 0) ?? 0;
+  const totalInvoiceOutstanding = openInvoices?.reduce((s: number, inv: any) => s + Number(inv.outstanding), 0) ?? 0;
+  // Party-level outstanding (includes opening balances without invoices)
+  const selectedParty = parties?.find((p: any) => p.id === partyId);
+  const partyOutstanding = Number(selectedParty?.outstandingAmount ?? 0);
+  const nonInvoiceOutstanding = Math.max(0, partyOutstanding - totalInvoiceOutstanding);
 
   const mutation = useMutation({
     mutationFn: (data: any) => api.post('/payments', data),
@@ -203,31 +207,51 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, defaultTyp
             </div>
           </div>
 
-          {/* Open invoices hint */}
-          {partyId && openInvoices && openInvoices.length > 0 && (
-            <div className="bg-blue-50 border border-blue-100 rounded-lg p-3">
-              <p className="text-xs font-medium text-blue-700 mb-2">
-                {openInvoices.length} invoice terbuka — total {formatRupiah(totalOutstanding)}
-              </p>
-              <div className="space-y-1 max-h-28 overflow-y-auto">
-                {openInvoices.map((inv: any) => (
-                  <div key={inv.id} className="flex justify-between text-xs text-blue-600">
-                    <span>{inv.invoiceNumber} ({formatDate(inv.date)})</span>
-                    <span className="font-mono tabular-nums">{formatRupiah(Number(inv.outstanding))}</span>
+          {/* Outstanding info */}
+          {partyId && openInvoices && (
+            <div className="space-y-2">
+              {/* Open invoices */}
+              {openInvoices.length > 0 && (
+                <div className="bg-blue-50 border border-blue-100 rounded-lg p-3">
+                  <p className="text-xs font-medium text-blue-700 mb-2">
+                    {openInvoices.length} invoice terbuka — total {formatRupiah(totalInvoiceOutstanding)}
+                  </p>
+                  <div className="space-y-1 max-h-28 overflow-y-auto">
+                    {openInvoices.map((inv: any) => (
+                      <div key={inv.id} className="flex justify-between text-xs text-blue-600">
+                        <span>{inv.invoiceNumber} ({formatDate(inv.date)})</span>
+                        <span className="font-mono tabular-nums">{formatRupiah(Number(inv.outstanding))}</span>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-              <button
-                onClick={() => setAmount(totalOutstanding)}
-                className="mt-2 text-[11px] text-blue-600 hover:text-blue-700 font-medium underline underline-offset-2"
-              >
-                Isi jumlah lunaskan semua
-              </button>
-            </div>
-          )}
-          {partyId && openInvoices && openInvoices.length === 0 && (
-            <div className="bg-gray-50 border border-gray-100 rounded-lg p-3 text-xs text-gray-500">
-              Tidak ada invoice terbuka untuk {isReceive ? 'pelanggan' : 'supplier'} ini.
+                </div>
+              )}
+
+              {/* Non-invoice outstanding (e.g. opening balance) */}
+              {nonInvoiceOutstanding > 0 && (
+                <div className="bg-amber-50 border border-amber-100 rounded-lg p-3">
+                  <p className="text-xs font-medium text-amber-700">
+                    Saldo {isReceive ? 'piutang' : 'hutang'} tanpa invoice (saldo awal): {formatRupiah(nonInvoiceOutstanding)}
+                  </p>
+                </div>
+              )}
+
+              {/* Total outstanding with fill button */}
+              {partyOutstanding > 0 && (
+                <button
+                  onClick={() => setAmount(partyOutstanding)}
+                  className="text-[11px] text-blue-600 hover:text-blue-700 font-medium underline underline-offset-2"
+                >
+                  Isi jumlah lunaskan semua ({formatRupiah(partyOutstanding)})
+                </button>
+              )}
+
+              {/* No outstanding at all */}
+              {partyOutstanding <= 0 && openInvoices.length === 0 && (
+                <div className="bg-gray-50 border border-gray-100 rounded-lg p-3 text-xs text-gray-500">
+                  Tidak ada {isReceive ? 'piutang' : 'hutang'} untuk {isReceive ? 'pelanggan' : 'supplier'} ini.
+                </div>
+              )}
             </div>
           )}
 
@@ -289,7 +313,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, defaultTyp
               <p className={`text-xs font-medium ${isReceive ? 'text-green-700' : 'text-orange-700'}`}>
                 {isReceive ? 'Menerima' : 'Membayar'}{' '}
                 <span className="text-base font-bold font-mono tabular-nums">{formatRupiah(numAmount)}</span>
-                {totalOutstanding > 0 && numAmount >= totalOutstanding && ' · Melunasi semua tagihan'}
+                {partyOutstanding > 0 && numAmount >= partyOutstanding && ' · Melunasi semua tagihan'}
               </p>
             </div>
           )}
