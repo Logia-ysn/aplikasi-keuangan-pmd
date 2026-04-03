@@ -284,6 +284,16 @@ export const SYSTEM_ACCOUNT_ROLES = {
     expectedRootType: 'EXPENSE' as const,
   },
 
+  // ── Biaya Konversi Produksi ──────────────────────
+  PRODUCTION_CONVERSION: {
+    key: 'PRODUCTION_CONVERSION',
+    label: 'Biaya Konversi Produksi',
+    description: 'Selisih nilai output vs input produksi (biaya konversi: listrik, tenaga kerja, overhead)',
+    multiAccount: false,
+    required: false,
+    expectedRootType: 'EXPENSE' as const,
+  },
+
   // ── Selisih Persediaan ──────────────────────────
   INVENTORY_VARIANCE: {
     key: 'INVENTORY_VARIANCE',
@@ -358,6 +368,8 @@ export const DEFAULT_ACCOUNT_NUMBERS: Record<SystemAccountRole, string | string[
   // Pendapatan & Beban Lain-lain
   OTHER_INCOME: '7.4',
   OTHER_EXPENSE: '8.7',
+  // Biaya Konversi Produksi
+  PRODUCTION_CONVERSION: '6.39',
   // Selisih Persediaan
   INVENTORY_VARIANCE: '6.38',
   // Pembulatan

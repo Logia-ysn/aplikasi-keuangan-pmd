@@ -823,8 +823,7 @@ router.post('/production-runs', roleMiddleware(['Admin', 'Accountant', 'StaffPro
         });
       }
 
-      // 8b. GL posting per item account: DR output accounts / CR input accounts
-      // Total DR (output) MUST equal total CR (input) for balanced journal
+      // 8b. GL posting: DR output accounts / CR input accounts / CR conversion cost (if any)
       const defaultInvAccount = await systemAccounts.getAccount('INVENTORY');
       const inputNames = body.inputs.map(i => itemMap.get(i.itemId)?.name || '').join(', ');
       const outputNames = body.outputs.map(o => itemMap.get(o.itemId)?.name || '').join(', ');
@@ -832,7 +831,7 @@ router.post('/production-runs', roleMiddleware(['Admin', 'Accountant', 'StaffPro
       const jvNumber = `JV-${runNumber}`;
       const journalItems: { accountId: string; debit: number; credit: number; description: string }[] = [];
 
-      // CR each input item's account — compute total input cost
+      // CR each input item's account
       let totalInputCost = new Decimal(0);
       for (const input of body.inputs) {
         const item = itemMap.get(input.itemId);
@@ -849,39 +848,42 @@ router.post('/production-runs', roleMiddleware(['Admin', 'Accountant', 'StaffPro
         });
       }
 
-      // DR each output item's account — distribute total input cost proportionally
-      // so that total DR = total CR (balanced journal)
-      const rawOutputValues: { itemId: string; unitCost: number; rawVal: Decimal; acctId: string; name: string }[] = [];
-      let totalRawOutput = new Decimal(0);
+      // DR each output item's account (at HPP/unit price set by user)
+      let totalOutputCost = new Decimal(0);
       for (const output of body.outputs) {
         const unitCost = output.unitPrice ?? 0;
-        const rawVal = new Decimal(output.quantity).mul(new Decimal(unitCost)).toDecimalPlaces(2);
+        const val = new Decimal(output.quantity).mul(new Decimal(unitCost)).toDecimalPlaces(2).toNumber();
+        if (val <= 0) continue;
+        totalOutputCost = totalOutputCost.plus(new Decimal(val));
         const outItem = await tx.inventoryItem.findUnique({ where: { id: output.itemId }, select: { accountId: true, name: true } });
         const acctId = outItem?.accountId || defaultInvAccount.id;
-        rawOutputValues.push({ itemId: output.itemId, unitCost, rawVal, acctId, name: outItem?.name || '' });
-        totalRawOutput = totalRawOutput.plus(rawVal);
+        journalItems.push({
+          accountId: acctId,
+          debit: val, credit: 0,
+          description: `Produksi masuk ${outItem?.name || ''}: ${runNumber}`,
+        });
       }
 
-      // Distribute input cost to outputs proportionally
-      let distributedSum = new Decimal(0);
-      for (let i = 0; i < rawOutputValues.length; i++) {
-        const out = rawOutputValues[i];
-        let val: number;
-        if (totalRawOutput.isZero()) {
-          val = 0;
-        } else if (i === rawOutputValues.length - 1) {
-          // Last item gets the remainder to avoid rounding errors
-          val = totalInputCost.minus(distributedSum).toDecimalPlaces(2).toNumber();
+      // Balance the journal: if output > input, CR the difference to conversion cost account
+      // if output < input, DR the difference (production loss)
+      const diff = totalOutputCost.minus(totalInputCost).toDecimalPlaces(2).toNumber();
+      if (Math.abs(diff) > 0) {
+        const conversionAccount = await systemAccounts.getAccount('PRODUCTION_CONVERSION');
+        if (diff > 0) {
+          // Output > Input: conversion cost absorbed (CR)
+          journalItems.push({
+            accountId: conversionAccount.id,
+            debit: 0, credit: diff,
+            description: `Biaya konversi produksi: ${runNumber}`,
+          });
         } else {
-          val = totalInputCost.mul(out.rawVal).div(totalRawOutput).toDecimalPlaces(2).toNumber();
+          // Output < Input: production loss (DR)
+          journalItems.push({
+            accountId: conversionAccount.id,
+            debit: Math.abs(diff), credit: 0,
+            description: `Rugi konversi produksi: ${runNumber}`,
+          });
         }
-        distributedSum = distributedSum.plus(new Decimal(val));
-        if (val <= 0) continue;
-        journalItems.push({
-          accountId: out.acctId,
-          debit: val, credit: 0,
-          description: `Produksi masuk ${out.name}: ${runNumber}`,
-        });
       }
 
       if (journalItems.length > 0) {
