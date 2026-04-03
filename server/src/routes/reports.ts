@@ -493,6 +493,120 @@ router.get('/ledger-detail', async (req, res) => {
   }
 });
 
+// GET /api/reports/ledger-book — full ledger with mutations per account
+router.get('/ledger-book', async (req, res) => {
+  const { startDate: rawStart, endDate: rawEnd } = req.query;
+  const startDate = parseQueryDate(rawStart);
+  const endDate = parseQueryDate(rawEnd, true);
+
+  try {
+    // Get all active leaf accounts (non-group)
+    const accounts = await prisma.account.findMany({
+      where: { isActive: true, isGroup: false },
+      select: { id: true, name: true, accountNumber: true, rootType: true },
+      orderBy: { accountNumber: 'asc' },
+    });
+
+    // Sort accounts naturally by account number
+    accounts.sort((a, b) => compareAccountNumber(a.accountNumber, b.accountNumber));
+
+    // Build date filter
+    const dateFilter: Prisma.AccountingLedgerEntryWhereInput = { isCancelled: false };
+    if (startDate || endDate) {
+      dateFilter.date = {};
+      if (startDate) (dateFilter.date as any).gte = startDate;
+      if (endDate) (dateFilter.date as any).lte = endDate;
+    }
+
+    // Compute opening balance (before startDate) for each account if startDate is given
+    const openingBalances = new Map<string, number>();
+    if (startDate) {
+      const openingEntries = await prisma.accountingLedgerEntry.groupBy({
+        by: ['accountId'],
+        where: { isCancelled: false, date: { lt: startDate } },
+        _sum: { debit: true, credit: true },
+      });
+      for (const entry of openingEntries) {
+        const account = accounts.find(a => a.id === entry.accountId);
+        if (!account) continue;
+        const dr = Number(entry._sum.debit ?? 0);
+        const cr = Number(entry._sum.credit ?? 0);
+        const isDebitNormal = account.rootType === 'ASSET' || account.rootType === 'EXPENSE';
+        openingBalances.set(account.id, isDebitNormal ? (dr - cr) : (cr - dr));
+      }
+    }
+
+    // Fetch all ledger entries in the period
+    const allEntries = await prisma.accountingLedgerEntry.findMany({
+      where: dateFilter,
+      orderBy: [{ date: 'asc' }, { createdAt: 'asc' }],
+      select: {
+        id: true,
+        accountId: true,
+        date: true,
+        debit: true,
+        credit: true,
+        description: true,
+        referenceType: true,
+        referenceId: true,
+      },
+      take: 100000,
+    });
+
+    // Group entries by account
+    const entriesByAccount = new Map<string, typeof allEntries>();
+    for (const entry of allEntries) {
+      const list = entriesByAccount.get(entry.accountId) ?? [];
+      list.push(entry);
+      entriesByAccount.set(entry.accountId, list);
+    }
+
+    // Build result: only accounts that have entries or opening balance
+    const result = accounts
+      .filter(account => entriesByAccount.has(account.id) || (openingBalances.get(account.id) ?? 0) !== 0)
+      .map(account => {
+        const isDebitNormal = account.rootType === 'ASSET' || account.rootType === 'EXPENSE';
+        const openingBalance = openingBalances.get(account.id) ?? 0;
+        let runningBalance = openingBalance;
+
+        const entries = (entriesByAccount.get(account.id) ?? []).map(e => {
+          const debit = Number(e.debit);
+          const credit = Number(e.credit);
+          runningBalance += isDebitNormal ? (debit - credit) : (credit - debit);
+          return {
+            id: e.id,
+            date: e.date,
+            debit,
+            credit,
+            description: e.description,
+            referenceType: e.referenceType,
+            runningBalance,
+          };
+        });
+
+        const totalDebit = entries.reduce((s, e) => s + e.debit, 0);
+        const totalCredit = entries.reduce((s, e) => s + e.credit, 0);
+
+        return {
+          accountId: account.id,
+          accountNumber: account.accountNumber,
+          accountName: account.name,
+          rootType: account.rootType,
+          openingBalance,
+          entries,
+          totalDebit,
+          totalCredit,
+          closingBalance: runningBalance,
+        };
+      });
+
+    return res.json(result);
+  } catch (error) {
+    logger.error({ error }, 'GET /reports/ledger-book error');
+    return res.status(500).json({ error: 'Gagal mengambil data buku besar.' });
+  }
+});
+
 // POST /api/reports/export — export to Excel
 router.post('/export', async (req, res) => {
   const { filename, data } = req.body;

@@ -27,6 +27,7 @@ import { BankReconciliation } from './pages/BankReconciliation';
 import { VendorDeposits } from './pages/VendorDeposits';
 import { CustomerDeposits } from './pages/CustomerDeposits';
 import TaxReport from './pages/reports/TaxReport';
+import LedgerBook from './pages/reports/LedgerBook';
 
 
 const ProtectedRoute = () => {
@@ -87,6 +88,7 @@ function App() {
             <Route path="/reports/aging-ar" element={<FinanceRoute><AgingAnalysis type="Customer" /></FinanceRoute>} />
             <Route path="/reports/aging-ap" element={<FinanceRoute><AgingAnalysis type="Supplier" /></FinanceRoute>} />
             <Route path="/reports/tax" element={<FinanceRoute><TaxReport /></FinanceRoute>} />
+            <Route path="/reports/ledger-book" element={<FinanceRoute><LedgerBook /></FinanceRoute>} />
 
             <Route path="/reconciliation" element={<RoleRoute allowed={['Admin', 'Accountant']}><BankReconciliation /></RoleRoute>} />
             <Route path="/settings" element={<AdminRoute><SettingsPage /></AdminRoute>} />
