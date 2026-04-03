@@ -864,10 +864,11 @@ router.post('/production-runs', roleMiddleware(['Admin', 'Accountant', 'StaffPro
         });
       }
 
-      // Balance the journal: difference goes to COGS (HPP Beras)
+      // Balance the journal: difference goes to HPP Beras (5.1)
       const diff = totalOutputCost.minus(totalInputCost).toDecimalPlaces(2).toNumber();
       if (Math.abs(diff) > 0) {
-        const cogsAccount = await systemAccounts.getAccount('COGS');
+        const hppBerasAccount = await tx.account.findFirst({ where: { accountNumber: '5.1' } });
+        const cogsAccount = hppBerasAccount || await systemAccounts.getAccount('COGS');
         if (diff > 0) {
           // Output > Input: HPP produksi (CR to balance)
           journalItems.push({
