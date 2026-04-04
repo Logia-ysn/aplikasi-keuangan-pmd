@@ -10,7 +10,7 @@ WORKDIR /app
 
 # Client deps
 COPY client/package.json client/package-lock.json* ./client/
-RUN cd client && npm ci
+RUN cd client && npm ci --legacy-peer-deps
 
 # Server deps
 COPY server/package.json server/package-lock.json* ./server/
