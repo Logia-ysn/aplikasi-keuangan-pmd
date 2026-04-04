@@ -189,12 +189,51 @@ body {
 
 /* ── Mobile Responsive ── */
 @media (max-width: 767px) {
-  /* Make all data-tables horizontally scrollable */
-  .data-table {
+  /* Summary cards: prevent value overflow on small screens */
+  .card {
+    overflow: hidden;
+  }
+  /* Shrink large values in summary cards */
+  .card .text-lg {
+    font-size: 0.8rem;
+    line-height: 1.15rem;
+  }
+  .card .text-xl {
+    font-size: 0.9rem;
+    line-height: 1.25rem;
+  }
+  /* Truncate long monetary values */
+  .card .font-mono,
+  .card .tabular-nums {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
     display: block;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    min-width: 600px;
+  }
+  /* Flex children in cards need min-w-0 for truncation */
+  .card .flex > div:last-child {
+    min-width: 0;
+  }
+  /* Icon containers should not shrink */
+  .card .flex > div:first-child:has(.bg-blue-50, .bg-red-50, .bg-green-50, .bg-orange-50, .bg-amber-50, .bg-teal-50) {
+    flex-shrink: 0;
+  }
+  .card .p-2 {
+    flex-shrink: 0;
+  }
+  /* Reduce card padding on mobile */
+  .card.px-4 {
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+  }
+  /* KPI cards with border + rounded-xl (InventoryDashboard) */
+  .border.rounded-xl .text-2xl {
+    font-size: 1.1rem;
+    line-height: 1.5rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   /* Modal responsive — constrain width on mobile */

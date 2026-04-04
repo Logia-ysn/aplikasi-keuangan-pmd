@@ -92,7 +92,7 @@ export const SalesInvoices = () => {
             <div className="p-2 bg-blue-50 rounded-lg">
               <Receipt size={16} className="text-blue-600" />
             </div>
-            <div>
+            <div className="min-w-0">
               <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Total Invoice</p>
               <p className="text-lg font-bold text-gray-900">{summary.total}</p>
             </div>
@@ -103,7 +103,7 @@ export const SalesInvoices = () => {
             <div className="p-2 bg-red-50 rounded-lg">
               <DollarSign size={16} className="text-red-500" />
             </div>
-            <div>
+            <div className="min-w-0">
               <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Total Piutang</p>
               <p className="text-lg font-bold text-red-600 font-mono tabular-nums">{formatRupiah(summary.outstanding)}</p>
             </div>
