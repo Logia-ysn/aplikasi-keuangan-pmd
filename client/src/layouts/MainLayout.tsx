@@ -8,6 +8,7 @@ import { CommandPalette } from '../components/CommandPalette';
 import { ShortcutHelp } from '../components/ShortcutHelp';
 import ChangePasswordModal from '../components/ChangePasswordModal';
 import OnboardingWizard from '../components/OnboardingWizard';
+import api from '../lib/api';
 
 const routeNames: Record<string, string> = {
   '': 'Dashboard',
@@ -56,8 +57,8 @@ export const MainLayout = () => {
     user = JSON.parse(localStorage.getItem('user') || 'null');
   } catch {}
 
-  const handleLogout = () => {
-    localStorage.removeItem('token');
+  const handleLogout = async () => {
+    try { await api.post('/auth/logout'); } catch { /* ignore */ }
     localStorage.removeItem('user');
     navigate('/login');
   };

@@ -16,11 +16,6 @@ api.interceptors.request.use((config) => {
       config.headers['X-CSRF-Token'] = csrfToken;
     }
   }
-  // Keep Bearer token support for backward compatibility
-  const token = localStorage.getItem('token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
   return config;
 });
 
@@ -29,7 +24,6 @@ api.interceptors.response.use(
   (error) => {
     const isLoginRequest = error.config?.url?.includes('/auth/login');
     if (error.response?.status === 401 && !isLoginRequest) {
-      localStorage.removeItem('token');
       localStorage.removeItem('user');
       window.location.href = '/login';
     }

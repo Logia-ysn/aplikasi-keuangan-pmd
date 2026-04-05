@@ -39,9 +39,9 @@ ENV NODE_ENV=production
 # Install pg_dump/psql (for backup/restore), gzip, and vips (for sharp image processing)
 RUN apk add --no-cache postgresql16-client gzip vips
 
-# Install only production deps + prisma CLI + tsx + sharp + multer
+# Install only production deps (prisma, tsx, sharp, multer all in dependencies)
 COPY server/package.json server/package-lock.json* ./server/
-RUN cd server && npm ci --omit=dev && npm install prisma tsx sharp multer @types/multer
+RUN cd server && npm ci --omit=dev
 
 # Create uploads directory
 RUN mkdir -p /app/uploads/attachments

@@ -281,7 +281,6 @@ const LoginPage: React.FC = () => {
     setError('');
     try {
       const response = await api.post('/auth/login', { username, password });
-      localStorage.setItem('token', response.data.token);
       localStorage.setItem('user', JSON.stringify(response.data.user));
       navigate('/');
     } catch (err: unknown) {

@@ -982,7 +982,6 @@ const BackupTab: React.FC = () => {
     mutationFn: async () => api.post('/settings/reset-data', { confirmation: 'RESET' }),
     onSuccess: () => {
       toast.success('Data berhasil direset. Login ulang...');
-      localStorage.removeItem('token');
       localStorage.removeItem('user');
       localStorage.removeItem('onboardingDone');
       localStorage.removeItem('widgetPrefs');
@@ -1043,15 +1042,10 @@ const BackupTab: React.FC = () => {
   };
 
   const handleDownload = (filename: string) => {
-    const token = localStorage.getItem('token');
     const baseUrl = (import.meta as any).env?.VITE_API_URL || '/api';
     const url = `${baseUrl}/backup/download/${encodeURIComponent(filename)}`;
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', filename);
-    // Add auth header via fetch and create blob URL
+    // Cookie-based auth — no need for Authorization header
     fetch(url, {
-      headers: { Authorization: `Bearer ${token}` },
       credentials: 'include',
     })
       .then((res) => {

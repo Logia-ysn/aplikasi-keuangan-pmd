@@ -31,8 +31,8 @@ import LedgerBook from './pages/reports/LedgerBook';
 
 
 const ProtectedRoute = () => {
-  const token = localStorage.getItem('token');
-  if (!token) {
+  const user = localStorage.getItem('user');
+  if (!user) {
     return <Navigate to="/login" replace />;
   }
   return <Outlet />;

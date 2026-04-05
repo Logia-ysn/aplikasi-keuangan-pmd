@@ -3,11 +3,15 @@ import ExcelJS from 'exceljs';
 import { prisma } from '../lib/prisma';
 import { Prisma } from '@prisma/client';
 import { computeImpact } from '../utils/accountBalance';
+import { roleMiddleware } from '../middleware/auth';
 import { systemAccounts } from '../services/systemAccounts';
 import { logger } from '../lib/logger';
 import { compareAccountNumber } from '../utils/accountSort';
 
 const router = Router();
+
+// All report endpoints require at least Viewer role
+router.use(roleMiddleware(['Admin', 'Accountant', 'Viewer']));
 
 function parseQueryDate(value: unknown, endOfDay = false): Date | undefined {
   if (typeof value !== 'string' || !value) return undefined;

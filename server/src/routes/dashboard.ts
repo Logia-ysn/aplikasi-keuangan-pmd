@@ -1,9 +1,13 @@
 import { Router } from 'express';
 import { prisma } from '../lib/prisma';
+import { roleMiddleware } from '../middleware/auth';
 import { systemAccounts } from '../services/systemAccounts';
 import { logger } from '../lib/logger';
 
 const router = Router();
+
+// All dashboard endpoints require at least Viewer role
+router.use(roleMiddleware(['Admin', 'Accountant', 'Viewer']));
 
 // GET /api/dashboard/metrics
 router.get('/metrics', async (req, res) => {

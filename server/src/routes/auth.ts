@@ -73,9 +73,7 @@ router.post('/login', loginRateLimiter, async (req, res) => {
       path: '/',
     });
 
-    // Still return token in response body for backward compatibility
     return res.json({
-      token,
       user: {
         id: user.id,
         username: user.username,
@@ -86,6 +84,23 @@ router.post('/login', loginRateLimiter, async (req, res) => {
   } catch (error) {
     logger.error({ error }, 'Login error');
     return res.status(500).json({ error: 'Login gagal.' });
+  }
+});
+
+// GET /api/auth/me — return current user from cookie/token
+router.get('/me', authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user!.userId },
+      select: { id: true, username: true, fullName: true, role: true, isActive: true },
+    });
+    if (!user || !user.isActive) {
+      return res.status(401).json({ error: 'User tidak ditemukan atau tidak aktif.' });
+    }
+    return res.json({ user });
+  } catch (error) {
+    logger.error({ error }, 'GET /auth/me error');
+    return res.status(500).json({ error: 'Gagal mengambil data user.' });
   }
 });
 
