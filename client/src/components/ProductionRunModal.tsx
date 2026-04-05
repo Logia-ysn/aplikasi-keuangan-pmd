@@ -20,11 +20,12 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   items: any[];
+  editRun?: any | null;
 }
 
 const today = () => new Date().toISOString().split('T')[0];
 
-export function ProductionRunModal({ isOpen, onClose, items }: Props) {
+export function ProductionRunModal({ isOpen, onClose, items, editRun }: Props) {
   const queryClient = useQueryClient();
   const [date, setDate] = useState(today());
   const [referenceNumber, setReferenceNumber] = useState('');
@@ -34,18 +35,40 @@ export function ProductionRunModal({ isOpen, onClose, items }: Props) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
 
-  // Reset form when opened
+  // Reset form when opened (prefill if editing)
   useEffect(() => {
     if (isOpen) {
-      setDate(today());
-      setReferenceNumber('');
-      setNotes('');
-      setInputs([{ itemId: '', quantity: '' }]);
-      setOutputs([{ itemId: '', quantity: '', unitPrice: '', isByProduct: false }]);
+      if (editRun) {
+        const runItems = editRun.items ?? [];
+        const inputItems = runItems.filter((i: any) => i.lineType === 'Input');
+        const outputItems = runItems.filter((i: any) => i.lineType === 'Output' || i.lineType === 'ByProduct');
+        setDate(editRun.date ? new Date(editRun.date).toISOString().split('T')[0] : today());
+        setReferenceNumber(editRun.referenceNumber ?? '');
+        setNotes(editRun.notes ?? '');
+        setInputs(inputItems.length > 0
+          ? inputItems.map((i: any) => ({ itemId: i.itemId ?? i.item?.id ?? '', quantity: String(Number(i.quantity)) }))
+          : [{ itemId: '', quantity: '' }]
+        );
+        setOutputs(outputItems.length > 0
+          ? outputItems.map((o: any) => ({
+              itemId: o.itemId ?? o.item?.id ?? '',
+              quantity: String(Number(o.quantity)),
+              unitPrice: o.unitPrice != null && Number(o.unitPrice) > 0 ? String(Number(o.unitPrice)) : '',
+              isByProduct: o.isByProduct || o.lineType === 'ByProduct',
+            }))
+          : [{ itemId: '', quantity: '', unitPrice: '', isByProduct: false }]
+        );
+      } else {
+        setDate(today());
+        setReferenceNumber('');
+        setNotes('');
+        setInputs([{ itemId: '', quantity: '' }]);
+        setOutputs([{ itemId: '', quantity: '', unitPrice: '', isByProduct: false }]);
+      }
       setErrors([]);
       setIsSubmitting(false);
     }
-  }, [isOpen]);
+  }, [isOpen, editRun]);
 
   // Escape key handler
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
@@ -98,7 +121,7 @@ export function ProductionRunModal({ isOpen, onClose, items }: Props) {
 
     setIsSubmitting(true);
     try {
-      await api.post('/inventory/production-runs', {
+      const payload = {
         date,
         notes: notes || null,
         referenceNumber: referenceNumber || null,
@@ -109,14 +132,21 @@ export function ProductionRunModal({ isOpen, onClose, items }: Props) {
           unitPrice: o.unitPrice ? parseFloat(o.unitPrice) : null,
           isByProduct: o.isByProduct,
         })),
-      });
+      };
+
+      if (editRun) {
+        await api.put(`/inventory/production-runs/${editRun.id}`, payload);
+      } else {
+        await api.post('/inventory/production-runs', payload);
+      }
       queryClient.invalidateQueries({ queryKey: ['production-runs'] });
+      queryClient.invalidateQueries({ queryKey: ['production-run-detail'] });
       queryClient.invalidateQueries({ queryKey: ['inventory-items'] });
       queryClient.invalidateQueries({ queryKey: ['stock-movements'] });
-      toast.success('Proses produksi berhasil dicatat.');
+      toast.success(editRun ? 'Proses produksi berhasil diperbarui.' : 'Proses produksi berhasil dicatat.');
       onClose();
     } catch (err: any) {
-      toast.error(err.response?.data?.error || 'Gagal mencatat proses produksi.');
+      toast.error(err.response?.data?.error || (editRun ? 'Gagal mengedit proses produksi.' : 'Gagal mencatat proses produksi.'));
     } finally {
       setIsSubmitting(false);
     }
@@ -136,7 +166,7 @@ export function ProductionRunModal({ isOpen, onClose, items }: Props) {
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <h2 id="production-modal-title" className="text-base font-semibold text-gray-900">
-            Proses Produksi
+            {editRun ? `Edit ${editRun.runNumber}` : 'Proses Produksi'}
           </h2>
           <button
             onClick={onClose}
@@ -396,7 +426,7 @@ export function ProductionRunModal({ isOpen, onClose, items }: Props) {
               disabled={isSubmitting}
               className="btn-primary min-w-[120px]"
             >
-              {isSubmitting ? 'Menyimpan...' : 'Simpan Produksi'}
+              {isSubmitting ? 'Menyimpan...' : editRun ? 'Simpan Perubahan' : 'Simpan Produksi'}
             </button>
           </div>
         </form>

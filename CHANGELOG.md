@@ -1,5 +1,20 @@
 # Changelog
 
+## [2.4.0] - 2026-04-05
+
+### Fitur Baru
+- **Dashboard Pelanggan & Vendor** — KPI (piutang, hutang, deposit), aging analysis piutang/hutang, top 10 pelanggan/vendor, invoice jatuh tempo, pembayaran terakhir
+- **Dashboard Proses Produksi** — KPI produksi, volume input/output/samping, tren rendemen, top bahan input/output, rendemen tertinggi/terendah, dengan filter periode dan produk
+- **Edit Proses Produksi** — Edit data produksi yang sudah dibuat (reverse stok & jurnal lama, buat baru)
+- **Detail Proses Produksi** — Drawer detail dengan ringkasan biaya, jurnal GL, dan tombol pembatalan
+
+### Perbaikan
+- Fix GL posting invoice jasa: item bertipe service tanpa serviceItemId sekarang otomatis masuk ke akun 4.2 (Pendapatan Jasa) bukan 4.1 (Penjualan)
+- Fix data 10 invoice item jasa yang salah masuk akun 4.1, dipindahkan ke 4.2 beserta jurnal dan ledger
+- Fix rendemen produksi multi-input: kalkulasi total output / total input, produk samping tidak dihitung
+- Fix duplikasi journal entry number saat edit produksi berulang (suffix -R, -R2, -R3, dst)
+- Fix mobile overflow text/nilai keluar dari card container
+
 ## [2.3.0] - 2026-04-04
 
 ### Fitur Baru

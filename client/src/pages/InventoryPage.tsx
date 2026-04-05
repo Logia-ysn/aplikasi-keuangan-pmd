@@ -11,6 +11,7 @@ import { ConfirmDialog } from '../components/ConfirmDialog';
 import { ProductionRunModal } from '../components/ProductionRunModal';
 import InventoryDashboardTab from '../components/InventoryDashboardTab';
 import ProductionDetailDrawer from '../components/ProductionDetailDrawer';
+import ProductionDashboardTab from '../components/ProductionDashboardTab';
 import ImportModal from '../components/ImportModal';
 import { exportToExcel } from '../lib/exportExcel';
 
@@ -47,7 +48,9 @@ export function InventoryPage() {
   const [isCancelling, setIsCancelling] = useState(false);
 
   // --- Production tab state ---
+  const [prodSubTab, setProdSubTab] = useState<'dashboard' | 'data'>('dashboard');
   const [productionModalOpen, setProductionModalOpen] = useState(false);
+  const [editProdRun, setEditProdRun] = useState<any | null>(null);
   const [filterProdStartDate, setFilterProdStartDate] = useState('');
   const [filterProdEndDate, setFilterProdEndDate] = useState('');
   const [cancelProdTarget, setCancelProdTarget] = useState<string | null>(null);
@@ -288,7 +291,7 @@ export function InventoryPage() {
             <Plus size={15} /> Tambah Layanan
           </button>
         ) : activeTab === 'production' ? (
-          <button onClick={() => setProductionModalOpen(true)} className="btn-primary">
+          <button onClick={() => { setEditProdRun(null); setProductionModalOpen(true); }} className="btn-primary">
             <Plus size={15} /> Proses Produksi
           </button>
         ) : null}
@@ -637,6 +640,32 @@ export function InventoryPage() {
       {/* ─── Tab 3: Proses Produksi ─── */}
       {activeTab === 'production' && (
         <div className="space-y-4">
+          {/* Sub-tabs */}
+          <div className="flex gap-2">
+            <button
+              onClick={() => setProdSubTab('dashboard')}
+              className={cn(
+                'px-3 py-1.5 text-xs font-medium rounded-lg transition-colors',
+                prodSubTab === 'dashboard' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              )}
+            >
+              Dashboard
+            </button>
+            <button
+              onClick={() => setProdSubTab('data')}
+              className={cn(
+                'px-3 py-1.5 text-xs font-medium rounded-lg transition-colors',
+                prodSubTab === 'data' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              )}
+            >
+              Data Produksi
+            </button>
+          </div>
+
+          {prodSubTab === 'dashboard' && <ProductionDashboardTab items={items} />}
+
+          {prodSubTab === 'data' && (
+          <>
           {/* Filters */}
           <div className="flex flex-wrap gap-3 items-end">
             <div>
@@ -761,6 +790,15 @@ export function InventoryPage() {
                             >
                               <Eye size={15} />
                             </button>
+                            {!isCancelled && (userRole === 'Admin' || userRole === 'Accountant' || userRole === 'StaffProduksi') && (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setEditProdRun(run); setProductionModalOpen(true); }}
+                                className="p-1.5 hover:bg-amber-50 rounded text-gray-300 hover:text-amber-500 transition-colors"
+                                title="Edit proses produksi"
+                              >
+                                <Edit2 size={15} />
+                              </button>
+                            )}
                             {!isCancelled && userRole === 'Admin' && (
                               <button
                                 onClick={(e) => { e.stopPropagation(); setCancelProdTarget(run.id); }}
@@ -780,6 +818,8 @@ export function InventoryPage() {
             </table>
            </div>
           </div>
+          </>
+          )}
         </div>
       )}
 
@@ -939,8 +979,9 @@ export function InventoryPage() {
 
       <ProductionRunModal
         isOpen={productionModalOpen}
-        onClose={() => setProductionModalOpen(false)}
+        onClose={() => { setProductionModalOpen(false); setEditProdRun(null); }}
         items={items}
+        editRun={editProdRun}
       />
 
       <ProductionDetailDrawer

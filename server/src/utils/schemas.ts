@@ -311,6 +311,8 @@ export const CreateProductionRunSchema = z.object({
   outputs: z.array(ProductionOutputLineSchema).min(1, 'Minimal satu item output.'),
 });
 
+export const UpdateProductionRunSchema = CreateProductionRunSchema;
+
 // ─── Bank Reconciliation ────────────────────────────────────────────────────
 export const CreateReconciliationSchema = z.object({
   accountId: z.string().min(1, 'Akun bank wajib dipilih.'),

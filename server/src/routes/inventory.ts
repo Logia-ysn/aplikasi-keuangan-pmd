@@ -3,7 +3,7 @@ import Decimal from 'decimal.js';
 import { prisma } from '../lib/prisma';
 import { AuthRequest, roleMiddleware } from '../middleware/auth';
 import { validateBody } from '../utils/validate';
-import { CreateInventoryItemSchema, UpdateInventoryItemSchema, CreateStockMovementSchema, UpdateStockMovementSchema, CreateProductionRunSchema } from '../utils/schemas';
+import { CreateInventoryItemSchema, UpdateInventoryItemSchema, CreateStockMovementSchema, UpdateStockMovementSchema, CreateProductionRunSchema, UpdateProductionRunSchema } from '../utils/schemas';
 import { BusinessError, handleRouteError } from '../utils/errors';
 import { generateDocumentNumber } from '../utils/documentNumber';
 import { updateAccountBalance } from '../utils/accountBalance';
@@ -1006,6 +1006,322 @@ router.post('/production-runs', roleMiddleware(['Admin', 'Accountant', 'StaffPro
   }
 });
 
+// PUT /api/inventory/production-runs/:id — Edit (cancel old + recreate with same runNumber)
+router.put('/production-runs/:id', roleMiddleware(['Admin', 'Accountant', 'StaffProduksi']), async (req: AuthRequest, res) => {
+  const id = req.params.id as string;
+  const body = validateBody(UpdateProductionRunSchema, req.body, res);
+  if (!body) return;
+
+  try {
+    const result = await prisma.$transaction(async (tx) => {
+      // ── 1. Load existing run ──
+      const oldRun = await tx.productionRun.findUnique({
+        where: { id },
+        include: { items: { include: { item: true } } },
+      });
+      if (!oldRun) throw new BusinessError('Data proses produksi tidak ditemukan.');
+      if (oldRun.isCancelled) throw new BusinessError('Proses produksi yang sudah dibatalkan tidak bisa diedit.');
+
+      // ── 2. Reverse old stock movements ──
+      const oldMovements = await tx.stockMovement.findMany({
+        where: { referenceType: 'ProductionRun', referenceId: id, isCancelled: false },
+        include: { item: true },
+      });
+
+      const outputItemIds = new Set<string>();
+
+      for (const mov of oldMovements) {
+        const isIn = mov.movementType === 'In' || mov.movementType === 'AdjustmentIn';
+        const isOut = mov.movementType === 'Out' || mov.movementType === 'AdjustmentOut';
+        const qty = Number(mov.quantity);
+
+        if (isIn && Number(mov.item.currentStock) < qty) {
+          throw new BusinessError(
+            `Tidak dapat mengedit: stok '${mov.item.name}' tidak mencukupi untuk pembalikan.`
+          );
+        }
+
+        if (isIn) outputItemIds.add(mov.itemId);
+
+        const reverseDelta = isOut ? qty : -qty;
+        await tx.inventoryItem.update({
+          where: { id: mov.itemId },
+          data: { currentStock: { increment: reverseDelta } },
+        });
+
+        await tx.stockMovement.update({
+          where: { id: mov.id },
+          data: { isCancelled: true },
+        });
+      }
+
+      // Recalculate averageCost for old output items
+      for (const itemId of outputItemIds) {
+        const activeInMovements = await tx.stockMovement.findMany({
+          where: { itemId, movementType: { in: ['In', 'AdjustmentIn'] }, isCancelled: false },
+          select: { quantity: true, unitCost: true },
+        });
+        if (activeInMovements.length === 0) {
+          await tx.inventoryItem.update({ where: { id: itemId }, data: { averageCost: 0 } });
+        } else {
+          let totalQty = new Decimal(0), totalValue = new Decimal(0);
+          for (const m of activeInMovements) {
+            const q = new Decimal(Number(m.quantity));
+            totalQty = totalQty.plus(q);
+            totalValue = totalValue.plus(q.mul(new Decimal(Number(m.unitCost))));
+          }
+          await tx.inventoryItem.update({
+            where: { id: itemId },
+            data: { averageCost: totalQty.gt(0) ? totalValue.div(totalQty).toDecimalPlaces(2).toNumber() : 0 },
+          });
+        }
+      }
+
+      // ── 3. Cancel old journal + ledger ──
+      const oldJvNumber = `JV-${oldRun.runNumber}`;
+      const oldJournal = await tx.journalEntry.findUnique({
+        where: { entryNumber: oldJvNumber },
+        include: { items: true },
+      });
+      if (oldJournal) {
+        await tx.journalEntry.update({
+          where: { id: oldJournal.id },
+          data: { status: 'Cancelled', cancelledAt: new Date() },
+        });
+        await tx.accountingLedgerEntry.updateMany({
+          where: { referenceId: oldJournal.id },
+          data: { isCancelled: true },
+        });
+        for (const ji of oldJournal.items) {
+          await updateAccountBalance(tx, ji.accountId, Number(ji.credit), Number(ji.debit));
+        }
+      }
+
+      // ── 4. Delete old run items ──
+      await tx.productionRunItem.deleteMany({ where: { productionRunId: id } });
+
+      // ── 5. Apply new data (same logic as POST, but reuse the run record) ──
+      const txDate = new Date(body.date);
+      const fiscalYear = await tx.fiscalYear.findFirst({
+        where: { isClosed: false, startDate: { lte: txDate }, endDate: { gte: txDate } },
+      });
+      if (!fiscalYear) throw new BusinessError('Tidak ada tahun fiskal aktif untuk tanggal transaksi ini.');
+
+      const allItemIds = [...body.inputs.map((i) => i.itemId), ...body.outputs.map((o) => o.itemId)];
+      const allItems = await tx.inventoryItem.findMany({ where: { id: { in: allItemIds } } });
+      const itemMap = new Map(allItems.map((i) => [i.id, i]));
+
+      for (const input of body.inputs) {
+        const item = itemMap.get(input.itemId);
+        if (!item) throw new BusinessError('Item input tidak ditemukan.');
+        if (!item.isActive) throw new BusinessError(`Item '${item.name}' tidak aktif.`);
+        if (Number(item.currentStock) < input.quantity) {
+          throw new BusinessError(
+            `Stok '${item.name}' tidak cukup. Stok saat ini: ${Number(item.currentStock).toLocaleString('id-ID', { maximumFractionDigits: 3 })} ${item.unit}`
+          );
+        }
+      }
+
+      for (const output of body.outputs) {
+        const item = itemMap.get(output.itemId);
+        if (!item) throw new BusinessError('Item output tidak ditemukan.');
+        if (!item.isActive) throw new BusinessError(`Item output '${item.name}' tidak aktif.`);
+      }
+
+      const totalInputQty = body.inputs.reduce((s, i) => s + i.quantity, 0);
+      const totalMainOutputQty = body.outputs.filter(o => !o.isByProduct).reduce((s, o) => s + o.quantity, 0);
+      const rendemenPct = totalInputQty > 0 ? (totalMainOutputQty / totalInputQty) * 100 : null;
+
+      // Update header
+      await tx.productionRun.update({
+        where: { id },
+        data: {
+          date: txDate,
+          notes: body.notes || null,
+          referenceType: body.referenceType || null,
+          referenceId: body.referenceId || null,
+          referenceNumber: body.referenceNumber || null,
+          rendemenPct: rendemenPct !== null ? rendemenPct : null,
+          fiscalYearId: fiscalYear.id,
+        },
+      });
+
+      // Process inputs
+      let totalInputValue = new Decimal(0);
+      for (const input of body.inputs) {
+        const item = itemMap.get(input.itemId);
+        if (!item) continue;
+        const avgCost = Number(item.averageCost);
+        const inputUnitCost = avgCost > 0 ? avgCost : 0;
+        const inputTotalValue = new Decimal(input.quantity).mul(new Decimal(inputUnitCost)).toDecimalPlaces(2).toNumber();
+        totalInputValue = totalInputValue.plus(new Decimal(inputTotalValue));
+
+        await tx.inventoryItem.update({
+          where: { id: input.itemId },
+          data: { currentStock: { decrement: input.quantity } },
+        });
+
+        const movNumber = await generateDocumentNumber(tx, 'SM', txDate, fiscalYear.id);
+        await tx.stockMovement.create({
+          data: {
+            movementNumber: movNumber, date: txDate, itemId: input.itemId,
+            movementType: 'Out', quantity: input.quantity, unitCost: inputUnitCost,
+            totalValue: inputTotalValue, referenceType: 'ProductionRun', referenceId: id,
+            referenceNumber: oldRun.runNumber, notes: body.notes || null,
+            fiscalYearId: fiscalYear.id, createdById: req.user!.userId,
+          },
+        });
+      }
+
+      // Process outputs
+      let totalOutputValue = new Decimal(0);
+      for (const output of body.outputs) {
+        const outputItem = await tx.inventoryItem.findUnique({ where: { id: output.itemId } });
+        const unitCost = output.unitPrice ?? 0;
+        const newAvgCost = outputItem && unitCost > 0
+          ? calcWeightedAverage(outputItem.currentStock, outputItem.averageCost, output.quantity, unitCost)
+          : undefined;
+
+        await tx.inventoryItem.update({
+          where: { id: output.itemId },
+          data: {
+            currentStock: { increment: output.quantity },
+            ...(newAvgCost !== undefined ? { averageCost: newAvgCost } : {}),
+          },
+        });
+        const totalValue = new Decimal(output.quantity).mul(new Decimal(unitCost)).toDecimalPlaces(2).toNumber();
+        totalOutputValue = totalOutputValue.plus(new Decimal(totalValue));
+
+        const movNumber = await generateDocumentNumber(tx, 'SM', txDate, fiscalYear.id);
+        await tx.stockMovement.create({
+          data: {
+            movementNumber: movNumber, date: txDate, itemId: output.itemId,
+            movementType: 'In', quantity: output.quantity, unitCost, totalValue,
+            referenceType: 'ProductionRun', referenceId: id,
+            referenceNumber: oldRun.runNumber, notes: body.notes || null,
+            fiscalYearId: fiscalYear.id, createdById: req.user!.userId,
+          },
+        });
+      }
+
+      // GL posting
+      const defaultInvAccount = await systemAccounts.getAccount('INVENTORY');
+      const inputNames = body.inputs.map(i => itemMap.get(i.itemId)?.name || '').join(', ');
+      const outputNames = body.outputs.map(o => itemMap.get(o.itemId)?.name || '').join(', ');
+
+      const journalItems: { accountId: string; debit: number; credit: number; description: string }[] = [];
+
+      let totalInputCost = new Decimal(0);
+      for (const input of body.inputs) {
+        const item = itemMap.get(input.itemId);
+        if (!item) continue;
+        const avgCost = Number(item.averageCost);
+        const val = new Decimal(input.quantity).mul(new Decimal(avgCost > 0 ? avgCost : 0)).toDecimalPlaces(2).toNumber();
+        if (val <= 0) continue;
+        totalInputCost = totalInputCost.plus(new Decimal(val));
+        journalItems.push({
+          accountId: item.accountId || defaultInvAccount.id,
+          debit: 0, credit: val,
+          description: `Bahan baku keluar ${item.name}: ${oldRun.runNumber}`,
+        });
+      }
+
+      let totalOutputCost = new Decimal(0);
+      for (const output of body.outputs) {
+        const unitCost = output.unitPrice ?? 0;
+        const val = new Decimal(output.quantity).mul(new Decimal(unitCost)).toDecimalPlaces(2).toNumber();
+        if (val <= 0) continue;
+        totalOutputCost = totalOutputCost.plus(new Decimal(val));
+        const outItem = await tx.inventoryItem.findUnique({ where: { id: output.itemId }, select: { accountId: true, name: true } });
+        journalItems.push({
+          accountId: outItem?.accountId || defaultInvAccount.id,
+          debit: val, credit: 0,
+          description: `Produksi masuk ${outItem?.name || ''}: ${oldRun.runNumber}`,
+        });
+      }
+
+      const diff = totalOutputCost.minus(totalInputCost).toDecimalPlaces(2).toNumber();
+      if (Math.abs(diff) > 0) {
+        const hppBerasAccount = await tx.account.findFirst({ where: { accountNumber: '5.1' } });
+        const cogsAccount = hppBerasAccount || await systemAccounts.getAccount('COGS');
+        journalItems.push({
+          accountId: cogsAccount.id,
+          debit: diff > 0 ? 0 : Math.abs(diff),
+          credit: diff > 0 ? diff : 0,
+          description: `HPP ${diff > 0 ? 'konversi' : 'rugi'} produksi: ${oldRun.runNumber}`,
+        });
+      }
+
+      if (journalItems.length > 0) {
+        // Generate unique revision JV number
+        const revCount = await tx.journalEntry.count({
+          where: { entryNumber: { startsWith: oldJvNumber } },
+        });
+        const revSuffix = revCount > 1 ? `-R${revCount}` : '-R';
+        const journalEntry = await tx.journalEntry.create({
+          data: {
+            entryNumber: oldJvNumber + revSuffix,
+            date: txDate,
+            narration: `Produksi (revisi): ${oldRun.runNumber} — ${inputNames} → ${outputNames}`,
+            status: 'Submitted',
+            fiscalYearId: fiscalYear.id,
+            createdBy: req.user!.userId,
+            submittedAt: new Date(),
+            items: { create: journalItems },
+          },
+        });
+
+        await tx.accountingLedgerEntry.createMany({
+          data: journalItems.map(ji => ({
+            date: txDate, accountId: ji.accountId, debit: ji.debit, credit: ji.credit,
+            referenceType: 'JournalEntry', referenceId: journalEntry.id,
+            description: ji.description, fiscalYearId: fiscalYear.id,
+          })),
+        });
+
+        const balanceMap = new Map<string, { debit: number; credit: number }>();
+        for (const ji of journalItems) {
+          const entry = balanceMap.get(ji.accountId) || { debit: 0, credit: 0 };
+          entry.debit += ji.debit;
+          entry.credit += ji.credit;
+          balanceMap.set(ji.accountId, entry);
+        }
+        for (const [acctId, bal] of balanceMap) {
+          await updateAccountBalance(tx, acctId, bal.debit, bal.credit);
+        }
+      }
+
+      // Create new run items
+      const lineItems = [
+        ...body.inputs.map(i => ({
+          productionRunId: id, itemId: i.itemId, lineType: 'Input',
+          quantity: i.quantity, unitPrice: null as number | null,
+          rendemenPct: null as number | null, isByProduct: false,
+        })),
+        ...body.outputs.map((o) => ({
+          productionRunId: id, itemId: o.itemId,
+          lineType: o.isByProduct ? 'ByProduct' : 'Output',
+          quantity: o.quantity, unitPrice: o.unitPrice ?? null,
+          rendemenPct: totalInputQty > 0 && !o.isByProduct ? (o.quantity / totalInputQty) * 100 : null,
+          isByProduct: o.isByProduct ?? false,
+        })),
+      ];
+      await tx.productionRunItem.createMany({ data: lineItems });
+
+      return tx.productionRun.findUnique({
+        where: { id },
+        include: {
+          items: { include: { item: { select: { id: true, name: true, unit: true, code: true } } } },
+        },
+      });
+    }, { timeout: 30000 });
+
+    return res.json(result);
+  } catch (error: any) {
+    return handleRouteError(res, error, 'PUT /inventory/production-runs/:id', 'Gagal mengedit proses produksi.');
+  }
+});
+
 // PUT /api/inventory/production-runs/:id/cancel
 router.put('/production-runs/:id/cancel', roleMiddleware(['Admin']), async (req: AuthRequest, res) => {
   const id = req.params.id as string;
@@ -1329,6 +1645,214 @@ router.get('/dashboard/production-stats', async (_req, res) => {
   } catch (error) {
     logger.error({ error }, 'GET /inventory/dashboard/production-stats error');
     return res.status(500).json({ error: 'Gagal mengambil statistik produksi.' });
+  }
+});
+
+// GET /api/inventory/dashboard/production — Comprehensive production dashboard
+router.get('/dashboard/production', async (req, res) => {
+  try {
+    const now = new Date();
+
+    // Parse filter params
+    const filterItemId = typeof req.query.itemId === 'string' ? req.query.itemId : undefined;
+    const filterStartDate = typeof req.query.startDate === 'string' ? new Date(req.query.startDate) : undefined;
+    const filterEndDate = typeof req.query.endDate === 'string' ? new Date(req.query.endDate + 'T23:59:59') : undefined;
+
+    // Build period boundaries
+    const periodStart = filterStartDate || new Date(now.getFullYear(), now.getMonth(), 1);
+    const periodEnd = filterEndDate || new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+    const periodDays = Math.max(1, Math.ceil((periodEnd.getTime() - periodStart.getTime()) / 86400000));
+
+    // Previous period (same duration, immediately before)
+    const prevPeriodEnd = new Date(periodStart.getTime() - 1);
+    const prevPeriodStart = new Date(prevPeriodEnd.getTime() - periodDays * 86400000);
+
+    // If filtering by itemId, find runs that contain this item
+    let runIdFilter: string[] | undefined;
+    if (filterItemId) {
+      const matchingItems = await prisma.productionRunItem.findMany({
+        where: { itemId: filterItemId },
+        select: { productionRunId: true },
+        distinct: ['productionRunId'],
+      });
+      runIdFilter = matchingItems.map(m => m.productionRunId);
+    }
+
+    const baseWhere: any = { isCancelled: false };
+    if (runIdFilter) baseWhere.id = { in: runIdFilter };
+
+    // 1. KPI: total runs, period runs, prev period runs, avg rendemen
+    const [totalRuns, periodRuns, prevPeriodRuns, allActiveRuns] = await Promise.all([
+      prisma.productionRun.count({ where: baseWhere }),
+      prisma.productionRun.count({ where: { ...baseWhere, date: { gte: periodStart, lte: periodEnd } } }),
+      prisma.productionRun.count({ where: { ...baseWhere, date: { gte: prevPeriodStart, lte: prevPeriodEnd } } }),
+      prisma.productionRun.findMany({
+        where: baseWhere,
+        select: { id: true, runNumber: true, date: true, rendemenPct: true },
+        orderBy: { date: 'desc' },
+      }),
+    ]);
+
+    const runsWithRendemen = allActiveRuns.filter(r => r.rendemenPct !== null);
+    const avgRendemen = runsWithRendemen.length > 0
+      ? runsWithRendemen.reduce((s, r) => s + Number(r.rendemenPct), 0) / runsWithRendemen.length
+      : 0;
+    const periodRendemen = runsWithRendemen.filter(r => {
+      const d = new Date(r.date);
+      return d >= periodStart && d <= periodEnd;
+    });
+    const avgRendemenPeriod = periodRendemen.length > 0
+      ? periodRendemen.reduce((s, r) => s + Number(r.rendemenPct), 0) / periodRendemen.length
+      : 0;
+
+    // 2. Total input/output quantities in period
+    const periodRunIds = allActiveRuns
+      .filter(r => { const d = new Date(r.date); return d >= periodStart && d <= periodEnd; })
+      .map(r => r.id);
+
+    const periodItems = periodRunIds.length > 0
+      ? await prisma.productionRunItem.findMany({
+          where: {
+            productionRunId: { in: periodRunIds },
+            ...(filterItemId ? { itemId: filterItemId } : {}),
+          },
+          select: { lineType: true, quantity: true, unitPrice: true, isByProduct: true, itemId: true },
+        })
+      : [];
+
+    // For totals, use all items in matching runs (not filtered by itemId)
+    const allPeriodItems = periodRunIds.length > 0
+      ? (filterItemId
+          ? await prisma.productionRunItem.findMany({
+              where: { productionRunId: { in: periodRunIds } },
+              select: { lineType: true, quantity: true, isByProduct: true, itemId: true },
+            })
+          : periodItems)
+      : [];
+
+    const totalInputQtyPeriod = allPeriodItems
+      .filter(i => i.lineType === 'Input')
+      .reduce((s, i) => s + Number(i.quantity), 0);
+    const totalOutputQtyPeriod = allPeriodItems
+      .filter(i => i.lineType === 'Output')
+      .reduce((s, i) => s + Number(i.quantity), 0);
+    const totalByProductQtyPeriod = allPeriodItems
+      .filter(i => i.lineType === 'ByProduct' || i.isByProduct)
+      .reduce((s, i) => s + Number(i.quantity), 0);
+
+    // 3. Rendemen trend: daily within period
+    const trendRuns = allActiveRuns.filter(r => {
+      const d = new Date(r.date);
+      return d >= periodStart && d <= periodEnd && r.rendemenPct !== null;
+    });
+    const rendemenByDay = new Map<string, { total: number; count: number }>();
+    for (const r of trendRuns) {
+      const day = new Date(r.date).toISOString().split('T')[0];
+      const entry = rendemenByDay.get(day) || { total: 0, count: 0 };
+      entry.total += Number(r.rendemenPct);
+      entry.count += 1;
+      rendemenByDay.set(day, entry);
+    }
+    const rendemenTrend = Array.from(rendemenByDay.entries())
+      .map(([date, v]) => ({ date, avgRendemen: Math.round((v.total / v.count) * 100) / 100, count: v.count }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    // 4. Top 5 input items in period
+    const inputItemMap = new Map<string, number>();
+    for (const item of allPeriodItems.filter(i => i.lineType === 'Input')) {
+      inputItemMap.set(item.itemId, (inputItemMap.get(item.itemId) || 0) + Number(item.quantity));
+    }
+    const topInputIds = Array.from(inputItemMap.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5);
+    const inputItemDetails = topInputIds.length > 0
+      ? await prisma.inventoryItem.findMany({
+          where: { id: { in: topInputIds.map(i => i[0]) } },
+          select: { id: true, name: true, unit: true },
+        })
+      : [];
+    const topInputs = topInputIds.map(([id, qty]) => {
+      const item = inputItemDetails.find(i => i.id === id);
+      return { id, name: item?.name || '', unit: item?.unit || '', quantity: qty };
+    });
+
+    // 5. Top 5 output items in period
+    const outputItemMap = new Map<string, number>();
+    for (const item of allPeriodItems.filter(i => i.lineType === 'Output')) {
+      outputItemMap.set(item.itemId, (outputItemMap.get(item.itemId) || 0) + Number(item.quantity));
+    }
+    const topOutputIds = Array.from(outputItemMap.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5);
+    const outputItemDetails = topOutputIds.length > 0
+      ? await prisma.inventoryItem.findMany({
+          where: { id: { in: topOutputIds.map(i => i[0]) } },
+          select: { id: true, name: true, unit: true },
+        })
+      : [];
+    const topOutputs = topOutputIds.map(([id, qty]) => {
+      const item = outputItemDetails.find(i => i.id === id);
+      return { id, name: item?.name || '', unit: item?.unit || '', quantity: qty };
+    });
+
+    // 6. Best & worst rendemen runs in period
+    const sortedByRendemen = periodRendemen
+      .sort((a, b) => Number(b.rendemenPct) - Number(a.rendemenPct));
+    const bestRendemen = sortedByRendemen.slice(0, 5).map(r => ({
+      runNumber: r.runNumber, date: r.date, rendemenPct: Number(r.rendemenPct),
+    }));
+    const worstRendemen = sortedByRendemen.slice(-5).reverse().map(r => ({
+      runNumber: r.runNumber, date: r.date, rendemenPct: Number(r.rendemenPct),
+    }));
+
+    // 7. Recent 10 production runs (within period)
+    const recentProduction = await prisma.productionRun.findMany({
+      where: { ...baseWhere, date: { gte: periodStart, lte: periodEnd } },
+      select: {
+        id: true, runNumber: true, date: true, rendemenPct: true, referenceNumber: true,
+        items: {
+          select: { lineType: true, quantity: true, isByProduct: true, item: { select: { name: true, unit: true } } },
+        },
+      },
+      orderBy: { date: 'desc' },
+      take: 10,
+    });
+
+    return res.json({
+      summary: {
+        totalRuns,
+        periodRuns,
+        prevPeriodRuns,
+        avgRendemen: Math.round(avgRendemen * 100) / 100,
+        avgRendemenPeriod: Math.round(avgRendemenPeriod * 100) / 100,
+        totalInputQtyPeriod,
+        totalOutputQtyPeriod,
+        totalByProductQtyPeriod,
+      },
+      rendemenTrend,
+      topInputs,
+      topOutputs,
+      bestRendemen,
+      worstRendemen,
+      recentProduction: recentProduction.map(r => {
+        const inputs = r.items.filter(i => i.lineType === 'Input');
+        const outputs = r.items.filter(i => i.lineType === 'Output');
+        return {
+          id: r.id,
+          runNumber: r.runNumber,
+          date: r.date,
+          rendemenPct: r.rendemenPct ? Number(r.rendemenPct) : null,
+          referenceNumber: r.referenceNumber,
+          totalInput: inputs.reduce((s, i) => s + Number(i.quantity), 0),
+          totalOutput: outputs.reduce((s, i) => s + Number(i.quantity), 0),
+          inputSummary: inputs.map(i => `${i.item.name} ${Number(i.quantity).toLocaleString('id-ID')} ${i.item.unit}`).join(', '),
+          outputSummary: outputs.map(i => `${i.item.name} ${Number(i.quantity).toLocaleString('id-ID')} ${i.item.unit}`).join(', '),
+        };
+      }),
+    });
+  } catch (error) {
+    logger.error({ error }, 'GET /inventory/dashboard/production error');
+    return res.status(500).json({ error: 'Gagal mengambil dashboard produksi.' });
   }
 });
 
