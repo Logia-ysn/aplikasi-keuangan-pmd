@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Loader2, Warehouse, PackageSearch, Edit2, Trash2, XCircle, Plus, LayoutDashboard, Upload, Download } from 'lucide-react';
+import { Loader2, Warehouse, PackageSearch, Edit2, Trash2, XCircle, Plus, LayoutDashboard, Upload, Download, Eye } from 'lucide-react';
 import { cn } from '../lib/utils';
 import api from '../lib/api';
 import { formatDate, formatRupiah } from '../lib/formatters';
@@ -10,6 +10,7 @@ import { StockMovementModal } from '../components/StockMovementModal';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { ProductionRunModal } from '../components/ProductionRunModal';
 import InventoryDashboardTab from '../components/InventoryDashboardTab';
+import ProductionDetailDrawer from '../components/ProductionDetailDrawer';
 import ImportModal from '../components/ImportModal';
 import { exportToExcel } from '../lib/exportExcel';
 
@@ -51,6 +52,7 @@ export function InventoryPage() {
   const [filterProdEndDate, setFilterProdEndDate] = useState('');
   const [cancelProdTarget, setCancelProdTarget] = useState<string | null>(null);
   const [isCancellingProd, setIsCancellingProd] = useState(false);
+  const [selectedProdRunId, setSelectedProdRunId] = useState<string | null>(null);
 
   // --- Services tab state ---
   const [serviceModalOpen, setServiceModalOpen] = useState(false);
@@ -694,7 +696,11 @@ export function InventoryPage() {
                     const inputLines = (run.items ?? []).filter((i: any) => i.lineType === 'Input');
                     const outputLines = (run.items ?? []).filter((i: any) => i.lineType === 'Output' || i.lineType === 'ByProduct');
                     return (
-                      <tr key={run.id} className={cn(isCancelled && 'opacity-50')}>
+                      <tr
+                        key={run.id}
+                        className={cn('cursor-pointer', isCancelled && 'opacity-50')}
+                        onClick={() => setSelectedProdRunId(run.id)}
+                      >
                         <td className={cn('text-gray-500 whitespace-nowrap', isCancelled && 'line-through')}>
                           {formatDate(run.date)}
                         </td>
@@ -747,15 +753,24 @@ export function InventoryPage() {
                           {run.notes ?? '—'}
                         </td>
                         <td>
-                          {!isCancelled && userRole === 'Admin' && (
+                          <div className="flex items-center gap-0.5">
                             <button
-                              onClick={() => setCancelProdTarget(run.id)}
-                              className="p-1.5 hover:bg-red-50 rounded text-gray-300 hover:text-red-500 transition-colors"
-                              title="Batalkan proses produksi"
+                              onClick={(e) => { e.stopPropagation(); setSelectedProdRunId(run.id); }}
+                              className="p-1.5 hover:bg-blue-50 rounded text-gray-300 hover:text-blue-500 transition-colors"
+                              title="Lihat detail"
                             >
-                              <XCircle size={15} />
+                              <Eye size={15} />
                             </button>
-                          )}
+                            {!isCancelled && userRole === 'Admin' && (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setCancelProdTarget(run.id); }}
+                                className="p-1.5 hover:bg-red-50 rounded text-gray-300 hover:text-red-500 transition-colors"
+                                title="Batalkan proses produksi"
+                              >
+                                <XCircle size={15} />
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     );
@@ -926,6 +941,16 @@ export function InventoryPage() {
         isOpen={productionModalOpen}
         onClose={() => setProductionModalOpen(false)}
         items={items}
+      />
+
+      <ProductionDetailDrawer
+        runId={selectedProdRunId}
+        onClose={() => setSelectedProdRunId(null)}
+        canCancel={userRole === 'Admin'}
+        onCancel={(id) => {
+          setSelectedProdRunId(null);
+          setCancelProdTarget(id);
+        }}
       />
 
       <ConfirmDialog

@@ -679,6 +679,40 @@ router.get('/production-runs', async (req, res) => {
   }
 });
 
+// GET /api/inventory/production-runs/:id
+router.get('/production-runs/:id', async (req, res) => {
+  try {
+    const run = await prisma.productionRun.findUnique({
+      where: { id: req.params.id as string },
+      include: {
+        items: {
+          include: {
+            item: { select: { id: true, name: true, unit: true, code: true, averageCost: true } },
+          },
+        },
+        createdBy: { select: { id: true, fullName: true } },
+      },
+    });
+    if (!run) return res.status(404).json({ error: 'Data proses produksi tidak ditemukan.' });
+
+    // Fetch related journal entry for GL info
+    const jvNumber = `JV-${run.runNumber}`;
+    const journal = await prisma.journalEntry.findUnique({
+      where: { entryNumber: jvNumber },
+      include: {
+        items: {
+          include: { account: { select: { id: true, accountNumber: true, name: true } } },
+        },
+      },
+    });
+
+    return res.json({ ...run, journal: journal || null });
+  } catch (error) {
+    logger.error({ error }, 'GET /inventory/production-runs/:id error');
+    return res.status(500).json({ error: 'Gagal mengambil detail proses produksi.' });
+  }
+});
+
 // POST /api/inventory/production-runs
 router.post('/production-runs', roleMiddleware(['Admin', 'Accountant', 'StaffProduksi']), async (req: AuthRequest, res) => {
   const body = validateBody(CreateProductionRunSchema, req.body, res);
