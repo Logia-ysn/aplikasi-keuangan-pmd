@@ -558,6 +558,7 @@ model ProductionRunItem {
   quantity        Decimal       @db.Decimal(15, 3)
   unitPrice       Decimal?      @db.Decimal(15, 2) @map("unit_price")
   rendemenPct     Decimal?      @db.Decimal(5, 2) @map("rendemen_pct")
+  isByProduct     Boolean       @default(false) @map("is_by_product")
   createdAt       DateTime      @default(now()) @map("created_at")
 
   @@index([productionRunId])

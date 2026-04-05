@@ -13,6 +13,7 @@ interface OutputLineItem {
   itemId: string;
   quantity: string;
   unitPrice: string;
+  isByProduct: boolean;
 }
 
 interface Props {
@@ -29,7 +30,7 @@ export function ProductionRunModal({ isOpen, onClose, items }: Props) {
   const [referenceNumber, setReferenceNumber] = useState('');
   const [notes, setNotes] = useState('');
   const [inputs, setInputs] = useState<LineItem[]>([{ itemId: '', quantity: '' }]);
-  const [outputs, setOutputs] = useState<OutputLineItem[]>([{ itemId: '', quantity: '', unitPrice: '' }]);
+  const [outputs, setOutputs] = useState<OutputLineItem[]>([{ itemId: '', quantity: '', unitPrice: '', isByProduct: false }]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
 
@@ -40,7 +41,7 @@ export function ProductionRunModal({ isOpen, onClose, items }: Props) {
       setReferenceNumber('');
       setNotes('');
       setInputs([{ itemId: '', quantity: '' }]);
-      setOutputs([{ itemId: '', quantity: '', unitPrice: '' }]);
+      setOutputs([{ itemId: '', quantity: '', unitPrice: '', isByProduct: false }]);
       setErrors([]);
       setIsSubmitting(false);
     }
@@ -66,26 +67,22 @@ export function ProductionRunModal({ isOpen, onClose, items }: Props) {
   const updateInput = (idx: number, field: keyof LineItem, value: string) => {
     setInputs(prev => prev.map((row, i) => i === idx ? { ...row, [field]: value } : row));
   };
-  const updateOutput = (idx: number, field: keyof OutputLineItem, value: string) => {
+  const updateOutput = (idx: number, field: string, value: string | boolean) => {
     setOutputs(prev => prev.map((row, i) => i === idx ? { ...row, [field]: value } : row));
   };
   const addInput = () => setInputs(prev => [...prev, { itemId: '', quantity: '' }]);
   const removeInput = (idx: number) => setInputs(prev => prev.filter((_, i) => i !== idx));
-  const addOutput = () => setOutputs(prev => [...prev, { itemId: '', quantity: '', unitPrice: '' }]);
+  const addOutput = () => setOutputs(prev => [...prev, { itemId: '', quantity: '', unitPrice: '', isByProduct: false }]);
   const removeOutput = (idx: number) => setOutputs(prev => prev.filter((_, i) => i !== idx));
 
-  // Rendemen calculation
-  const totalInputQty = inputs.length === 1 && inputs[0].itemId
-    ? parseFloat(inputs[0].quantity) || 0
-    : 0;
-  const rendemenDisplay = inputs.length === 1 && totalInputQty > 0
-    ? outputs.map(o => {
-        const qty = parseFloat(o.quantity) || 0;
-        const item = getItemById(o.itemId);
-        const pct = ((qty / totalInputQty) * 100).toFixed(1);
-        return item ? `${item.name} ${pct}%` : null;
-      }).filter(Boolean)
-    : [];
+  // Rendemen calculation: total main output / total input
+  const totalInputQty = inputs.reduce((s, r) => s + (parseFloat(r.quantity) || 0), 0);
+  const totalMainOutputQty = outputs
+    .filter(o => !o.isByProduct)
+    .reduce((s, r) => s + (parseFloat(r.quantity) || 0), 0);
+  const rendemenPct = totalInputQty > 0 && totalMainOutputQty > 0
+    ? ((totalMainOutputQty / totalInputQty) * 100).toFixed(1)
+    : null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -110,6 +107,7 @@ export function ProductionRunModal({ isOpen, onClose, items }: Props) {
           itemId: o.itemId,
           quantity: parseFloat(o.quantity),
           unitPrice: o.unitPrice ? parseFloat(o.unitPrice) : null,
+          isByProduct: o.isByProduct,
         })),
       });
       queryClient.invalidateQueries({ queryKey: ['production-runs'] });
@@ -278,11 +276,11 @@ export function ProductionRunModal({ isOpen, onClose, items }: Props) {
                   const item = getItemById(row.itemId);
                   const qty = parseFloat(row.quantity) || 0;
                   const price = parseFloat(row.unitPrice) || 0;
-                  const rPct = totalInputQty > 0 && qty > 0
+                  const rPct = totalInputQty > 0 && qty > 0 && !row.isByProduct
                     ? ((qty / totalInputQty) * 100).toFixed(1)
                     : null;
                   return (
-                    <div key={idx} className="border border-gray-100 rounded-lg p-2.5 space-y-2 bg-gray-50/50">
+                    <div key={idx} className={`border rounded-lg p-2.5 space-y-2 ${row.isByProduct ? 'border-amber-200 bg-amber-50/50' : 'border-gray-100 bg-gray-50/50'}`}>
                       <div className="flex gap-2 items-start">
                         <div className="flex-1">
                           <select
@@ -315,6 +313,11 @@ export function ProductionRunModal({ isOpen, onClose, items }: Props) {
                             <span className="text-xs font-semibold text-green-700">{rPct}%</span>
                           </div>
                         )}
+                        {row.isByProduct && (
+                          <div className="flex items-center px-2 py-2 bg-amber-100 rounded-lg">
+                            <span className="text-[10px] font-semibold text-amber-700">Samping</span>
+                          </div>
+                        )}
                         {outputs.length > 1 && (
                           <button
                             type="button"
@@ -325,7 +328,7 @@ export function ProductionRunModal({ isOpen, onClose, items }: Props) {
                           </button>
                         )}
                       </div>
-                      {/* HPP / Unit Price row */}
+                      {/* HPP / Unit Price row + By-product toggle */}
                       <div className="flex items-center gap-2 pl-0.5">
                         <label className="text-[10px] text-gray-400 font-medium whitespace-nowrap">HPP/kg (Rp)</label>
                         <input
@@ -341,6 +344,15 @@ export function ProductionRunModal({ isOpen, onClose, items }: Props) {
                             = Rp {(price * qty).toLocaleString('id-ID')}
                           </span>
                         )}
+                        <label className="ml-auto flex items-center gap-1.5 cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={row.isByProduct}
+                            onChange={e => updateOutput(idx, 'isByProduct', e.target.checked)}
+                            className="rounded border-gray-300 text-amber-500 focus:ring-amber-500 w-3.5 h-3.5"
+                          />
+                          <span className="text-[10px] text-gray-500 font-medium whitespace-nowrap">Produk Samping</span>
+                        </label>
                       </div>
                     </div>
                   );
@@ -349,16 +361,22 @@ export function ProductionRunModal({ isOpen, onClose, items }: Props) {
             </div>
 
             {/* Rendemen summary */}
-            {inputs.length === 1 && totalInputQty > 0 && rendemenDisplay.length > 0 && (
+            {rendemenPct !== null && (
               <div className="bg-blue-50 rounded-lg px-4 py-3 text-sm text-blue-800">
                 <span className="font-semibold">Rendemen: </span>
-                {rendemenDisplay.join(' \u00b7 ')}
-                {' dari '}
-                {totalInputQty.toLocaleString('id-ID', { maximumFractionDigits: 3 })}
-                {' '}
-                {getItemById(inputs[0].itemId)?.unit ?? ''}
-                {' '}
-                {getItemById(inputs[0].itemId)?.name ?? ''}
+                {rendemenPct}%
+                <span className="text-blue-600 ml-1">
+                  ({totalMainOutputQty.toLocaleString('id-ID', { maximumFractionDigits: 3 })}
+                  {' / '}
+                  {totalInputQty.toLocaleString('id-ID', { maximumFractionDigits: 3 })}
+                  {' '}
+                  {getItemById(inputs[0]?.itemId)?.unit ?? 'Kg'})
+                </span>
+                {outputs.some(o => o.isByProduct && parseFloat(o.quantity) > 0) && (
+                  <span className="text-amber-700 ml-2 text-xs">
+                    (produk samping tidak dihitung)
+                  </span>
+                )}
               </div>
             )}
           </div>

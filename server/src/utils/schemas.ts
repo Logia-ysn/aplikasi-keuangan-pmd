@@ -298,6 +298,7 @@ const ProductionOutputLineSchema = z.object({
   itemId: z.string().min(1, 'Item wajib dipilih.'),
   quantity: z.coerce.number().positive('Kuantitas harus lebih dari 0.'),
   unitPrice: z.coerce.number().nonnegative('Harga tidak boleh negatif.').optional().nullable(),
+  isByProduct: z.boolean().optional().default(false),
 });
 
 export const CreateProductionRunSchema = z.object({

@@ -692,7 +692,7 @@ export function InventoryPage() {
                   productionRuns.map((run: any) => {
                     const isCancelled = run.isCancelled;
                     const inputLines = (run.items ?? []).filter((i: any) => i.lineType === 'Input');
-                    const outputLines = (run.items ?? []).filter((i: any) => i.lineType === 'Output');
+                    const outputLines = (run.items ?? []).filter((i: any) => i.lineType === 'Output' || i.lineType === 'ByProduct');
                     return (
                       <tr key={run.id} className={cn(isCancelled && 'opacity-50')}>
                         <td className={cn('text-gray-500 whitespace-nowrap', isCancelled && 'line-through')}>
@@ -728,6 +728,11 @@ export function InventoryPage() {
                               {line.unitPrice != null && Number(line.unitPrice) > 0 && (
                                 <span className="text-blue-500 ml-1 font-mono">
                                   @{formatRupiah(Number(line.unitPrice))}
+                                </span>
+                              )}
+                              {(line.isByProduct || line.lineType === 'ByProduct') && (
+                                <span className="ml-1 text-[9px] px-1 py-0.5 bg-amber-100 text-amber-700 rounded font-medium">
+                                  Samping
                                 </span>
                               )}
                             </div>

@@ -725,12 +725,10 @@ router.post('/production-runs', roleMiddleware(['Admin', 'Accountant', 'StaffPro
       const runDate = new Date(body.date);
       const runNumber = await generateDocumentNumber(tx, 'PR', runDate, fiscalYear.id);
 
-      // 5. Calculate rendemenPct (only if single input)
-      let rendemenPct: number | null = null;
-      if (body.inputs.length === 1) {
-        const totalOutput = body.outputs.reduce((s, o) => s + o.quantity, 0);
-        rendemenPct = (totalOutput / body.inputs[0].quantity) * 100;
-      }
+      // 5. Calculate rendemenPct: total main output / total input × 100
+      const totalInputQty = body.inputs.reduce((s, i) => s + i.quantity, 0);
+      const totalMainOutputQty = body.outputs.filter(o => !o.isByProduct).reduce((s, o) => s + o.quantity, 0);
+      const rendemenPct = totalInputQty > 0 ? (totalMainOutputQty / totalInputQty) * 100 : null;
 
       // 6. Create the ProductionRun header
       const run = await tx.productionRun.create({
@@ -935,19 +933,20 @@ router.post('/production-runs', roleMiddleware(['Admin', 'Accountant', 'StaffPro
           quantity: i.quantity,
           unitPrice: null as number | null,
           rendemenPct: null as number | null,
+          isByProduct: false,
         })),
         ...body.outputs.map((o) => {
-          let rPct: number | null = null;
-          if (body.inputs.length === 1) {
-            rPct = (o.quantity / body.inputs[0].quantity) * 100;
-          }
+          const rPct = totalInputQty > 0 && !o.isByProduct
+            ? (o.quantity / totalInputQty) * 100
+            : null;
           return {
             productionRunId: run.id,
             itemId: o.itemId,
-            lineType: 'Output',
+            lineType: o.isByProduct ? 'ByProduct' : 'Output',
             quantity: o.quantity,
             unitPrice: o.unitPrice ?? null,
             rendemenPct: rPct,
+            isByProduct: o.isByProduct ?? false,
           };
         }),
       ];
