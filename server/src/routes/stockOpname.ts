@@ -7,6 +7,7 @@ import { CreateStockOpnameSchema, SubmitStockOpnameSchema } from '../utils/schem
 import { BusinessError, handleRouteError } from '../utils/errors';
 import { generateDocumentNumber } from '../utils/documentNumber';
 import { updateAccountBalance } from '../utils/accountBalance';
+import { cancelJournalsByPrefix } from '../utils/journalCancel';
 import { systemAccounts } from '../services/systemAccounts';
 import { logger } from '../lib/logger';
 
@@ -323,25 +324,9 @@ router.put('/:id/cancel', roleMiddleware(['Admin']), async (req: AuthRequest, re
         }
       }
 
-      // Cancel journal + ledger entries
+      // Cancel ALL related journals + ledger entries (including any revisions)
       const jvNumber = `JV-${so.opnameNumber}`;
-      const journal = await tx.journalEntry.findUnique({
-        where: { entryNumber: jvNumber },
-        include: { items: true },
-      });
-      if (journal) {
-        await tx.journalEntry.update({
-          where: { id: journal.id },
-          data: { status: 'Cancelled' as any, cancelledAt: new Date() },
-        });
-        await tx.accountingLedgerEntry.updateMany({
-          where: { referenceId: journal.id },
-          data: { isCancelled: true },
-        });
-        for (const ji of journal.items) {
-          await updateAccountBalance(tx, ji.accountId, Number(ji.credit), Number(ji.debit));
-        }
-      }
+      await cancelJournalsByPrefix(tx, jvNumber);
 
       await tx.stockOpname.update({
         where: { id },

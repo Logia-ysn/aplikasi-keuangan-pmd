@@ -7,6 +7,7 @@ import { CreateInventoryItemSchema, UpdateInventoryItemSchema, CreateStockMoveme
 import { BusinessError, handleRouteError } from '../utils/errors';
 import { generateDocumentNumber } from '../utils/documentNumber';
 import { updateAccountBalance } from '../utils/accountBalance';
+import { cancelJournalsByPrefix } from '../utils/journalCancel';
 import { systemAccounts } from '../services/systemAccounts';
 import { logger } from '../lib/logger';
 import { calcWeightedAverage } from '../utils/weightedAverage';
@@ -1077,25 +1078,9 @@ router.put('/production-runs/:id', roleMiddleware(['Admin', 'Accountant', 'Staff
         }
       }
 
-      // ── 3. Cancel old journal + ledger ──
+      // ── 3. Cancel ALL active journals for this production run (including revisions) ──
       const oldJvNumber = `JV-${oldRun.runNumber}`;
-      const oldJournal = await tx.journalEntry.findUnique({
-        where: { entryNumber: oldJvNumber },
-        include: { items: true },
-      });
-      if (oldJournal) {
-        await tx.journalEntry.update({
-          where: { id: oldJournal.id },
-          data: { status: 'Cancelled', cancelledAt: new Date() },
-        });
-        await tx.accountingLedgerEntry.updateMany({
-          where: { referenceId: oldJournal.id },
-          data: { isCancelled: true },
-        });
-        for (const ji of oldJournal.items) {
-          await updateAccountBalance(tx, ji.accountId, Number(ji.credit), Number(ji.debit));
-        }
-      }
+      await cancelJournalsByPrefix(tx, oldJvNumber);
 
       // ── 4. Delete old run items ──
       await tx.productionRunItem.deleteMany({ where: { productionRunId: id } });
@@ -1253,11 +1238,11 @@ router.put('/production-runs/:id', roleMiddleware(['Admin', 'Accountant', 'Staff
       }
 
       if (journalItems.length > 0) {
-        // Generate unique revision JV number
-        const revCount = await tx.journalEntry.count({
-          where: { entryNumber: { startsWith: oldJvNumber } },
+        // Generate unique revision JV number (count only cancelled revisions to get next number)
+        const cancelledCount = await tx.journalEntry.count({
+          where: { entryNumber: { startsWith: oldJvNumber }, status: 'Cancelled' },
         });
-        const revSuffix = revCount > 1 ? `-R${revCount}` : '-R';
+        const revSuffix = `-R${cancelledCount > 0 ? cancelledCount : 1}`;
         const journalEntry = await tx.journalEntry.create({
           data: {
             entryNumber: oldJvNumber + revSuffix,
@@ -1406,26 +1391,9 @@ router.put('/production-runs/:id/cancel', roleMiddleware(['Admin']), async (req:
         }
       }
 
-      // Cancel related journal entry + ledger entries
+      // Cancel ALL related journals + ledger entries (including revisions)
       const jvNumber = `JV-${run.runNumber}`;
-      const journal = await tx.journalEntry.findUnique({
-        where: { entryNumber: jvNumber },
-        include: { items: true },
-      });
-      if (journal) {
-        await tx.journalEntry.update({
-          where: { id: journal.id },
-          data: { status: 'Cancelled', cancelledAt: new Date() },
-        });
-        await tx.accountingLedgerEntry.updateMany({
-          where: { referenceId: journal.id },
-          data: { isCancelled: true },
-        });
-        // Reverse account balances
-        for (const ji of journal.items) {
-          await updateAccountBalance(tx, ji.accountId, Number(ji.credit), Number(ji.debit));
-        }
-      }
+      await cancelJournalsByPrefix(tx, jvNumber);
 
       // Mark run as cancelled
       await tx.productionRun.update({
