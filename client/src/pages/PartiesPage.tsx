@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Plus, Search, MoreHorizontal, Users, Loader2, Mail, Phone, MapPin, Pencil, Trash2, AlertCircle, Upload, Download } from 'lucide-react';
+import { Plus, Search, MoreHorizontal, Users, Loader2, Mail, Phone, MapPin, Pencil, Trash2, AlertCircle, Upload, Download, LayoutDashboard, List } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '../lib/utils';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -8,8 +8,10 @@ import { formatRupiah } from '../lib/formatters';
 import PartyFormModal from '../components/PartyFormModal';
 import ImportModal from '../components/ImportModal';
 import { exportToExcel } from '../lib/exportExcel';
+import PartiesDashboardTab from '../components/PartiesDashboardTab';
 
 export const PartiesPage = () => {
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'data'>('dashboard');
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('All');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -84,36 +86,72 @@ export const PartiesPage = () => {
           <p className="text-sm text-gray-500 mt-0.5">Kelola data mitra bisnis, saldo piutang, dan hutang usaha.</p>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            className="btn-secondary flex items-center gap-1.5"
-            onClick={() =>
-              exportToExcel(
-                (parties ?? []).map((p: any) => ({
-                  name: p.name,
-                  partyType: p.partyType,
-                  phone: p.phone ?? '',
-                  email: p.email ?? '',
-                  address: p.address ?? '',
-                  taxId: p.taxId ?? '',
-                  outstandingAmount: Number(p.outstandingAmount ?? 0),
-                  depositBalance: Number(p.depositBalance ?? 0),
-                  customerDepositBalance: Number(p.customerDepositBalance ?? 0),
-                })),
-                'pelanggan-vendor'
-              )
-            }
-          >
-            <Download size={14} /> Download
-          </button>
-          <button className="btn-secondary flex items-center gap-1.5" onClick={() => setIsImportOpen(true)}>
-            <Upload size={14} /> Import
-          </button>
-          <button className="btn-primary" onClick={() => { setEditParty(null); setIsModalOpen(true); }}>
+          {activeTab === 'data' && (
+            <>
+              <button
+                className="btn-secondary flex items-center gap-1.5"
+                onClick={() =>
+                  exportToExcel(
+                    (parties ?? []).map((p: any) => ({
+                      name: p.name,
+                      partyType: p.partyType,
+                      phone: p.phone ?? '',
+                      email: p.email ?? '',
+                      address: p.address ?? '',
+                      taxId: p.taxId ?? '',
+                      outstandingAmount: Number(p.outstandingAmount ?? 0),
+                      depositBalance: Number(p.depositBalance ?? 0),
+                      customerDepositBalance: Number(p.customerDepositBalance ?? 0),
+                    })),
+                    'pelanggan-vendor'
+                  )
+                }
+              >
+                <Download size={14} /> Download
+              </button>
+              <button className="btn-secondary flex items-center gap-1.5" onClick={() => setIsImportOpen(true)}>
+                <Upload size={14} /> Import
+              </button>
+            </>
+          )}
+          <button className="btn-primary" onClick={() => { setEditParty(null); setIsModalOpen(true); setActiveTab('data'); }}>
             <Plus size={15} /> Tambah Mitra Baru
           </button>
         </div>
       </div>
 
+      {/* Tab Navigation */}
+      <div className="flex border-b border-gray-200">
+        <button
+          onClick={() => setActiveTab('dashboard')}
+          className={cn(
+            'flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px',
+            activeTab === 'dashboard'
+              ? 'border-blue-600 text-blue-600'
+              : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+          )}
+        >
+          <LayoutDashboard size={14} /> Dashboard
+        </button>
+        <button
+          onClick={() => setActiveTab('data')}
+          className={cn(
+            'flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px',
+            activeTab === 'data'
+              ? 'border-blue-600 text-blue-600'
+              : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+          )}
+        >
+          <List size={14} /> Data Mitra
+        </button>
+      </div>
+
+      {/* Dashboard Tab */}
+      {activeTab === 'dashboard' && <PartiesDashboardTab />}
+
+      {/* Data Tab */}
+      {activeTab === 'data' && (
+      <>
       {/* Search & Filter */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
         <div className="relative flex-1 max-w-sm">
@@ -273,6 +311,8 @@ export const PartiesPage = () => {
           ))
         )}
       </div>
+      </>
+      )}
 
       {/* Form Modal (Create / Edit) */}
       <PartyFormModal

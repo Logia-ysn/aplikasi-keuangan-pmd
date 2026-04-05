@@ -94,6 +94,7 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
 
       const arAccount = await systemAccounts.getAccount('AR');
       const salesAccount = await systemAccounts.getAccount('SALES');
+      const serviceRevenueAccount = await systemAccounts.getAccount('SERVICE_REVENUE');
 
       const inventoryAccount = await systemAccounts.getAccount('INVENTORY');
       // Prefer HPP Beras (5.1) for COGS, fallback to parent (5)
@@ -123,6 +124,9 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
         } else if (item.serviceItemId) {
           const svc = await tx.serviceItem.findUnique({ where: { id: item.serviceItemId } });
           if (svc) lineAccountId = svc.accountId;
+        } else if (item.itemType === 'service') {
+          // Service item without serviceItemId → use Pendapatan Jasa (4.2)
+          lineAccountId = serviceRevenueAccount.id;
         }
 
         resolvedItems.push({
