@@ -188,38 +188,7 @@ function DashboardContent({ data }: { data: DashboardData }) {
       </div>
 
       {/* Rendemen Trend Chart */}
-      {data.rendemenTrend.length > 0 && (
-        <div className="bg-white border border-gray-200 rounded-xl p-5">
-          <h3 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
-            <BarChart3 size={14} className="text-gray-400" />
-            Tren Rendemen
-          </h3>
-          <div className="flex items-end gap-1 h-32">
-            {data.rendemenTrend.map((d) => {
-              const pct = Math.max(5, (d.avgRendemen / 100) * 100);
-              const isGood = d.avgRendemen >= 60;
-              return (
-                <div key={d.date} className="flex-1 flex flex-col items-center gap-1 group relative">
-                  <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-[9px] px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10 pointer-events-none">
-                    {d.date.slice(5)} · {d.avgRendemen.toFixed(1)}% ({d.count}x)
-                  </div>
-                  <div
-                    className={cn(
-                      'w-full rounded-t transition-all',
-                      isGood ? 'bg-green-400 hover:bg-green-500' : 'bg-amber-400 hover:bg-amber-500'
-                    )}
-                    style={{ height: `${pct}%`, minHeight: '4px' }}
-                  />
-                </div>
-              );
-            })}
-          </div>
-          <div className="flex justify-between mt-1.5 text-[9px] text-gray-400">
-            <span>{data.rendemenTrend[0]?.date.slice(5)}</span>
-            <span>{data.rendemenTrend[data.rendemenTrend.length - 1]?.date.slice(5)}</span>
-          </div>
-        </div>
-      )}
+      {data.rendemenTrend.length > 0 && <RendemenTrendChart trend={data.rendemenTrend} />}
 
       {/* Top Inputs & Outputs */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -370,6 +339,96 @@ function RankList({ title, icon, items, color }: {
           })}
         </div>
       )}
+    </div>
+  );
+}
+
+function RendemenTrendChart({ trend }: { trend: { date: string; avgRendemen: number; count: number }[] }) {
+  const values = trend.map(d => d.avgRendemen);
+  const minVal = Math.floor(Math.min(...values) / 5) * 5; // round down to nearest 5
+  const maxVal = Math.ceil(Math.max(...values) / 5) * 5;  // round up to nearest 5
+  const range = maxVal - minVal || 10;
+
+  // Y-axis grid lines
+  const gridLines = [];
+  const step = range <= 20 ? 5 : 10;
+  for (let v = minVal; v <= maxVal; v += step) {
+    gridLines.push(v);
+  }
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-5">
+      <h3 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
+        <BarChart3 size={14} className="text-gray-400" />
+        Tren Rendemen Harian
+      </h3>
+      <div className="relative" style={{ minHeight: '200px' }}>
+        {/* Y-axis grid + labels */}
+        <div className="absolute left-0 top-0 bottom-6 w-10 flex flex-col justify-between">
+          {gridLines.slice().reverse().map(v => (
+            <span key={v} className="text-[9px] text-gray-400 font-mono tabular-nums text-right pr-1">
+              {v}%
+            </span>
+          ))}
+        </div>
+
+        {/* Chart area */}
+        <div className="ml-11 relative" style={{ height: '180px' }}>
+          {/* Horizontal grid lines */}
+          {gridLines.map(v => {
+            const bottom = ((v - minVal) / range) * 100;
+            return (
+              <div
+                key={v}
+                className="absolute left-0 right-0 border-t border-gray-100"
+                style={{ bottom: `${bottom}%` }}
+              />
+            );
+          })}
+
+          {/* Bars */}
+          <div className="absolute inset-0 flex items-end gap-1.5 px-1">
+            {trend.map((d) => {
+              const heightPct = Math.max(3, ((d.avgRendemen - minVal) / range) * 100);
+              const isGood = d.avgRendemen >= 60;
+              const day = d.date.slice(8);
+              const month = d.date.slice(5, 7);
+              return (
+                <div key={d.date} className="flex-1 flex flex-col items-center" style={{ height: '100%' }}>
+                  <div className="flex-1 w-full flex flex-col items-center justify-end">
+                    {/* Value label on top */}
+                    <span className={cn(
+                      'text-[9px] font-semibold tabular-nums mb-0.5',
+                      isGood ? 'text-green-600' : 'text-amber-600'
+                    )}>
+                      {d.avgRendemen.toFixed(1)}%
+                    </span>
+                    {/* Bar */}
+                    <div
+                      className={cn(
+                        'w-full max-w-[40px] rounded-t-md transition-all',
+                        isGood ? 'bg-green-400' : 'bg-amber-400'
+                      )}
+                      style={{ height: `${heightPct}%`, minHeight: '6px' }}
+                    />
+                  </div>
+                  {/* X-axis label */}
+                  <span className="text-[9px] text-gray-400 mt-1 tabular-nums">{day}/{month}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Count labels */}
+        <div className="ml-11 flex gap-1.5 px-1 mt-0.5">
+          {trend.map(d => (
+            <div key={d.date} className="flex-1 text-center">
+              <span className="text-[8px] text-gray-300">{d.count}x</span>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
