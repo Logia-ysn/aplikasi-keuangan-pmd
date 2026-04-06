@@ -158,12 +158,46 @@ router.post('/', roleMiddleware(['Admin', 'Accountant', 'StaffProduksi']), async
         include: { supplier: true, items: true },
       });
 
+      // Landed cost allocation: distribute non-linked items' cost + invoice-level
+      // adjustment (biayaLain - potongan) to linked items proportionally by value.
+      // Non-linked = service/fee items (rental, commission, risk) and discounts/extras
+      // are folded into COGS of the goods received, not left in generic 1.4.0.
+      const linkedInvItems = invoice.items.filter((i) => i.inventoryItemId);
+      const nonLinkedInvItems = invoice.items.filter((i) => !i.inventoryItemId);
+      const linkedSubtotal = linkedInvItems.reduce((s, i) => s.plus(new Decimal(i.amount.toString())), new Decimal(0));
+      const nonLinkedTotal = nonLinkedInvItems.reduce((s, i) => s.plus(new Decimal(i.amount.toString())), new Decimal(0));
+      const adjustmentRemainder = new Decimal(body.biayaLain ?? 0).minus(new Decimal(body.potongan ?? 0));
+      const landedCostPool = nonLinkedTotal.plus(adjustmentRemainder);
+      const canDistribute = linkedInvItems.length > 0 && linkedSubtotal.gt(0) && !landedCostPool.isZero();
+
+      // effectiveAmount per invoice item (original + allocated share)
+      const effectiveAmountMap = new Map<string, Decimal>();
+      if (canDistribute) {
+        let allocatedSoFar = new Decimal(0);
+        linkedInvItems.forEach((invItem, idx) => {
+          const original = new Decimal(invItem.amount.toString());
+          let share: Decimal;
+          if (idx === linkedInvItems.length - 1) {
+            // Last item absorbs rounding remainder
+            share = landedCostPool.minus(allocatedSoFar);
+          } else {
+            share = landedCostPool.mul(original).div(linkedSubtotal).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
+            allocatedSoFar = allocatedSoFar.plus(share);
+          }
+          effectiveAmountMap.set(invItem.id, original.plus(share));
+        });
+      }
+
       // Auto-post journal entry: Dr Inventory (per item account), Cr AP
       // Build DR entries using item-specific inventory accounts when available
       const debitByAccount = new Map<string, { amount: number; names: string[] }>();
       let itemsTotal = 0;
 
       for (const invItem of invoice.items) {
+        // Skip non-linked items when landed cost distribution is active
+        // (their cost has been absorbed into linked items' effective amount)
+        if (canDistribute && !invItem.inventoryItemId) continue;
+
         let drAccountId = inventoryAccount.id; // default: generic 1.4.0
 
         if (invItem.inventoryItemId) {
@@ -173,7 +207,8 @@ router.post('/', roleMiddleware(['Admin', 'Accountant', 'StaffProduksi']), async
           }
         }
 
-        const amt = Number(invItem.amount);
+        const effective = effectiveAmountMap.get(invItem.id);
+        const amt = effective ? effective.toNumber() : Number(invItem.amount);
         itemsTotal += amt;
         const existing = debitByAccount.get(drAccountId);
         if (existing) {
@@ -184,9 +219,10 @@ router.post('/', roleMiddleware(['Admin', 'Accountant', 'StaffProduksi']), async
         }
       }
 
-      // Allocate potongan/biayaLain adjustment to generic inventory
-      const adjustmentRemainder = new Decimal(body.biayaLain ?? 0).minus(new Decimal(body.potongan ?? 0));
-      if (!adjustmentRemainder.isZero()) {
+      // Note: adjustmentRemainder (potongan/biayaLain) is now folded into landedCostPool
+      // above and distributed proportionally to linked items. If canDistribute is false
+      // (no linked items), fallback: apply to generic 1.4.0 to keep books balanced.
+      if (!canDistribute && !adjustmentRemainder.isZero()) {
         const adjNum = adjustmentRemainder.toNumber();
         const existing = debitByAccount.get(inventoryAccount.id);
         if (existing) {
@@ -261,8 +297,10 @@ router.post('/', roleMiddleware(['Admin', 'Accountant', 'StaffProduksi']), async
         if (!inventoryItem || !inventoryItem.isActive) continue;
 
         const movementNumber = await generateDocumentNumber(tx, 'SM', parsedDate, fiscalYear.id);
-        const unitCost = new Decimal(item.amount.toString()).div(new Decimal(item.quantity.toString())).toDecimalPlaces(2).toNumber();
-        const totalValue = Number(item.amount);
+        // Use effectiveAmount (original + allocated landed cost) for inventory valuation
+        const effectiveAmount = effectiveAmountMap.get(item.id) ?? new Decimal(item.amount.toString());
+        const unitCost = effectiveAmount.div(new Decimal(item.quantity.toString())).toDecimalPlaces(2).toNumber();
+        const totalValue = effectiveAmount.toNumber();
 
         // Recalculate weighted average cost
         const newAvgCost = calcWeightedAverage(

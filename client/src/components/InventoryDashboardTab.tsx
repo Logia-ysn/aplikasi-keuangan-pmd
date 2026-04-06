@@ -220,7 +220,7 @@ export default function InventoryDashboardTab() {
   const criticalItems = activeItems.filter(i => Number(i.currentStock) <= MIN_STOCK_KG * 0.5);
 
   // Sort for stock overview: lowest stock first
-  const sortedItems = [...activeItems].sort((a, b) => Number(a.currentStock) - Number(b.currentStock));
+  const sortedItems = [...activeItems].sort((a, b) => Number(b.currentStock) - Number(a.currentStock));
 
   // Chart data for stock per item
   const stockChartData = [...activeItems]
