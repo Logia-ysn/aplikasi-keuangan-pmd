@@ -12,6 +12,10 @@ import { BusinessError, handleRouteError } from '../utils/errors';
 import { systemAccounts } from '../services/systemAccounts';
 import { logger } from '../lib/logger';
 import { calcWeightedAverage } from '../utils/weightedAverage';
+import {
+  computePurchaseItem,
+  sumPotonganItem,
+} from '../services/purchaseInvoiceCalc';
 
 const router = Router();
 
@@ -94,20 +98,23 @@ router.post('/', roleMiddleware(['Admin', 'Accountant', 'StaffProduksi']), async
       const apAccount = await systemAccounts.getAccount('AP');
       const inventoryAccount = await systemAccounts.getAccount('INVENTORY');
 
+      // Per-item calc: hargaAkhir includes PPN, PPh, potonganItem.
+      // quantity source of truth = timbanganDiterima (when provided) else quantity.
       const itemsWithAmount = body.items.map((item) => {
-        const base = new Decimal(item.quantity).mul(new Decimal(item.rate));
-        const disc = base.mul(new Decimal(item.discount ?? 0).div(100));
-        const amount = base.minus(disc).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
-        return { ...item, computedAmount: amount };
+        const calc = computePurchaseItem(item);
+        return {
+          ...item,
+          effectiveQty: calc.effectiveQuantity,
+          computedAmount: calc.hargaAkhir,
+        };
       });
-      const subtotal = itemsWithAmount.reduce((sum, item) => sum.plus(item.computedAmount), new Decimal(0));
-      // Per-item tax: sum each item's tax amount
-      const taxAmount = itemsWithAmount.reduce((sum, item) => {
-        return sum.plus(item.computedAmount.mul(new Decimal(item.taxPct ?? 0).div(100)));
-      }, new Decimal(0)).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
-      const grandTotal = subtotal
-        .plus(taxAmount)
-        .minus(new Decimal(body.potongan ?? 0))
+      const itemsSubtotal = itemsWithAmount.reduce(
+        (sum, item) => sum.plus(item.computedAmount),
+        new Decimal(0),
+      );
+      // Header `potongan` is now a derived cache from per-item deductions.
+      const headerPotongan = sumPotonganItem(body.items);
+      const grandTotal = itemsSubtotal
         .plus(new Decimal(body.biayaLain ?? 0))
         .toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
       const grandTotalNum = grandTotal.toNumber();
@@ -129,7 +136,7 @@ router.post('/', roleMiddleware(['Admin', 'Accountant', 'StaffProduksi']), async
           grandTotal: grandTotalNum,
           outstanding: grandTotalNum,
           taxPct: 0, // tax is per-item now
-          potongan: body.potongan ?? 0,
+          potongan: headerPotongan.toNumber(), // cached SUM(items.potonganItem)
           biayaLain: body.biayaLain ?? 0,
           status: 'Submitted',
           notes: body.notes || null,
@@ -140,15 +147,23 @@ router.post('/', roleMiddleware(['Admin', 'Accountant', 'StaffProduksi']), async
             create: itemsWithAmount.map((item) => {
               const linkedItem = item.inventoryItemId ? invItemMap.get(item.inventoryItemId) : null;
               const itemAccountId = linkedItem?.accountId || inventoryAccount.id;
+              // quantity := effective (timbanganDiterima when provided) so that
+              // stock movement, WAC, and downstream logic use the real received qty.
               return {
                 itemName: item.itemName,
                 inventoryItemId: item.inventoryItemId || null,
-                quantity: item.quantity,
+                quantity: item.effectiveQty.toNumber(),
                 unit: item.unit || 'pcs',
                 rate: item.rate,
                 discount: item.discount ?? 0,
                 amount: item.computedAmount.toNumber(),
                 taxPct: item.taxPct ?? 0,
+                pphPct: item.pphPct ?? 0,
+                potonganItem: item.potonganItem ?? 0,
+                kualitas: item.kualitas ?? null,
+                refaksi: item.refaksi ?? null,
+                timbanganTruk: item.timbanganTruk ?? null,
+                timbanganDiterima: item.timbanganDiterima ?? null,
                 accountId: itemAccountId,
                 description: item.description || null,
               };
@@ -158,15 +173,15 @@ router.post('/', roleMiddleware(['Admin', 'Accountant', 'StaffProduksi']), async
         include: { supplier: true, items: true },
       });
 
-      // Landed cost allocation: distribute non-linked items' cost + invoice-level
-      // adjustment (biayaLain - potongan) to linked items proportionally by value.
-      // Non-linked = service/fee items (rental, commission, risk) and discounts/extras
-      // are folded into COGS of the goods received, not left in generic 1.4.0.
+      // Landed cost allocation: distribute non-linked items' cost + biayaLain
+      // to linked items proportionally by value.
+      // NOTE: potonganItem is already embedded per-line in `amount` (see
+      // computePurchaseItem), so header potongan is NOT subtracted here.
       const linkedInvItems = invoice.items.filter((i) => i.inventoryItemId);
       const nonLinkedInvItems = invoice.items.filter((i) => !i.inventoryItemId);
       const linkedSubtotal = linkedInvItems.reduce((s, i) => s.plus(new Decimal(i.amount.toString())), new Decimal(0));
       const nonLinkedTotal = nonLinkedInvItems.reduce((s, i) => s.plus(new Decimal(i.amount.toString())), new Decimal(0));
-      const adjustmentRemainder = new Decimal(body.biayaLain ?? 0).minus(new Decimal(body.potongan ?? 0));
+      const adjustmentRemainder = new Decimal(body.biayaLain ?? 0);
       const landedCostPool = nonLinkedTotal.plus(adjustmentRemainder);
       const canDistribute = linkedInvItems.length > 0 && linkedSubtotal.gt(0) && !landedCostPool.isZero();
 
@@ -232,12 +247,8 @@ router.post('/', roleMiddleware(['Admin', 'Accountant', 'StaffProduksi']), async
         }
       }
 
-      // Add tax GL entry (DR PPN Masukan / TAX_INPUT) if there's any tax
-      const taxAmountNum = taxAmount.toNumber();
-      if (taxAmountNum > 0) {
-        const taxInputAccount = await systemAccounts.getAccount('TAX_INPUT');
-        debitByAccount.set(taxInputAccount.id, { amount: taxAmountNum, names: ['PPN Masukan'] });
-      }
+      // NOTE: PPN/PPh are folded into item `amount` (landed-cost model) —
+      // no separate GL lines for 1.5.3 PPN Masukan or 2.2.2 PPh Pembelian.
 
       const jvNumber = `JV-${invoice.invoiceNumber}`;
       const debitJournalItems = Array.from(debitByAccount.entries()).map(([accountId, data]) => ({
@@ -297,9 +308,14 @@ router.post('/', roleMiddleware(['Admin', 'Accountant', 'StaffProduksi']), async
         if (!inventoryItem || !inventoryItem.isActive) continue;
 
         const movementNumber = await generateDocumentNumber(tx, 'SM', parsedDate, fiscalYear.id);
-        // Use effectiveAmount (original + allocated landed cost) for inventory valuation
+        // Use effectiveAmount (hargaAkhir + allocated landed cost share) for valuation.
+        // item.quantity here already equals timbanganDiterima (set at create time),
+        // so unitCost represents the true all-in per-kg cost.
         const effectiveAmount = effectiveAmountMap.get(item.id) ?? new Decimal(item.amount.toString());
-        const unitCost = effectiveAmount.div(new Decimal(item.quantity.toString())).toDecimalPlaces(2).toNumber();
+        const qty = new Decimal(item.quantity.toString());
+        const unitCost = qty.gt(0)
+          ? effectiveAmount.div(qty).toDecimalPlaces(2).toNumber()
+          : 0;
         const totalValue = effectiveAmount.toNumber();
 
         // Recalculate weighted average cost

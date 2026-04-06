@@ -65,15 +65,28 @@ export const CreateSalesInvoiceSchema = z.object({
 });
 
 // ─── Purchase Invoice ─────────────────────────────────────────────────────────
+// Extends generic InvoiceItemSchema with raw-material weigh & quality fields.
+// `quantity` remains the source of truth for stock movement, but the service
+// layer will set quantity := timbanganDiterima when the latter is provided.
+const PurchaseInvoiceItemSchema = InvoiceItemSchema.extend({
+  kualitas: z.string().nullable().optional(),
+  refaksi: z.coerce.number().min(0).nullable().optional(),
+  timbanganTruk: z.coerce.number().min(0).nullable().optional(),
+  timbanganDiterima: z.coerce.number().positive().nullable().optional(),
+  potonganItem: z.coerce.number().min(0).optional().default(0),
+});
+
 export const CreatePurchaseInvoiceSchema = z.object({
   date: z.string().min(1, 'Tanggal wajib diisi.'),
   partyId: z.string().min(1, 'Pemasok wajib dipilih.'),
-  items: z.array(InvoiceItemSchema).min(1, 'Minimal satu item.'),
+  items: z.array(PurchaseInvoiceItemSchema).min(1, 'Minimal satu item.'),
   dueDate: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
   taxPct: z.coerce.number().min(0).max(100).optional().default(0),
-  potongan: z.coerce.number().min(0).optional().default(0),
   biayaLain: z.coerce.number().min(0).optional().default(0),
+  // `potongan` at header level is a derived cache (SUM items.potonganItem).
+  // Accept it for backward compat but the service layer recomputes from items.
+  potongan: z.coerce.number().min(0).optional().default(0),
 });
 
 // ─── Payment ──────────────────────────────────────────────────────────────────

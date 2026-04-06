@@ -37,17 +37,23 @@ router.post(
         return res.status(400).json({ error: 'referenceType dan referenceId wajib diisi.' });
       }
 
-      if (!['payment', 'journal'].includes(referenceType)) {
-        return res.status(400).json({ error: 'referenceType harus "payment" atau "journal".' });
+      const ALLOWED_REF_TYPES = ['payment', 'journal', 'purchase_invoice'];
+      if (!ALLOWED_REF_TYPES.includes(referenceType)) {
+        return res.status(400).json({
+          error: `referenceType harus salah satu dari: ${ALLOWED_REF_TYPES.join(', ')}.`,
+        });
       }
 
       // Validate reference exists
       if (referenceType === 'payment') {
         const payment = await prisma.payment.findUnique({ where: { id: referenceId } });
         if (!payment) return res.status(404).json({ error: 'Transaksi pembayaran tidak ditemukan.' });
-      } else {
+      } else if (referenceType === 'journal') {
         const journal = await prisma.journalEntry.findUnique({ where: { id: referenceId } });
         if (!journal) return res.status(404).json({ error: 'Jurnal tidak ditemukan.' });
+      } else if (referenceType === 'purchase_invoice') {
+        const pi = await prisma.purchaseInvoice.findUnique({ where: { id: referenceId } });
+        if (!pi) return res.status(404).json({ error: 'Invoice pembelian tidak ditemukan.' });
       }
 
       // Check existing count

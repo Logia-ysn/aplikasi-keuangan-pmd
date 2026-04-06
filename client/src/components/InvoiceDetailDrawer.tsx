@@ -1,13 +1,16 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { X, FileDown, Clock, CreditCard, Package, User, Calendar, AlertTriangle, CheckCircle2, Loader2, Wallet, XCircle, Pencil, Save } from 'lucide-react';
+import { X, FileDown, Clock, CreditCard, Package, User, Calendar, AlertTriangle, CheckCircle2, Loader2, Wallet, XCircle, Pencil, Save, Paperclip, FileText, Image as ImageIcon, Trash2, Download } from 'lucide-react';
+import { pdf } from '@react-pdf/renderer';
 import { cn } from '../lib/utils';
 import api from '../lib/api';
 import { formatRupiah, formatDate } from '../lib/formatters';
 import PDFDownloadButton from './PDFDownloadButton';
 import InvoicePDF from '../lib/pdf/InvoicePDF';
 import { useCompanyPDF } from '../lib/pdf/useCompanyPDF';
+import { mergeInvoicePdfWithAttachments } from '../lib/pdf/mergePdfWithAttachments';
+import type { AttachmentRef } from '../lib/pdf/mergePdfWithAttachments';
 import ApplyDepositModal from './ApplyDepositModal';
 import ApplyCustomerDepositModal from './ApplyCustomerDepositModal';
 import { ConfirmDialog } from './ConfirmDialog';
@@ -39,7 +42,9 @@ const InvoiceDetailDrawer: React.FC<Props> = ({ type, invoiceId, onClose }) => {
   const [editNotes, setEditNotes] = useState('');
   const [editDueDate, setEditDueDate] = useState('');
   const [editTerms, setEditTerms] = useState('');
+  const [isMerging, setIsMerging] = useState(false);
   const endpoint = isSales ? '/sales/invoices' : '/purchase/invoices';
+  const canHaveAttachments = type === 'purchase';
 
   const { data: invoice, isLoading } = useQuery({
     queryKey: [type === 'sales' ? 'sales-invoice-detail' : 'purchase-invoice-detail', invoiceId],
@@ -88,6 +93,40 @@ const InvoiceDetailDrawer: React.FC<Props> = ({ type, invoiceId, onClose }) => {
     onError: (err: any) => toast.error(err.response?.data?.error || 'Gagal memperbarui invoice.'),
   });
 
+  // Attachments (purchase invoice only for now)
+  const { data: attachments = [] } = useQuery({
+    queryKey: ['pi-attachments', invoiceId],
+    queryFn: async () => {
+      const res = await api.get(`/attachments/purchase_invoice/${invoiceId}`);
+      return res.data as Array<{ id: string; fileName: string; mimeType: string; fileSize: number }>;
+    },
+    enabled: !!invoiceId && canHaveAttachments,
+  });
+
+  const uploadAttachmentMutation = useMutation({
+    mutationFn: async (files: File[]) => {
+      const fd = new FormData();
+      fd.append('referenceType', 'purchase_invoice');
+      fd.append('referenceId', invoiceId!);
+      for (const f of files) fd.append('files', f);
+      await api.post('/attachments/upload', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pi-attachments', invoiceId] });
+      toast.success('Lampiran berhasil diupload.');
+    },
+    onError: (err: any) => toast.error(err.response?.data?.error || 'Gagal upload lampiran.'),
+  });
+
+  const deleteAttachmentMutation = useMutation({
+    mutationFn: (id: string) => api.delete(`/attachments/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pi-attachments', invoiceId] });
+      toast.success('Lampiran dihapus.');
+    },
+    onError: (err: any) => toast.error(err.response?.data?.error || 'Gagal hapus lampiran.'),
+  });
+
   if (!invoiceId) return null;
 
   const party = isSales ? invoice?.customer : invoice?.supplier;
@@ -131,6 +170,75 @@ const InvoiceDetailDrawer: React.FC<Props> = ({ type, invoiceId, onClose }) => {
       dueDate: editDueDate || undefined,
       terms: editTerms || undefined,
     });
+  };
+
+  // Client-side merge: render invoice PDF, then append each attachment.
+  // Called from "Unduh PDF + Lampiran" button in header.
+  const downloadMergedPdf = async () => {
+    if (!invoice) return;
+    try {
+      setIsMerging(true);
+      const invoiceDoc = (
+        <InvoicePDF
+          type={type}
+          invoiceNumber={invoice.invoiceNumber}
+          date={invoice.date}
+          dueDate={invoice.dueDate}
+          terms={invoice.terms}
+          status={invoice.status}
+          notes={invoice.notes}
+          taxPct={invoice.taxPct ?? 0}
+          potongan={invoice.potongan ?? 0}
+          biayaLain={invoice.biayaLain ?? 0}
+          labelPotongan={invoice.labelPotongan}
+          labelBiaya={invoice.labelBiaya}
+          grandTotal={invoice.grandTotal}
+          party={{
+            name: party?.name ?? '—',
+            address: party?.address,
+            phone: party?.phone,
+            email: party?.email,
+            taxId: party?.taxId,
+          }}
+          items={items.map((it: any) => ({
+            itemName: it.itemName,
+            quantity: it.quantity,
+            unit: it.unit,
+            rate: it.rate,
+            discount: it.discount ?? 0,
+            taxPct: it.taxPct ?? 0,
+            pphPct: it.pphPct ?? 0,
+            amount: it.amount,
+            description: it.description,
+          }))}
+          company={company}
+        />
+      );
+      const invoiceBlob = await pdf(invoiceDoc).toBlob();
+      const refs: AttachmentRef[] = attachments.map((a) => ({
+        id: a.id,
+        fileName: a.fileName,
+        mimeType: a.mimeType,
+        fetchUrl: `/api/attachments/file/${a.id}`,
+      }));
+      const merged = await mergeInvoicePdfWithAttachments(invoiceBlob, refs, {
+        fetchBinary: async (url) => {
+          const res = await api.get(url, { responseType: 'arraybuffer' });
+          return res.data as ArrayBuffer;
+        },
+      });
+      const url = URL.createObjectURL(merged);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${invoice.invoiceNumber}_with_lampiran.pdf`;
+      link.click();
+      URL.revokeObjectURL(url);
+      toast.success('PDF + lampiran siap diunduh.');
+    } catch (err: any) {
+      toast.error(err?.message || 'Gagal menggabungkan PDF.');
+    } finally {
+      setIsMerging(false);
+    }
   };
 
   return (
@@ -217,6 +325,17 @@ const InvoiceDetailDrawer: React.FC<Props> = ({ type, invoiceId, onClose }) => {
                   />
                 }
               />
+            )}
+            {invoice && canHaveAttachments && attachments.length > 0 && (
+              <button
+                onClick={downloadMergedPdf}
+                disabled={isMerging}
+                className="btn-secondary btn-sm flex items-center gap-1.5 disabled:opacity-50"
+                title="Unduh PDF invoice + semua lampiran dalam 1 file"
+              >
+                {isMerging ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+                <span className="hidden sm:inline">PDF + Lampiran</span>
+              </button>
             )}
             <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 transition-colors">
               <X size={18} />
@@ -370,6 +489,13 @@ const InvoiceDetailDrawer: React.FC<Props> = ({ type, invoiceId, onClose }) => {
                               )}
                             </div>
                             {item.description && <p className="text-[10px] text-gray-400">{item.description}</p>}
+                            {!isSales && (item.kualitas || item.timbanganTruk || item.refaksi) && (
+                              <div className="text-[10px] text-gray-400 space-x-2 mt-0.5">
+                                {item.kualitas && <span>Kualitas: <span className="text-gray-600">{item.kualitas}</span></span>}
+                                {Number(item.timbanganTruk) > 0 && <span>Truk: {Number(item.timbanganTruk).toLocaleString('id-ID')} kg</span>}
+                                {Number(item.refaksi) > 0 && <span className="text-amber-600">Refaksi: {Number(item.refaksi).toLocaleString('id-ID')} kg</span>}
+                              </div>
+                            )}
                           </td>
                           <td className="px-3 py-2.5 text-center font-mono text-xs text-gray-700">
                             {Number(item.quantity).toLocaleString('id-ID')}
@@ -402,6 +528,65 @@ const InvoiceDetailDrawer: React.FC<Props> = ({ type, invoiceId, onClose }) => {
                   </table>
                 </div>
               </div>
+
+              {/* Attachments (purchase invoice only) */}
+              {canHaveAttachments && (
+                <div className="px-6 py-4 border-b border-gray-100">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest flex items-center gap-1">
+                      <Paperclip size={10} /> Dokumen Pendukung ({attachments.length})
+                    </p>
+                    {invoice.status !== 'Cancelled' && (
+                      <label className="flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-700 cursor-pointer">
+                        + Tambah File
+                        <input
+                          type="file"
+                          multiple
+                          accept=".jpg,.jpeg,.png,.webp,.pdf"
+                          className="hidden"
+                          onChange={(e) => {
+                            const files = Array.from(e.target.files || []);
+                            if (files.length > 0) uploadAttachmentMutation.mutate(files);
+                            e.target.value = '';
+                          }}
+                        />
+                      </label>
+                    )}
+                  </div>
+                  {attachments.length === 0 ? (
+                    <p className="text-xs text-gray-400 italic">Belum ada lampiran.</p>
+                  ) : (
+                    <div className="space-y-1.5">
+                      {attachments.map((a) => (
+                        <div key={a.id} className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg text-xs">
+                          {a.mimeType === 'application/pdf' ? (
+                            <FileText size={14} className="text-red-500 shrink-0" />
+                          ) : (
+                            <ImageIcon size={14} className="text-blue-500 shrink-0" />
+                          )}
+                          <a
+                            href={`/api/attachments/file/${a.id}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex-1 truncate text-gray-700 hover:text-blue-600"
+                          >
+                            {a.fileName}
+                          </a>
+                          <span className="text-gray-400">{(a.fileSize / 1024).toFixed(0)} KB</span>
+                          {invoice.status !== 'Cancelled' && (
+                            <button
+                              onClick={() => deleteAttachmentMutation.mutate(a.id)}
+                              className="text-gray-400 hover:text-red-500"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Summary */}
               <div className="px-6 py-4 border-b border-gray-100">

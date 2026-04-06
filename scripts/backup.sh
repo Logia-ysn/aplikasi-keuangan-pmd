@@ -14,6 +14,7 @@ BACKUP_BRANCH="backups"
 MAX_BACKUPS=3
 TIMESTAMP=$(date +%Y-%m-%d_%H%M%S)
 BACKUP_FILENAME="pmd_finance_${TIMESTAMP}.sql.gz"
+UPLOADS_FILENAME="pmd_uploads_${TIMESTAMP}.tar.gz"
 WORKTREE_DIR="/tmp/pmd-backup-worktree"
 LOG_FILE="${SCRIPT_DIR}/backup.log"
 
@@ -23,8 +24,8 @@ log() {
 }
 
 cleanup() {
-  # Remove temp dump file
-  rm -f "/tmp/${BACKUP_FILENAME}" 2>/dev/null || true
+  # Remove temp files
+  rm -f "/tmp/${BACKUP_FILENAME}" "/tmp/${UPLOADS_FILENAME}" 2>/dev/null || true
   # Remove git worktree
   if [ -d "$WORKTREE_DIR" ]; then
     git -C "$PROJECT_DIR" worktree remove --force "$WORKTREE_DIR" 2>/dev/null || rm -rf "$WORKTREE_DIR"
@@ -84,6 +85,28 @@ docker exec "$CONTAINER_ID" \
 
 DUMP_SIZE=$(du -h "$DUMP_FILE" | cut -f1)
 log "Dump created: ${BACKUP_FILENAME} (${DUMP_SIZE})"
+
+# ─── Step 1b: Archive uploads volume (attachments) ───────────────────────────
+log "Step 1b/4: Archiving uploads volume..."
+
+UPLOADS_FILE="/tmp/${UPLOADS_FILENAME}"
+# Find the volume name: docker compose prefixes with project dir name
+UPLOAD_VOL=$(docker volume ls --format '{{.Name}}' | grep -E '_uploads$' | head -1 || true)
+if [ -n "$UPLOAD_VOL" ]; then
+  docker run --rm \
+    -v "${UPLOAD_VOL}:/src:ro" \
+    -v /tmp:/dst \
+    alpine:3 \
+    sh -c "cd /src && tar -czf /dst/${UPLOADS_FILENAME} . 2>/dev/null || tar -czf /dst/${UPLOADS_FILENAME} --files-from /dev/null"
+  if [ -f "$UPLOADS_FILE" ]; then
+    UPLOADS_SIZE=$(du -h "$UPLOADS_FILE" | cut -f1)
+    log "Uploads archive: ${UPLOADS_FILENAME} (${UPLOADS_SIZE})"
+  else
+    log "WARN: uploads archive not produced"
+  fi
+else
+  log "WARN: uploads volume not found, skipping attachment backup"
+fi
 
 # ─── Step 2: Prepare git worktree ────────────────────────────────────────────
 log "Step 2/4: Preparing git worktree..."
@@ -145,17 +168,21 @@ fi
 log "Step 3/4: Copying dump and rotating old backups..."
 
 cp "$DUMP_FILE" "${WORKTREE_DIR}/${BACKUP_FILENAME}"
-
-# Rotate: keep only MAX_BACKUPS most recent .sql.gz files
-cd "$WORKTREE_DIR"
-BACKUP_COUNT=$(ls -1 pmd_finance_*.sql.gz 2>/dev/null | wc -l | tr -d ' ')
-
-if [ "$BACKUP_COUNT" -gt "$MAX_BACKUPS" ]; then
-  ls -1t pmd_finance_*.sql.gz | tail -n +$((MAX_BACKUPS + 1)) | while read -r old_file; do
-    log "Rotating out: ${old_file}"
-    git rm "$old_file" 2>/dev/null || rm -f "$old_file"
-  done
+if [ -f "$UPLOADS_FILE" ]; then
+  cp "$UPLOADS_FILE" "${WORKTREE_DIR}/${UPLOADS_FILENAME}"
 fi
+
+# Rotate: keep only MAX_BACKUPS most recent .sql.gz AND .tar.gz files
+cd "$WORKTREE_DIR"
+for pattern in 'pmd_finance_*.sql.gz' 'pmd_uploads_*.tar.gz'; do
+  COUNT=$(ls -1 $pattern 2>/dev/null | wc -l | tr -d ' ')
+  if [ "$COUNT" -gt "$MAX_BACKUPS" ]; then
+    ls -1t $pattern | tail -n +$((MAX_BACKUPS + 1)) | while read -r old_file; do
+      log "Rotating out: ${old_file}"
+      git rm "$old_file" 2>/dev/null || rm -f "$old_file"
+    done
+  fi
+done
 
 # ─── Step 4: Commit + push ───────────────────────────────────────────────────
 log "Step 4/4: Committing and pushing..."

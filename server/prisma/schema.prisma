@@ -261,6 +261,12 @@ model PurchaseInvoiceItem {
   discount          Decimal         @default(0) @db.Decimal(5, 2)
   amount            Decimal         @db.Decimal(15, 2)
   taxPct            Decimal         @default(0) @db.Decimal(5, 2) @map("tax_pct")
+  pphPct            Decimal         @default(0) @db.Decimal(5, 2) @map("pph_pct")
+  potonganItem      Decimal         @default(0) @db.Decimal(15, 2) @map("potongan_item")
+  kualitas          String?
+  refaksi           Decimal?        @db.Decimal(15, 3)
+  timbanganTruk     Decimal?        @db.Decimal(15, 3) @map("timbangan_truk")
+  timbanganDiterima Decimal?        @db.Decimal(15, 3) @map("timbangan_diterima")
   accountId         String          @map("account_id")
   account           Account         @relation(fields: [accountId], references: [id])
   description       String?

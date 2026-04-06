@@ -83,6 +83,7 @@ export function InventoryPage() {
     : (itemsRaw?.data ?? []);
 
   const movementFilters = useMemo(() => ({
+    limit: 200,
     ...(filterItemId ? { itemId: filterItemId } : {}),
     ...(filterMovementType ? { movementType: filterMovementType } : {}),
     ...(filterStartDate ? { startDate: filterStartDate } : {}),

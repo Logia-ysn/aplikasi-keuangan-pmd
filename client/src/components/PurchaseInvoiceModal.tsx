@@ -1,36 +1,75 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../lib/api';
-import { X, Plus, Trash2, Loader2, AlertCircle, ChevronDown } from 'lucide-react';
+import { X, Plus, Trash2, Loader2, AlertCircle, Paperclip, FileText, Image as ImageIcon } from 'lucide-react';
 import { formatRupiah } from '../lib/formatters';
 
-
+// Rice-mill purchase invoice item.
+// Flow: timbanganTruk (info only) → refaksi (kg deducted) → timbanganDiterima (net received)
+// → rate → ppn/pph → potonganItem → hargaAkhir.
 interface InvoiceItem {
   id: string;
   itemName: string;
   inventoryItemId: string;
   description: string;
-  quantity: number;
   unit: string;
-  rate: number;
-  discount: number; // percent
-  taxPct: number;   // PPN % per item
+  kualitas: string;
+  refaksi: number;            // kg, optional
+  timbanganTruk: number;       // kg, informational only
+  timbanganDiterima: number;   // kg, source of truth for qty
+  rate: number;                // harga per kg
+  taxPct: number;              // PPN % per item
+  pphPct: number;              // PPh % per item
+  potonganItem: number;        // IDR per item
 }
 
-const UNITS = ['Kg', 'Ton', 'Sak', 'Liter', 'Pcs', 'Box', 'Unit', 'Set', 'Meter', 'Jasa'];
+const MAX_ATTACHMENTS = 5;
+const MAX_FILE_SIZE = 5 * 1024 * 1024;
+const ALLOWED_MIME = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
 
 const defaultItem = (): InvoiceItem => ({
-  id: crypto.randomUUID(), itemName: '', inventoryItemId: '', description: '', quantity: 1, unit: 'Kg', rate: 0, discount: 0, taxPct: 0
+  id: crypto.randomUUID(),
+  itemName: '',
+  inventoryItemId: '',
+  description: '',
+  unit: 'Kg',
+  kualitas: '',
+  refaksi: 0,
+  timbanganTruk: 0,
+  timbanganDiterima: 0,
+  rate: 0,
+  taxPct: 0,
+  pphPct: 0,
+  potonganItem: 0,
 });
+
+// Per-item calc — mirrors server/src/services/purchaseInvoiceCalc.ts
+// so the UI total matches what the backend will persist.
+interface LineCalc {
+  effectiveQty: number;
+  subtotal: number;
+  ppn: number;
+  pph: number;
+  hargaAkhir: number;
+}
+
+const computeLine = (item: InvoiceItem): LineCalc => {
+  const qty = item.timbanganDiterima > 0 ? item.timbanganDiterima : 0;
+  const subtotal = Math.round(qty * item.rate * 100) / 100;
+  const ppn = Math.round(subtotal * (item.taxPct / 100) * 100) / 100;
+  const pph = Math.round(subtotal * (item.pphPct / 100) * 100) / 100;
+  const hargaAkhir = Math.round((subtotal + ppn - pph - item.potonganItem) * 100) / 100;
+  return { effectiveQty: qty, subtotal, ppn, pph, hargaAkhir };
+};
 
 const PurchaseInvoiceModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, onClose }) => {
   const [invoiceDate, setInvoiceDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [dueDate, setDueDate] = useState(() => new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0]);
   const [partyId, setPartyId] = useState('');
   const [notes, setNotes] = useState('');
-  const [potongan, setPotongan] = useState(0);
   const [biayaLain, setBiayaLain] = useState(0);
   const [items, setItems] = useState<InvoiceItem[]>([defaultItem()]);
+  const [stagedFiles, setStagedFiles] = useState<File[]>([]);
   const [error, setError] = useState('');
 
   const queryClient = useQueryClient();
@@ -40,7 +79,7 @@ const PurchaseInvoiceModal: React.FC<{ isOpen: boolean; onClose: () => void }> =
     queryFn: async () => {
       const res = await api.get('/parties?type=Supplier');
       return res.data.data ?? res.data;
-    }
+    },
   });
 
   const { data: inventoryItems } = useQuery({
@@ -55,7 +94,25 @@ const PurchaseInvoiceModal: React.FC<{ isOpen: boolean; onClose: () => void }> =
   const selectedParty = parties?.find((p: any) => p.id === partyId);
 
   const mutation = useMutation({
-    mutationFn: (data: any) => api.post('/purchase/invoices', data),
+    mutationFn: async (data: any) => {
+      const res = await api.post('/purchase/invoices', data);
+      const invoice = res.data;
+      // Upload staged attachments (best-effort; failures logged but not rolled back)
+      if (stagedFiles.length > 0 && invoice?.id) {
+        const fd = new FormData();
+        fd.append('referenceType', 'purchase_invoice');
+        fd.append('referenceId', invoice.id);
+        for (const f of stagedFiles) fd.append('files', f);
+        try {
+          await api.post('/attachments/upload', fd, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+          });
+        } catch (err) {
+          console.warn('Upload lampiran gagal:', err);
+        }
+      }
+      return invoice;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['purchase-invoices'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-metrics'] });
@@ -63,17 +120,18 @@ const PurchaseInvoiceModal: React.FC<{ isOpen: boolean; onClose: () => void }> =
       queryClient.invalidateQueries({ queryKey: ['inventory-items'] });
       queryClient.invalidateQueries({ queryKey: ['stock-movements'] });
       queryClient.invalidateQueries({ queryKey: ['coa'] });
+      queryClient.invalidateQueries({ queryKey: ['attachments'] });
       setInvoiceDate(new Date().toISOString().split('T')[0]);
       setDueDate(new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0]);
       setPartyId('');
       setNotes('');
-      setPotongan(0);
       setBiayaLain(0);
       setItems([defaultItem()]);
+      setStagedFiles([]);
       setError('');
       onClose();
     },
-    onError: (err: any) => setError(err.response?.data?.error || 'Gagal menyimpan invoice.')
+    onError: (err: any) => setError(err.response?.data?.error || 'Gagal menyimpan invoice.'),
   });
 
   const addItem = () => setItems([...items, defaultItem()]);
@@ -81,6 +139,14 @@ const PurchaseInvoiceModal: React.FC<{ isOpen: boolean; onClose: () => void }> =
   const updateItem = (i: number, field: keyof InvoiceItem, value: any) => {
     const next = [...items];
     next[i] = { ...next[i], [field]: value };
+    // Auto-derive timbanganDiterima when refaksi/timbanganTruk change
+    if (field === 'timbanganTruk' || field === 'refaksi') {
+      const truk = field === 'timbanganTruk' ? Number(value) : next[i].timbanganTruk;
+      const ref = field === 'refaksi' ? Number(value) : next[i].refaksi;
+      if (truk > 0) {
+        next[i].timbanganDiterima = Math.max(0, truk - (ref || 0));
+      }
+    }
     setItems(next);
   };
   const selectInventoryItem = (idx: number, inventoryId: string) => {
@@ -94,24 +160,45 @@ const PurchaseInvoiceModal: React.FC<{ isOpen: boolean; onClose: () => void }> =
     setItems(next);
   };
 
-  const lineTotal = (item: InvoiceItem) => {
-    const base = item.quantity * item.rate;
-    return base - (base * (item.discount / 100));
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    const valid: File[] = [];
+    for (const f of files) {
+      if (!ALLOWED_MIME.includes(f.type)) {
+        setError(`${f.name}: tipe file tidak didukung (JPG/PNG/WebP/PDF).`);
+        continue;
+      }
+      if (f.size > MAX_FILE_SIZE) {
+        setError(`${f.name}: ukuran melebihi 5 MB.`);
+        continue;
+      }
+      valid.push(f);
+    }
+    const merged = [...stagedFiles, ...valid].slice(0, MAX_ATTACHMENTS);
+    setStagedFiles(merged);
+    e.target.value = '';
   };
-  const lineTax = (item: InvoiceItem) => lineTotal(item) * (item.taxPct / 100);
-  const subtotal = items.reduce((s, it) => s + lineTotal(it), 0);
-  const taxAmount = items.reduce((s, it) => s + lineTax(it), 0);
-  const grandTotal = subtotal + taxAmount - potongan + biayaLain;
-  const canSubmit = partyId && items.some(i => i.itemName && i.rate > 0) && grandTotal > 0 && !mutation.isPending;
+  const removeStagedFile = (idx: number) => setStagedFiles(stagedFiles.filter((_, i) => i !== idx));
+
+  const lineCalcs = useMemo(() => items.map(computeLine), [items]);
+  const subtotalItems = lineCalcs.reduce((s, c) => s + c.hargaAkhir, 0);
+  const totalPpn = lineCalcs.reduce((s, c) => s + c.ppn, 0);
+  const totalPph = lineCalcs.reduce((s, c) => s + c.pph, 0);
+  const totalPotongan = items.reduce((s, i) => s + (i.potonganItem || 0), 0);
+  const grandTotal = subtotalItems + biayaLain;
+  const canSubmit =
+    partyId &&
+    items.some((i) => i.itemName && i.rate > 0 && i.timbanganDiterima > 0) &&
+    grandTotal > 0 &&
+    !mutation.isPending;
 
   if (!isOpen) return null;
 
   return (
-    <div role="dialog" aria-modal="true" aria-labelledby="purchase-modal-title" className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4" onKeyDown={(e: React.KeyboardEvent) => e.key === "Escape" && onClose()}>
-      <div className="rounded-xl w-full max-w-[calc(100vw-1rem)] lg:max-w-5xl shadow-2xl flex flex-col max-h-[95vh] overflow-hidden" style={{ backgroundColor: 'var(--color-bg-primary)' }}>
-
-        {/* ── HEADER BAR ── */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+    <div role="dialog" aria-modal="true" aria-labelledby="purchase-modal-title" className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-2 sm:p-4" onKeyDown={(e: React.KeyboardEvent) => e.key === 'Escape' && onClose()}>
+      <div className="rounded-xl w-full max-w-[calc(100vw-0.5rem)] lg:max-w-6xl shadow-2xl flex flex-col max-h-[98vh] overflow-hidden" style={{ backgroundColor: 'var(--color-bg-primary)' }}>
+        {/* HEADER */}
+        <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-gray-100">
           <div>
             <h2 id="purchase-modal-title" className="text-base font-semibold text-gray-900">Invoice Pembelian Baru</h2>
             <p className="text-xs text-gray-400 mt-0.5">Draft • belum disimpan</p>
@@ -121,20 +208,13 @@ const PurchaseInvoiceModal: React.FC<{ isOpen: boolean; onClose: () => void }> =
           </button>
         </div>
 
-        {/* ── BODY ── */}
+        {/* BODY */}
         <div className="flex-1 overflow-y-auto">
-
-          {/* Top meta section */}
-          <div className="p-6 grid grid-cols-2 gap-8 border-b border-gray-100">
-
-            {/* LEFT — Supplier */}
+          {/* Meta */}
+          <div className="p-4 sm:p-6 grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-8 border-b border-gray-100">
             <div>
               <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-2">Supplier / Pemasok</p>
-              <select
-                value={partyId}
-                onChange={(e) => setPartyId(e.target.value)}
-                className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2"
-              >
+              <select value={partyId} onChange={(e) => setPartyId(e.target.value)} className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2">
                 <option value="">— Pilih Supplier —</option>
                 {parties?.map((p: any) => (
                   <option key={p.id} value={p.id}>{p.name}</option>
@@ -148,244 +228,289 @@ const PurchaseInvoiceModal: React.FC<{ isOpen: boolean; onClose: () => void }> =
                 </div>
               )}
             </div>
-
-            {/* RIGHT — Invoice details */}
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">Tanggal Invoice</label>
-                <input type="date" value={invoiceDate} onChange={e => setInvoiceDate(e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                <input type="date" value={invoiceDate} onChange={(e) => setInvoiceDate(e.target.value)} className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
               <div>
                 <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">Jatuh Tempo</label>
-                <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
-              </div>
-              <div className="col-span-2">
-                <p className="text-xs text-gray-400 mt-1">PPN diatur per baris item</p>
+                <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
             </div>
           </div>
 
-          {/* ── ITEMS TABLE ── */}
-          <div className="px-6 pt-5 pb-4">
+          {/* ITEMS — Desktop table */}
+          <div className="px-4 sm:px-6 pt-5 pb-4">
             <div className="flex items-center justify-between mb-3">
-              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Daftar Barang / Jasa</p>
+              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Daftar Barang</p>
               <button onClick={addItem} className="flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-700">
                 <Plus size={13} /> Tambah Baris
               </button>
             </div>
 
-            <div className="border border-gray-200 rounded-xl overflow-hidden">
-              <table className="w-full text-sm">
+            {/* Desktop: horizontal scroll table */}
+            <div className="hidden md:block border border-gray-200 rounded-xl overflow-x-auto">
+              <table className="w-full text-sm min-w-[1400px]">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-200 text-[10px] font-semibold text-gray-400 uppercase tracking-wide">
-                    <th className="text-left px-4 py-3 w-8">#</th>
-                    <th className="text-left px-4 py-3 min-w-[200px]">Nama Barang / Jasa</th>
-                    <th className="text-center px-3 py-3 w-20">Qty</th>
-                    <th className="text-left px-3 py-3 w-24">Satuan</th>
-                    <th className="text-right px-3 py-3 w-36">Harga Satuan</th>
-                    <th className="text-right px-3 py-3 w-20">Diskon %</th>
-                    <th className="text-right px-3 py-3 w-20">PPN %</th>
-                    <th className="text-right px-4 py-3 w-36">Jumlah</th>
+                    <th className="text-left px-2 py-2 w-6">#</th>
+                    <th className="text-left px-2 py-2 min-w-[180px]">Jenis Barang</th>
+                    <th className="text-left px-2 py-2 w-32">Kualitas</th>
+                    <th className="text-right px-2 py-2 w-24">Refaksi (kg)</th>
+                    <th className="text-right px-2 py-2 w-28">Timb. Truk (kg)</th>
+                    <th className="text-right px-2 py-2 w-28">Timb. Diterima</th>
+                    <th className="text-right px-2 py-2 w-28">Harga/kg</th>
+                    <th className="text-right px-2 py-2 w-16">PPN %</th>
+                    <th className="text-right px-2 py-2 w-16">PPh %</th>
+                    <th className="text-right px-2 py-2 w-28">Potongan</th>
+                    <th className="text-right px-2 py-2 w-32">Harga Akhir</th>
                     <th className="w-8"></th>
                   </tr>
                 </thead>
                 <tbody>
-                  {items.map((item, idx) => (
-                    <tr key={item.id} className="group border-b border-gray-50 last:border-0 hover:bg-gray-50/50 transition-colors">
-                      <td className="px-4 py-3 text-center text-xs text-gray-300 font-medium">{idx + 1}</td>
-                      <td className="px-4 py-3">
-                        <select
-                          value={item.inventoryItemId}
-                          onChange={e => selectInventoryItem(idx, e.target.value)}
-                          className="w-full bg-transparent text-sm text-gray-800 border-none focus:ring-0 focus:outline-none p-0 cursor-pointer mb-0.5"
-                        >
-                          <option value="">— Pilih dari Stok Gudang —</option>
-                          {inventoryItems?.map((inv: any) => (
-                            <option key={inv.id} value={inv.id}>
-                              {inv.code} — {inv.name} ({inv.currentStock} {inv.unit})
-                            </option>
-                          ))}
-                        </select>
-                        {!item.inventoryItemId && (
-                          <input
-                            type="text"
-                            value={item.itemName}
-                            onChange={e => updateItem(idx, 'itemName', e.target.value)}
-                            placeholder="Atau ketik nama barang/jasa manual..."
-                            className="w-full bg-transparent text-xs text-gray-500 border-none focus:ring-0 focus:outline-none p-0 placeholder:text-gray-300"
-                          />
-                        )}
-                      </td>
-                      <td className="px-3 py-3">
-                        <input
-                          type="number"
-                          value={item.quantity}
-                          onChange={e => updateItem(idx, 'quantity', Number(e.target.value))}
-                          min={1}
-                          className="w-full bg-transparent text-sm text-gray-800 text-center font-mono border-none focus:ring-0 focus:outline-none p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                        />
-                      </td>
-                      <td className="px-3 py-3">
-                        <div className="relative">
-                          <select
-                            value={item.unit}
-                            onChange={e => updateItem(idx, 'unit', e.target.value)}
-                            className="w-full bg-transparent text-sm text-gray-600 border-none focus:ring-0 focus:outline-none p-0 appearance-none cursor-pointer pr-4"
-                          >
-                            {UNITS.map(u => <option key={u}>{u}</option>)}
+                  {items.map((item, idx) => {
+                    const calc = lineCalcs[idx];
+                    return (
+                      <tr key={item.id} className="border-b border-gray-50 last:border-0 hover:bg-gray-50/50">
+                        <td className="px-2 py-2 text-center text-xs text-gray-300">{idx + 1}</td>
+                        <td className="px-2 py-2">
+                          <select value={item.inventoryItemId} onChange={(e) => selectInventoryItem(idx, e.target.value)} className="w-full bg-transparent text-xs text-gray-800 border-none focus:ring-0 focus:outline-none p-0 cursor-pointer">
+                            <option value="">— Pilih dari Stok —</option>
+                            {inventoryItems?.map((inv: any) => (
+                              <option key={inv.id} value={inv.id}>{inv.code} — {inv.name}</option>
+                            ))}
                           </select>
-                          <ChevronDown size={10} className="absolute right-0 top-1/2 -translate-y-1/2 text-gray-300 pointer-events-none" />
-                        </div>
-                      </td>
-                      <td className="px-3 py-3 text-right">
-                        <input
-                          type="number"
-                          value={item.rate || ''}
-                          onChange={e => updateItem(idx, 'rate', Number(e.target.value))}
-                          placeholder="0"
-                          className="w-full bg-transparent text-sm text-gray-800 text-right font-mono border-none focus:ring-0 focus:outline-none p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                        />
-                      </td>
-                      <td className="px-3 py-3 text-right">
-                        <input
-                          type="number"
-                          value={item.discount || ''}
-                          onChange={e => updateItem(idx, 'discount', Math.min(100, Number(e.target.value)))}
-                          placeholder="0"
-                          min={0} max={100}
-                          className="w-full bg-transparent text-sm text-gray-600 text-right font-mono border-none focus:ring-0 focus:outline-none p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                        />
-                      </td>
-                      <td className="px-3 py-3 text-right">
-                        <input
-                          type="number"
-                          value={item.taxPct || ''}
-                          onChange={e => updateItem(idx, 'taxPct', Math.max(0, Math.min(100, Number(e.target.value))))}
-                          placeholder="0"
-                          min={0} max={100}
-                          className="w-full bg-transparent text-sm text-blue-600 text-right font-mono border-none focus:ring-0 focus:outline-none p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                        />
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <span className="font-mono text-sm font-medium text-gray-900 tabular-nums">
-                          {formatRupiah(lineTotal(item))}
-                        </span>
-                      </td>
-                      <td className="pr-3 py-3 text-center">
-                        {items.length > 1 && (
-                          <button onClick={() => removeItem(idx)}
-                            className="p-1 rounded text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors">
-                            <Trash2 size={13} />
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
+                          {!item.inventoryItemId && (
+                            <input type="text" value={item.itemName} onChange={(e) => updateItem(idx, 'itemName', e.target.value)} placeholder="atau manual..." className="w-full bg-transparent text-[11px] text-gray-500 border-none focus:ring-0 focus:outline-none p-0 placeholder:text-gray-300" />
+                          )}
+                        </td>
+                        <td className="px-2 py-2">
+                          <input type="text" value={item.kualitas} onChange={(e) => updateItem(idx, 'kualitas', e.target.value)} placeholder="KA 18%..." className="w-full bg-transparent text-xs text-gray-700 border-none focus:ring-0 focus:outline-none p-0 placeholder:text-gray-300" />
+                        </td>
+                        <td className="px-2 py-2 text-right">
+                          <input type="number" value={item.refaksi || ''} onChange={(e) => updateItem(idx, 'refaksi', Number(e.target.value))} placeholder="0" className="w-full bg-transparent text-xs text-amber-600 text-right font-mono border-none focus:ring-0 focus:outline-none p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+                        </td>
+                        <td className="px-2 py-2 text-right">
+                          <input type="number" value={item.timbanganTruk || ''} onChange={(e) => updateItem(idx, 'timbanganTruk', Number(e.target.value))} placeholder="0" className="w-full bg-transparent text-xs text-gray-500 text-right font-mono border-none focus:ring-0 focus:outline-none p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+                        </td>
+                        <td className="px-2 py-2 text-right">
+                          <input type="number" value={item.timbanganDiterima || ''} onChange={(e) => updateItem(idx, 'timbanganDiterima', Number(e.target.value))} placeholder="0" className="w-full bg-transparent text-xs text-gray-900 font-semibold text-right font-mono border-none focus:ring-0 focus:outline-none p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+                        </td>
+                        <td className="px-2 py-2 text-right">
+                          <input type="number" value={item.rate || ''} onChange={(e) => updateItem(idx, 'rate', Number(e.target.value))} placeholder="0" className="w-full bg-transparent text-xs text-gray-800 text-right font-mono border-none focus:ring-0 focus:outline-none p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+                        </td>
+                        <td className="px-2 py-2 text-right">
+                          <input type="number" value={item.taxPct || ''} onChange={(e) => updateItem(idx, 'taxPct', Math.max(0, Math.min(100, Number(e.target.value))))} placeholder="0" className="w-full bg-transparent text-xs text-blue-600 text-right font-mono border-none focus:ring-0 focus:outline-none p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+                        </td>
+                        <td className="px-2 py-2 text-right">
+                          <input type="number" value={item.pphPct || ''} onChange={(e) => updateItem(idx, 'pphPct', Math.max(0, Math.min(100, Number(e.target.value))))} placeholder="0" className="w-full bg-transparent text-xs text-purple-600 text-right font-mono border-none focus:ring-0 focus:outline-none p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+                        </td>
+                        <td className="px-2 py-2 text-right">
+                          <input type="number" value={item.potonganItem || ''} onChange={(e) => updateItem(idx, 'potonganItem', Math.max(0, Number(e.target.value)))} placeholder="0" className="w-full bg-transparent text-xs text-red-500 text-right font-mono border-none focus:ring-0 focus:outline-none p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+                        </td>
+                        <td className="px-2 py-2 text-right">
+                          <span className="font-mono text-xs font-medium text-gray-900 tabular-nums">{formatRupiah(calc.hargaAkhir)}</span>
+                        </td>
+                        <td className="pr-2 py-2 text-center">
+                          {items.length > 1 && (
+                            <button onClick={() => removeItem(idx)} className="p-1 rounded text-gray-300 hover:text-red-500 hover:bg-red-50">
+                              <Trash2 size={13} />
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
+
+            {/* Mobile: card per item */}
+            <div className="md:hidden space-y-3">
+              {items.map((item, idx) => {
+                const calc = lineCalcs[idx];
+                return (
+                  <div key={item.id} className="border border-gray-200 rounded-xl p-3 space-y-2 bg-white">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-semibold text-gray-400 uppercase">Item {idx + 1}</span>
+                      {items.length > 1 && (
+                        <button onClick={() => removeItem(idx)} className="p-1 text-gray-400 hover:text-red-500">
+                          <Trash2 size={14} />
+                        </button>
+                      )}
+                    </div>
+                    <div>
+                      <label className="block text-[10px] text-gray-400 mb-1">Jenis Barang</label>
+                      <select value={item.inventoryItemId} onChange={(e) => selectInventoryItem(idx, e.target.value)} className="w-full border border-gray-200 rounded-lg py-2 px-2 text-sm">
+                        <option value="">— Pilih dari Stok —</option>
+                        {inventoryItems?.map((inv: any) => (
+                          <option key={inv.id} value={inv.id}>{inv.name}</option>
+                        ))}
+                      </select>
+                      {!item.inventoryItemId && (
+                        <input type="text" value={item.itemName} onChange={(e) => updateItem(idx, 'itemName', e.target.value)} placeholder="Nama manual..." className="w-full mt-1 border border-gray-200 rounded-lg py-2 px-2 text-sm" />
+                      )}
+                    </div>
+                    <div>
+                      <label className="block text-[10px] text-gray-400 mb-1">Kualitas</label>
+                      <input type="text" value={item.kualitas} onChange={(e) => updateItem(idx, 'kualitas', e.target.value)} placeholder="KA 18%, bersih..." className="w-full border border-gray-200 rounded-lg py-2 px-2 text-sm" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[10px] text-gray-400 mb-1">Timb. Truk (kg)</label>
+                        <input type="number" value={item.timbanganTruk || ''} onChange={(e) => updateItem(idx, 'timbanganTruk', Number(e.target.value))} className="w-full border border-gray-200 rounded-lg py-2 px-2 text-sm font-mono" />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] text-gray-400 mb-1">Refaksi (kg)</label>
+                        <input type="number" value={item.refaksi || ''} onChange={(e) => updateItem(idx, 'refaksi', Number(e.target.value))} className="w-full border border-gray-200 rounded-lg py-2 px-2 text-sm font-mono text-amber-600" />
+                      </div>
+                      <div className="col-span-2">
+                        <label className="block text-[10px] text-gray-400 mb-1">Timbangan Diterima (kg) *</label>
+                        <input type="number" value={item.timbanganDiterima || ''} onChange={(e) => updateItem(idx, 'timbanganDiterima', Number(e.target.value))} className="w-full border border-gray-300 rounded-lg py-2 px-2 text-sm font-mono font-semibold" />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] text-gray-400 mb-1">Harga/kg *</label>
+                        <input type="number" value={item.rate || ''} onChange={(e) => updateItem(idx, 'rate', Number(e.target.value))} className="w-full border border-gray-200 rounded-lg py-2 px-2 text-sm font-mono" />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] text-gray-400 mb-1">Potongan</label>
+                        <input type="number" value={item.potonganItem || ''} onChange={(e) => updateItem(idx, 'potonganItem', Number(e.target.value))} className="w-full border border-gray-200 rounded-lg py-2 px-2 text-sm font-mono text-red-500" />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] text-gray-400 mb-1">PPN %</label>
+                        <input type="number" value={item.taxPct || ''} onChange={(e) => updateItem(idx, 'taxPct', Number(e.target.value))} className="w-full border border-gray-200 rounded-lg py-2 px-2 text-sm font-mono text-blue-600" />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] text-gray-400 mb-1">PPh %</label>
+                        <input type="number" value={item.pphPct || ''} onChange={(e) => updateItem(idx, 'pphPct', Number(e.target.value))} className="w-full border border-gray-200 rounded-lg py-2 px-2 text-sm font-mono text-purple-600" />
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between border-t border-gray-100 pt-2">
+                      <span className="text-xs text-gray-500">Harga Akhir</span>
+                      <span className="text-sm font-bold text-gray-900 font-mono">{formatRupiah(calc.hargaAkhir)}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
-          {/* ── SUMMARY + NOTES ── */}
-          <div className="px-6 pb-6 grid grid-cols-2 gap-8 items-start">
+          {/* ATTACHMENTS */}
+          <div className="px-4 sm:px-6 pb-4">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest flex items-center gap-1">
+                <Paperclip size={12} /> Dokumen Pendukung
+              </p>
+              <label className="flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-700 cursor-pointer">
+                <Plus size={13} /> Tambah File
+                <input type="file" multiple accept=".jpg,.jpeg,.png,.webp,.pdf" onChange={handleFileSelect} className="hidden" />
+              </label>
+            </div>
+            {stagedFiles.length === 0 ? (
+              <p className="text-xs text-gray-400 italic">Belum ada file. Max {MAX_ATTACHMENTS} file, 5 MB/file (JPG/PNG/PDF).</p>
+            ) : (
+              <div className="space-y-1.5">
+                {stagedFiles.map((f, i) => (
+                  <div key={i} className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg text-xs">
+                    {f.type === 'application/pdf' ? <FileText size={14} className="text-red-500" /> : <ImageIcon size={14} className="text-blue-500" />}
+                    <span className="flex-1 truncate">{f.name}</span>
+                    <span className="text-gray-400">{(f.size / 1024).toFixed(0)} KB</span>
+                    <button onClick={() => removeStagedFile(i)} className="text-gray-400 hover:text-red-500">
+                      <X size={12} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
 
-            {/* Notes */}
+          {/* SUMMARY + NOTES */}
+          <div className="px-4 sm:px-6 pb-6 grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-8 items-start">
             <div>
               <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">Catatan</label>
-              <textarea
-                value={notes}
-                onChange={e => setNotes(e.target.value)}
-                placeholder="Misal: No. PO, referensi pesanan, atau catatan internal..."
-                rows={4}
-                className="w-full border border-gray-200 rounded-lg py-2.5 px-3 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none placeholder:text-gray-300"
-              />
+              <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="No. PO, referensi..." rows={4} className="w-full border border-gray-200 rounded-lg py-2.5 px-3 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none placeholder:text-gray-300" />
             </div>
-
-            {/* Totals */}
             <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
-              <div className="space-y-2.5">
-                {/* Subtotal */}
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">Subtotal</span>
-                  <span className="font-mono text-gray-800 tabular-nums">{formatRupiah(subtotal)}</span>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between text-gray-500 text-xs">
+                  <span>Total PPN (info)</span>
+                  <span className="font-mono tabular-nums">{formatRupiah(totalPpn)}</span>
                 </div>
-
-                {/* PPN (total per-item) */}
-                {taxAmount > 0 && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-500">PPN (per item)</span>
-                    <span className="font-mono text-gray-800 tabular-nums">{formatRupiah(taxAmount)}</span>
-                  </div>
-                )}
-
-                {/* Potongan */}
-                <div className="flex items-center gap-2 text-sm">
-                  <span className="flex-1 text-gray-500">Potongan</span>
-                  <div className="flex items-center gap-1 shrink-0">
-                    <span className="text-gray-400 text-xs">−</span>
-                    <input
-                      type="number"
-                      value={potongan || ''}
-                      onChange={e => setPotongan(Math.max(0, Number(e.target.value)))}
-                      placeholder="0"
-                      className="w-28 text-right font-mono text-red-500 bg-transparent border-none focus:ring-0 focus:outline-none p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none tabular-nums"
-                    />
-                  </div>
+                <div className="flex justify-between text-gray-500 text-xs">
+                  <span>Total PPh (info)</span>
+                  <span className="font-mono tabular-nums">−{formatRupiah(totalPph)}</span>
                 </div>
-
-                {/* Biaya Lain */}
-                <div className="flex items-center gap-2 text-sm">
+                <div className="flex justify-between text-gray-500 text-xs">
+                  <span>Total Potongan</span>
+                  <span className="font-mono tabular-nums text-red-500">−{formatRupiah(totalPotongan)}</span>
+                </div>
+                <div className="flex justify-between border-t border-gray-200 pt-2">
+                  <span className="text-gray-600">Subtotal Item</span>
+                  <span className="font-mono tabular-nums text-gray-800">{formatRupiah(subtotalItems)}</span>
+                </div>
+                <div className="flex items-center gap-2">
                   <span className="flex-1 text-gray-500">Biaya Lain</span>
                   <div className="flex items-center gap-1 shrink-0">
                     <span className="text-gray-400 text-xs">+</span>
-                    <input
-                      type="number"
-                      value={biayaLain || ''}
-                      onChange={e => setBiayaLain(Math.max(0, Number(e.target.value)))}
-                      placeholder="0"
-                      className="w-28 text-right font-mono text-gray-700 bg-transparent border-none focus:ring-0 focus:outline-none p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none tabular-nums"
-                    />
+                    <input type="number" value={biayaLain || ''} onChange={(e) => setBiayaLain(Math.max(0, Number(e.target.value)))} placeholder="0" className="w-28 text-right font-mono text-gray-700 bg-transparent border-none focus:ring-0 focus:outline-none p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none tabular-nums" />
                   </div>
                 </div>
-
-                {/* Grand Total */}
                 <div className="border-t border-gray-200 pt-2.5 flex justify-between items-baseline">
                   <span className="text-sm font-semibold text-gray-700">Total</span>
-                  <span className="text-2xl font-bold text-blue-600 font-mono tabular-nums">{formatRupiah(grandTotal)}</span>
+                  <span className="text-xl sm:text-2xl font-bold text-blue-600 font-mono tabular-nums">{formatRupiah(grandTotal)}</span>
                 </div>
               </div>
             </div>
           </div>
 
           {error && (
-            <div className="mx-6 mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-red-700 text-sm">
+            <div className="mx-4 sm:mx-6 mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-red-700 text-sm">
               <AlertCircle size={15} /> <span>{error}</span>
             </div>
           )}
         </div>
 
-        {/* ── FOOTER ACTIONS ── */}
-        <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between">
-          <p className="text-xs text-gray-400">
-            {canSubmit ? `Total: ${formatRupiah(grandTotal)}` : 'Lengkapi supplier dan minimal 1 item untuk melanjutkan'}
+        {/* FOOTER */}
+        <div className="px-4 sm:px-6 py-4 border-t border-gray-100 flex items-center justify-between gap-2">
+          <p className="text-xs text-gray-400 hidden sm:block">
+            {canSubmit ? `Total: ${formatRupiah(grandTotal)}` : 'Lengkapi supplier & minimal 1 item'}
           </p>
-          <div className="flex gap-3">
-            <button onClick={onClose} className="btn-secondary">Batal</button>
+          <div className="flex gap-2 sm:gap-3 w-full sm:w-auto">
+            <button onClick={onClose} className="btn-secondary flex-1 sm:flex-none">Batal</button>
             <button
-              onClick={() => mutation.mutate({
-                date: invoiceDate, dueDate, partyId, notes, potongan, biayaLain,
-                items: items.map(i => ({ ...i, inventoryItemId: i.inventoryItemId || null, taxPct: i.taxPct })),
-              })}
+              onClick={() =>
+                mutation.mutate({
+                  date: invoiceDate,
+                  dueDate,
+                  partyId,
+                  notes,
+                  biayaLain,
+                  items: items.map((i) => ({
+                    itemName: i.itemName,
+                    inventoryItemId: i.inventoryItemId || null,
+                    description: i.description || null,
+                    quantity: i.timbanganDiterima > 0 ? i.timbanganDiterima : 0,
+                    unit: i.unit,
+                    rate: i.rate,
+                    discount: 0,
+                    taxPct: i.taxPct,
+                    pphPct: i.pphPct,
+                    potonganItem: i.potonganItem,
+                    kualitas: i.kualitas || null,
+                    refaksi: i.refaksi || null,
+                    timbanganTruk: i.timbanganTruk || null,
+                    timbanganDiterima: i.timbanganDiterima || null,
+                  })),
+                })
+              }
               disabled={!canSubmit}
-              className="btn-primary disabled:opacity-40 disabled:cursor-not-allowed"
+              className="btn-primary disabled:opacity-40 disabled:cursor-not-allowed flex-1 sm:flex-none"
             >
               {mutation.isPending ? <Loader2 size={15} className="animate-spin" /> : 'Simpan Invoice'}
             </button>
           </div>
         </div>
-
       </div>
     </div>
   );
