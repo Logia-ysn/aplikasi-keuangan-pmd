@@ -224,7 +224,7 @@ const InvoiceDetailDrawer: React.FC<Props> = ({ type, invoiceId, onClose, onEdit
         id: a.id,
         fileName: a.fileName,
         mimeType: a.mimeType,
-        fetchUrl: `/api/attachments/file/${a.id}`,
+        fetchUrl: `/attachments/file/${a.id}`,
       }));
       const merged = await mergeInvoicePdfWithAttachments(invoiceBlob, refs, {
         fetchBinary: async (url) => {
