@@ -32,7 +32,7 @@ interface AccountLedger {
 
 const LedgerBook: React.FC = () => {
   const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [endDate, setEndDate] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedAccounts, setExpandedAccounts] = useState<Set<string>>(new Set());
 
@@ -139,7 +139,7 @@ const LedgerBook: React.FC = () => {
       <div className="flex flex-wrap items-center gap-2 mb-3 no-print">
         <span className="text-xs text-gray-400">Preset:</span>
         <button
-          onClick={() => { setStartDate(''); setEndDate(format(new Date(), 'yyyy-MM-dd')); }}
+          onClick={() => { setStartDate(''); setEndDate(''); }}
           className="btn-secondary text-xs py-1.5 px-3"
         >
           Semua Histori
