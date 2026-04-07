@@ -99,15 +99,25 @@ export async function mergeInvoicePdfWithAttachments(
 
 async function webpToPng(webpBytes: ArrayBuffer): Promise<Uint8Array> {
   const blob = new Blob([webpBytes as unknown as BlobPart], { type: 'image/webp' });
-  const bmp = await createImageBitmap(blob);
-  const canvas = document.createElement('canvas');
-  canvas.width = bmp.width;
-  canvas.height = bmp.height;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) throw new Error('Canvas 2D context tidak tersedia');
-  ctx.drawImage(bmp, 0, 0);
-  const pngBlob: Blob = await new Promise((resolve, reject) => {
-    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('toBlob failed'))), 'image/png');
-  });
-  return new Uint8Array(await pngBlob.arrayBuffer());
+  const url = URL.createObjectURL(blob);
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const el = new Image();
+      el.onload = () => resolve(el);
+      el.onerror = () => reject(new Error('HTMLImageElement decode failed'));
+      el.src = url;
+    });
+    const canvas = document.createElement('canvas');
+    canvas.width = img.naturalWidth;
+    canvas.height = img.naturalHeight;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('Canvas 2D context tidak tersedia');
+    ctx.drawImage(img, 0, 0);
+    const pngBlob: Blob = await new Promise((resolve, reject) => {
+      canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('toBlob failed'))), 'image/png');
+    });
+    return new Uint8Array(await pngBlob.arrayBuffer());
+  } finally {
+    URL.revokeObjectURL(url);
+  }
 }
