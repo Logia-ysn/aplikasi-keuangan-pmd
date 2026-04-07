@@ -73,6 +73,7 @@ const PurchaseInvoiceItemSchema = InvoiceItemSchema.extend({
   refaksi: z.coerce.number().min(0).nullable().optional(),
   timbanganTruk: z.coerce.number().min(0).nullable().optional(),
   timbanganDiterima: z.coerce.number().positive().nullable().optional(),
+  nomorMobil: z.string().nullable().optional(),
   potonganItem: z.coerce.number().min(0).optional().default(0),
 });
 

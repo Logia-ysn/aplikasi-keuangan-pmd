@@ -164,6 +164,7 @@ router.post('/', roleMiddleware(['Admin', 'Accountant', 'StaffProduksi']), async
                 refaksi: item.refaksi ?? null,
                 timbanganTruk: item.timbanganTruk ?? null,
                 timbanganDiterima: item.timbanganDiterima ?? null,
+                nomorMobil: item.nomorMobil ?? null,
                 accountId: itemAccountId,
                 description: item.description || null,
               };

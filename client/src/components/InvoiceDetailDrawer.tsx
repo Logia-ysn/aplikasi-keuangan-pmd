@@ -502,8 +502,9 @@ const InvoiceDetailDrawer: React.FC<Props> = ({ type, invoiceId, onClose, onEdit
                               )}
                             </div>
                             {item.description && <p className="text-[10px] text-gray-400">{item.description}</p>}
-                            {!isSales && (item.kualitas || item.timbanganTruk || item.refaksi) && (
+                            {!isSales && (item.kualitas || item.timbanganTruk || item.refaksi || item.nomorMobil) && (
                               <div className="text-[10px] text-gray-400 space-x-2 mt-0.5">
+                                {item.nomorMobil && <span>Mobil: <span className="font-mono text-gray-600 uppercase">{item.nomorMobil}</span></span>}
                                 {item.kualitas && <span>Kualitas: <span className="text-gray-600">{item.kualitas}</span></span>}
                                 {Number(item.timbanganTruk) > 0 && <span>Truk: {Number(item.timbanganTruk).toLocaleString('id-ID')} kg</span>}
                                 {Number(item.refaksi) > 0 && <span className="text-amber-600">Refaksi: {Number(item.refaksi).toLocaleString('id-ID')} kg</span>}

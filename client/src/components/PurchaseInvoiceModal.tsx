@@ -24,6 +24,7 @@ interface InvoiceItem {
   taxPct: number;              // PPN % per item
   pphPct: number;              // PPh % per item
   potonganItem: number;        // IDR per item
+  nomorMobil: string;          // plat nomor mobil (material only, optional)
 }
 
 const MAX_ATTACHMENTS = 5;
@@ -45,6 +46,7 @@ const defaultItem = (type: ItemType = 'material'): InvoiceItem => ({
   taxPct: 0,
   pphPct: 0,
   potonganItem: 0,
+  nomorMobil: '',
 });
 
 // Per-item calc — mirrors server/src/services/purchaseInvoiceCalc.ts
@@ -298,6 +300,7 @@ const PurchaseInvoiceModal: React.FC<PurchaseInvoiceModalProps> = ({ isOpen, onC
                   <tr className="bg-gray-50 border-b border-gray-200 text-[10px] font-semibold text-gray-400 uppercase tracking-wide">
                     <th className="text-left px-2 py-2 w-14">Tipe</th>
                     <th className="text-left px-2 py-2 min-w-[180px]">Item / Jasa</th>
+                    <th className="text-left px-2 py-2 w-24">No. Mobil</th>
                     <th className="text-left px-2 py-2 w-32">Kualitas / Catatan</th>
                     <th className="text-right px-2 py-2 w-24">Refaksi (kg)</th>
                     <th className="text-right px-2 py-2 w-28">Timb. Truk (kg)</th>
@@ -337,6 +340,9 @@ const PurchaseInvoiceModal: React.FC<PurchaseInvoiceModalProps> = ({ isOpen, onC
                               )}
                             </>
                           )}
+                        </td>
+                        <td className="px-2 py-2">
+                          <input type="text" value={item.nomorMobil} onChange={(e) => updateItem(idx, 'nomorMobil', e.target.value)} placeholder={isService ? '—' : 'B 1234 ABC'} className="w-full bg-transparent text-xs text-gray-700 font-mono uppercase border-none focus:ring-0 focus:outline-none p-0 placeholder:text-gray-300 placeholder:normal-case" />
                         </td>
                         <td className="px-2 py-2">
                           {isService ? (
@@ -425,6 +431,10 @@ const PurchaseInvoiceModal: React.FC<PurchaseInvoiceModalProps> = ({ isOpen, onC
                           )}
                         </>
                       )}
+                    </div>
+                    <div>
+                      <label className="block text-[10px] text-gray-400 mb-1">No. Mobil</label>
+                      <input type="text" value={item.nomorMobil} onChange={(e) => updateItem(idx, 'nomorMobil', e.target.value)} placeholder="B 1234 ABC" className="w-full border border-gray-200 rounded-lg py-2 px-2 text-sm font-mono uppercase" />
                     </div>
                     <div>
                       <label className="block text-[10px] text-gray-400 mb-1">{isService ? 'Catatan' : 'Kualitas'}</label>
@@ -583,6 +593,7 @@ const PurchaseInvoiceModal: React.FC<PurchaseInvoiceModalProps> = ({ isOpen, onC
                     refaksi: i.refaksi || null,
                     timbanganTruk: i.timbanganTruk || null,
                     timbanganDiterima: i.timbanganDiterima || null,
+                    nomorMobil: i.nomorMobil?.trim() || null,
                   })),
                 })
               }

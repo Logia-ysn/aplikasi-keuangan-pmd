@@ -61,6 +61,7 @@ export const PurchaseInvoices = () => {
           taxPct: Number(it.taxPct ?? 0),
           pphPct: Number(it.pphPct ?? 0),
           potonganItem: Number(it.potonganItem ?? 0),
+          nomorMobil: it.nomorMobil ?? '',
         };
       });
 

@@ -268,6 +268,7 @@ model PurchaseInvoiceItem {
   refaksi           Decimal?        @db.Decimal(15, 3)
   timbanganTruk     Decimal?        @db.Decimal(15, 3) @map("timbangan_truk")
   timbanganDiterima Decimal?        @db.Decimal(15, 3) @map("timbangan_diterima")
+  nomorMobil        String?         @map("nomor_mobil")
   accountId         String          @map("account_id")
   account           Account         @relation(fields: [accountId], references: [id])
   description       String?
