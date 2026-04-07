@@ -148,6 +148,10 @@ export interface InvoicePDFProps {
   labelPotongan?: string | null;
   labelBiaya?: string | null;
   grandTotal: number | string;
+  outstanding?: number | string;
+  paidFromCash?: number | string;
+  paidFromDeposit?: number | string;
+  partyDepositBalance?: number | string;
   party: {
     name: string;
     address?: string | null;
@@ -181,6 +185,7 @@ const InvoicePDF: React.FC<InvoicePDFProps> = (props) => {
     type, invoiceNumber, date, dueDate, terms, status, notes,
     taxPct = 0, potongan = 0, biayaLain = 0,
     labelPotongan, labelBiaya, grandTotal,
+    outstanding, paidFromCash, paidFromDeposit, partyDepositBalance,
     party, items, company,
   } = props;
 
@@ -368,6 +373,47 @@ const InvoicePDF: React.FC<InvoicePDFProps> = (props) => {
             <Text style={S.summaryTotalValue}>{idr(numGT)}</Text>
           </View>
         </View>
+
+        {/* ── PAYMENT STATUS ── */}
+        {(() => {
+          const numOut = Number(outstanding ?? numGT);
+          const numCash = Number(paidFromCash ?? 0);
+          const numDep = Number(paidFromDeposit ?? 0);
+          const numBal = Number(partyDepositBalance ?? 0);
+          const hasPaymentInfo = numCash > 0 || numDep > 0 || numOut !== numGT || numBal > 0;
+          if (!hasPaymentInfo) return null;
+          return (
+            <View style={{ marginTop: 8, paddingTop: 6, borderTopWidth: 0.5, borderTopColor: C.border }}>
+              <Text style={{ fontSize: 8, fontWeight: 600, color: C.muted, marginBottom: 3 }}>STATUS PEMBAYARAN</Text>
+              {numCash > 0 && (
+                <View style={S.summaryRight}>
+                  <Text style={S.summaryLabel}>Bayar Tunai/Bank</Text>
+                  <Text style={S.summaryValue}>{idr(numCash)}</Text>
+                </View>
+              )}
+              {numDep > 0 && (
+                <View style={S.summaryRight}>
+                  <Text style={S.summaryLabel}>Bayar Uang Muka</Text>
+                  <Text style={S.summaryValue}>{idr(numDep)}</Text>
+                </View>
+              )}
+              <View style={S.summaryRight}>
+                <Text style={[S.summaryLabel, { color: numOut > 0 ? C.red : '#15803d', fontWeight: 600 }]}>
+                  {numOut > 0 ? 'Sisa Tagihan' : 'LUNAS'}
+                </Text>
+                <Text style={[S.summaryValue, { color: numOut > 0 ? C.red : '#15803d', fontWeight: 600 }]}>
+                  {idr(numOut)}
+                </Text>
+              </View>
+              {numBal > 0 && (
+                <View style={S.summaryRight}>
+                  <Text style={[S.summaryLabel, { fontStyle: 'italic' }]}>Saldo Uang Muka {isSales ? 'Pelanggan' : 'Supplier'}</Text>
+                  <Text style={[S.summaryValue, { fontStyle: 'italic' }]}>{idr(numBal)}</Text>
+                </View>
+              )}
+            </View>
+          );
+        })()}
 
         {/* ── NOTES ── */}
         {notes && (

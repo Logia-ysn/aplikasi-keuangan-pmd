@@ -206,6 +206,10 @@ const InvoiceDetailDrawer: React.FC<Props> = ({ type, invoiceId, onClose, onEdit
           labelPotongan={invoice.labelPotongan}
           labelBiaya={invoice.labelBiaya}
           grandTotal={invoice.grandTotal}
+          outstanding={outstanding}
+          paidFromCash={paidFromCash}
+          paidFromDeposit={paidFromDeposit}
+          partyDepositBalance={partyDepositBalance}
           party={{
             name: party?.name ?? '—',
             address: party?.address,
@@ -335,6 +339,10 @@ const InvoiceDetailDrawer: React.FC<Props> = ({ type, invoiceId, onClose, onEdit
                     labelPotongan={invoice.labelPotongan}
                     labelBiaya={invoice.labelBiaya}
                     grandTotal={invoice.grandTotal}
+          outstanding={outstanding}
+          paidFromCash={paidFromCash}
+          paidFromDeposit={paidFromDeposit}
+          partyDepositBalance={partyDepositBalance}
                     party={{
                       name: party?.name ?? '—',
                       address: party?.address,
