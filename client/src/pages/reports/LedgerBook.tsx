@@ -31,7 +31,7 @@ interface AccountLedger {
 }
 
 const LedgerBook: React.FC = () => {
-  const [startDate, setStartDate] = useState(format(new Date(), 'yyyy-MM-01'));
+  const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedAccounts, setExpandedAccounts] = useState<Set<string>>(new Set());
@@ -39,7 +39,10 @@ const LedgerBook: React.FC = () => {
   const { data: ledgerData, isLoading, isError, refetch } = useQuery<AccountLedger[]>({
     queryKey: ['ledger-book', startDate, endDate],
     queryFn: async () => {
-      const r = await api.get('/reports/ledger-book', { params: { startDate, endDate } });
+      const params: Record<string, string> = {};
+      if (startDate) params.startDate = startDate;
+      if (endDate) params.endDate = endDate;
+      const r = await api.get('/reports/ledger-book', { params });
       return r.data;
     },
   });
@@ -132,6 +135,29 @@ const LedgerBook: React.FC = () => {
       isError={isError}
       onRetry={refetch}
     >
+      {/* Preset periods */}
+      <div className="flex flex-wrap items-center gap-2 mb-3 no-print">
+        <span className="text-xs text-gray-400">Preset:</span>
+        <button
+          onClick={() => { setStartDate(''); setEndDate(format(new Date(), 'yyyy-MM-dd')); }}
+          className="btn-secondary text-xs py-1.5 px-3"
+        >
+          Semua Histori
+        </button>
+        <button
+          onClick={() => { setStartDate(format(new Date(), 'yyyy-01-01')); setEndDate(format(new Date(), 'yyyy-MM-dd')); }}
+          className="btn-secondary text-xs py-1.5 px-3"
+        >
+          Tahun Ini (YTD)
+        </button>
+        <button
+          onClick={() => { setStartDate(format(new Date(), 'yyyy-MM-01')); setEndDate(format(new Date(), 'yyyy-MM-dd')); }}
+          className="btn-secondary text-xs py-1.5 px-3"
+        >
+          Bulan Ini
+        </button>
+      </div>
+
       {/* Search + expand/collapse */}
       <div className="flex flex-wrap items-center gap-3 mb-4 no-print">
         <div className="relative flex-1 max-w-sm">
