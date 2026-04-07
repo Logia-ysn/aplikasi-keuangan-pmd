@@ -30,11 +30,14 @@ interface AccountLedger {
   closingBalance: number;
 }
 
+const PAGE_SIZE = 200;
+
 const LedgerBook: React.FC = () => {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedAccounts, setExpandedAccounts] = useState<Set<string>>(new Set());
+  const [page, setPage] = useState(1);
 
   const { data: ledgerData, isLoading, isError, refetch } = useQuery<AccountLedger[]>({
     queryKey: ['ledger-book', startDate, endDate],
@@ -57,6 +60,38 @@ const LedgerBook: React.FC = () => {
         a.accountNumber.includes(q),
     );
   }, [ledgerData, searchTerm]);
+
+  // Pagination: pack accounts into pages until each page holds ~PAGE_SIZE entries.
+  // An account with > PAGE_SIZE entries occupies its own page.
+  const pages = useMemo(() => {
+    const result: AccountLedger[][] = [];
+    let current: AccountLedger[] = [];
+    let currentCount = 0;
+    for (const acc of filtered) {
+      const n = acc.entries.length || 1;
+      if (currentCount > 0 && currentCount + n > PAGE_SIZE) {
+        result.push(current);
+        current = [];
+        currentCount = 0;
+      }
+      current.push(acc);
+      currentCount += n;
+    }
+    if (current.length > 0) result.push(current);
+    return result.length > 0 ? result : [[]];
+  }, [filtered]);
+
+  const totalEntries = useMemo(
+    () => filtered.reduce((s, a) => s + a.entries.length, 0),
+    [filtered],
+  );
+
+  const totalPages = pages.length;
+  const safePage = Math.min(Math.max(page, 1), totalPages);
+  const pageAccounts = pages[safePage - 1] ?? [];
+
+  // Reset to page 1 when filter/data changes
+  React.useEffect(() => { setPage(1); }, [searchTerm, startDate, endDate, ledgerData]);
 
   const toggleAccount = (accountId: string) => {
     setExpandedAccounts((prev) => {
@@ -177,19 +212,21 @@ const LedgerBook: React.FC = () => {
           Tutup Semua
         </button>
         {filtered && (
-          <span className="text-xs text-gray-400">{filtered.length} akun</span>
+          <span className="text-xs text-gray-400">
+            {filtered.length} akun · {totalEntries.toLocaleString('id-ID')} mutasi
+          </span>
         )}
       </div>
 
       {/* Ledger content */}
       <div className="space-y-3">
-        {filtered.length === 0 && !isLoading && (
+        {pageAccounts.length === 0 && !isLoading && (
           <div className="text-center py-16 text-gray-400 text-sm">
             Tidak ada data buku besar untuk periode ini.
           </div>
         )}
 
-        {filtered.map((account) => {
+        {pageAccounts.map((account) => {
           const isExpanded = expandedAccounts.has(account.accountId);
 
           return (
@@ -322,6 +359,40 @@ const LedgerBook: React.FC = () => {
           );
         })}
       </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between mt-4 no-print">
+          <span className="text-xs text-gray-500">
+            Halaman {safePage} dari {totalPages} · ~{PAGE_SIZE} mutasi/halaman
+          </span>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setPage(1)}
+              disabled={safePage === 1}
+              className="btn-secondary text-xs py-1.5 px-2.5 disabled:opacity-40"
+            >« Awal</button>
+            <button
+              onClick={() => setPage(safePage - 1)}
+              disabled={safePage === 1}
+              className="btn-secondary text-xs py-1.5 px-2.5 disabled:opacity-40"
+            >‹ Sebelumnya</button>
+            <span className="text-xs text-gray-600 px-2">
+              {safePage} / {totalPages}
+            </span>
+            <button
+              onClick={() => setPage(safePage + 1)}
+              disabled={safePage === totalPages}
+              className="btn-secondary text-xs py-1.5 px-2.5 disabled:opacity-40"
+            >Berikutnya ›</button>
+            <button
+              onClick={() => setPage(totalPages)}
+              disabled={safePage === totalPages}
+              className="btn-secondary text-xs py-1.5 px-2.5 disabled:opacity-40"
+            >Akhir »</button>
+          </div>
+        </div>
+      )}
     </ReportLayout>
   );
 };
