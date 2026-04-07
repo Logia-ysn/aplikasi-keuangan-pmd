@@ -96,6 +96,12 @@ const AllocationSchema = z.object({
   amount: z.coerce.number().positive(),
 });
 
+export const PaymentSplitSchema = z.object({
+  accountId: z.string().min(1, 'Akun split wajib dipilih.'),
+  amount: z.coerce.number().positive('Jumlah split harus lebih dari 0.'),
+  notes: z.string().nullable().optional(),
+});
+
 export const CreatePaymentSchema = z.object({
   date: z.string().min(1, 'Tanggal wajib diisi.'),
   partyId: z.string().min(1, 'Pihak wajib dipilih.'),
@@ -103,6 +109,7 @@ export const CreatePaymentSchema = z.object({
   paymentType: z.enum(['Receive', 'Pay', 'VendorDeposit', 'CustomerDeposit']),
   accountId: z.string().min(1, 'Akun kas/bank wajib dipilih.'),
   allocations: z.array(AllocationSchema).optional(),
+  splits: z.array(PaymentSplitSchema).optional(),
   referenceNo: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
   isOpeningBalance: z.boolean().optional(),

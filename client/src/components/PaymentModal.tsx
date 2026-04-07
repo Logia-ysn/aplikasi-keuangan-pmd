@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../lib/api';
-import { X, Loader2, AlertCircle, TrendingDown, TrendingUp, CheckCircle2, Paperclip } from 'lucide-react';
+import { X, Loader2, AlertCircle, TrendingDown, TrendingUp, CheckCircle2, Paperclip, Plus, Trash2 } from 'lucide-react';
 import { formatRupiah, formatDate } from '../lib/formatters';
 import AttachmentUpload from './AttachmentUpload';
 import AttachmentPreview from './AttachmentPreview';
@@ -22,6 +22,10 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, defaultTyp
   const [partyId, setPartyId] = useState('');
   const [amount, setAmount] = useState<number | ''>('');
   const [accountId, setAccountId] = useState('');
+  const [splitMode, setSplitMode] = useState(false);
+  const [splits, setSplits] = useState<Array<{ accountId: string; amount: number | ''; notes: string }>>([
+    { accountId: '', amount: '', notes: '' },
+  ]);
   const [referenceNo, setReferenceNo] = useState('');
   const [notes, setNotes] = useState('');
   const [error, setError] = useState('');
@@ -37,6 +41,8 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, defaultTyp
       setPartyId('');
       setAmount('');
       setAccountId('');
+      setSplitMode(false);
+      setSplits([{ accountId: '', amount: '', notes: '' }]);
       setReferenceNo('');
       setNotes('');
       setError('');
@@ -63,6 +69,17 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, defaultTyp
       const all: any[] = res.data.data ?? res.data;
       // Return non-group asset accounts that are typically cash/bank (1.1.x)
       return all.filter((a: any) => !a.isGroup && a.accountType === 'ASSET' && a.accountNumber.startsWith('1.1'));
+    },
+    enabled: isOpen,
+  });
+
+  // All non-group accounts (for split rows — allows cash + expense + others)
+  const { data: allAccounts } = useQuery({
+    queryKey: ['all-accounts-flat'],
+    queryFn: async () => {
+      const res = await api.get('/coa/flat');
+      const all: any[] = res.data.data ?? res.data;
+      return all.filter((a: any) => !a.isGroup && a.isActive !== false);
     },
     enabled: isOpen,
   });
@@ -106,18 +123,56 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, defaultTyp
   });
 
   const numAmount = Number(amount) || 0;
-  const canSubmit = partyId && numAmount > 0 && accountId && !mutation.isPending;
+
+  // Split totals & validation
+  const splitsTotal = splits.reduce((s, sp) => s + (Number(sp.amount) || 0), 0);
+  const splitsRemaining = numAmount - splitsTotal;
+  const splitsValid = splitMode
+    ? splits.length > 0 &&
+      splits.every((sp) => sp.accountId && Number(sp.amount) > 0) &&
+      Math.abs(splitsRemaining) < 0.01
+    : true;
+
+  const canSubmit =
+    partyId &&
+    numAmount > 0 &&
+    !mutation.isPending &&
+    (splitMode ? splitsValid : !!accountId);
 
   const handleSubmit = () => {
-    mutation.mutate({
+    const payload: any = {
       date,
       partyId,
       amount: numAmount,
       paymentType,
-      accountId,
+      // For split mode the server still requires accountId on the row;
+      // use the first split's account as the "primary" cash reference.
+      accountId: splitMode ? splits[0].accountId : accountId,
       referenceNo: referenceNo || null,
       notes: notes || null,
-    });
+    };
+    if (splitMode) {
+      payload.splits = splits.map((sp) => ({
+        accountId: sp.accountId,
+        amount: Number(sp.amount),
+        notes: sp.notes || null,
+      }));
+    }
+    mutation.mutate(payload);
+  };
+
+  const updateSplit = (idx: number, patch: Partial<{ accountId: string; amount: number | ''; notes: string }>) => {
+    setSplits((prev) => prev.map((sp, i) => (i === idx ? { ...sp, ...patch } : sp)));
+  };
+  const addSplit = () => {
+    // Auto-fill remaining as default amount for new row
+    setSplits((prev) => [
+      ...prev,
+      { accountId: '', amount: splitsRemaining > 0 ? Number(splitsRemaining.toFixed(2)) : '', notes: '' },
+    ]);
+  };
+  const removeSplit = (idx: number) => {
+    setSplits((prev) => (prev.length > 1 ? prev.filter((_, i) => i !== idx) : prev));
   };
 
   if (!isOpen) return null;
@@ -255,19 +310,34 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, defaultTyp
             </div>
           )}
 
-          {/* Amount & Account */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">Jumlah (Rp)</label>
+          {/* Amount */}
+          <div>
+            <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">Jumlah Tagihan (Rp)</label>
+            <input
+              type="number"
+              value={amount}
+              onChange={e => setAmount(e.target.value === '' ? '' : Number(e.target.value))}
+              placeholder="0"
+              min={0}
+              className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm text-gray-900 font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+            />
+          </div>
+
+          {/* Split toggle */}
+          <div className="flex items-center justify-between">
+            <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Distribusi Akun</label>
+            <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
               <input
-                type="number"
-                value={amount}
-                onChange={e => setAmount(e.target.value === '' ? '' : Number(e.target.value))}
-                placeholder="0"
-                min={0}
-                className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm text-gray-900 font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                type="checkbox"
+                checked={splitMode}
+                onChange={(e) => setSplitMode(e.target.checked)}
+                className="rounded"
               />
-            </div>
+              Split ke beberapa akun (mis. dipotong komisi)
+            </label>
+          </div>
+
+          {!splitMode ? (
             <div>
               <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">Akun Kas/Bank</label>
               <select
@@ -281,7 +351,70 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, defaultTyp
                 ))}
               </select>
             </div>
-          </div>
+          ) : (
+            <div className="space-y-2 border border-gray-200 rounded-lg p-3">
+              <p className="text-[11px] text-gray-500">
+                Total {numAmount > 0 ? formatRupiah(numAmount) : '0'} dibagi ke beberapa akun. Selisih harus 0.
+              </p>
+              {splits.map((sp, idx) => (
+                <div key={idx} className="grid grid-cols-12 gap-2 items-start">
+                  <select
+                    value={sp.accountId}
+                    onChange={(e) => updateSplit(idx, { accountId: e.target.value })}
+                    className="col-span-6 border border-gray-200 rounded-md py-1.5 px-2 text-xs text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">— Pilih Akun —</option>
+                    {allAccounts?.map((a: any) => (
+                      <option key={a.id} value={a.id}>{a.accountNumber} — {a.name}</option>
+                    ))}
+                  </select>
+                  <input
+                    type="number"
+                    value={sp.amount}
+                    onChange={(e) => updateSplit(idx, { amount: e.target.value === '' ? '' : Number(e.target.value) })}
+                    placeholder="0"
+                    min={0}
+                    className="col-span-3 border border-gray-200 rounded-md py-1.5 px-2 text-xs text-gray-900 font-mono text-right focus:outline-none focus:ring-2 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  />
+                  <input
+                    type="text"
+                    value={sp.notes}
+                    onChange={(e) => updateSplit(idx, { notes: e.target.value })}
+                    placeholder="catatan"
+                    className="col-span-2 border border-gray-200 rounded-md py-1.5 px-2 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeSplit(idx)}
+                    disabled={splits.length === 1}
+                    className="col-span-1 p-1.5 text-red-500 hover:bg-red-50 rounded disabled:opacity-30 disabled:cursor-not-allowed"
+                    aria-label="Hapus baris"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={addSplit}
+                className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 font-medium"
+              >
+                <Plus size={12} /> Tambah baris
+              </button>
+              <div className="flex justify-between pt-2 border-t border-gray-100 text-xs">
+                <span className="text-gray-500">Total split:</span>
+                <span className="font-mono font-semibold">{formatRupiah(splitsTotal)}</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-gray-500">Selisih:</span>
+                <span
+                  className={`font-mono font-semibold ${Math.abs(splitsRemaining) < 0.01 ? 'text-green-600' : 'text-red-600'}`}
+                >
+                  {formatRupiah(splitsRemaining)}
+                </span>
+              </div>
+            </div>
+          )}
 
           {/* Reference & Notes */}
           <div className="grid grid-cols-2 gap-4">

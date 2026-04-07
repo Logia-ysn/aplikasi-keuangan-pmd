@@ -41,6 +41,7 @@ model Account {
   salesItems     SalesInvoiceItem[]
   purchaseItems  PurchaseInvoiceItem[]
   payments            Payment[]                @relation("PaymentAccount")
+  paymentSplits       PaymentSplit[]           @relation("PaymentSplitAccount")
   inventoryItems      InventoryItem[]          @relation("ItemAccount")
   movementsAsOffset   StockMovement[]          @relation("MovementOffset")
   reconciliations     BankReconciliation[]     @relation("ReconciliationAccount")
@@ -292,6 +293,7 @@ model Payment {
   createdBy     String              @map("created_by")
   user          User                @relation(fields: [createdBy], references: [id])
   allocations           PaymentAllocation[]
+  splits                PaymentSplit[]
   depositApplications   VendorDepositApplication[] @relation("DepositApplications")
   customerDepositApplications CustomerDepositApplication[] @relation("CustomerDepositApplications")
   journalEntryId        String?             @unique @map("journal_entry_id")
@@ -309,6 +311,20 @@ model Payment {
   @@index([date])
   @@index([fiscalYearId])
   @@map("payments")
+}
+
+model PaymentSplit {
+  id        String  @id @default(uuid())
+  paymentId String  @map("payment_id")
+  payment   Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  accountId String  @map("account_id")
+  account   Account @relation("PaymentSplitAccount", fields: [accountId], references: [id])
+  amount    Decimal @db.Decimal(15, 2)
+  notes     String?
+
+  @@index([paymentId])
+  @@index([accountId])
+  @@map("payment_splits")
 }
 
 model PaymentAllocation {

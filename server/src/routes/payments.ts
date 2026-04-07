@@ -23,7 +23,7 @@ router.get('/', async (req, res) => {
 
     const [payments, total] = await Promise.all([
       prisma.payment.findMany({
-        include: { party: true },
+        include: { party: true, splits: { include: { account: true } } },
         orderBy: { date: 'desc' },
         skip,
         take,
@@ -256,18 +256,33 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
       const arAccount = await systemAccounts.getAccount('AR');
       const apAccount = await systemAccounts.getAccount('AP');
 
-      // Determine GL posting sides
-      // Receive (customer paying us): Dr Bank/Kas, Cr AR
-      // Pay (us paying vendor):       Dr AP, Cr Bank/Kas
-      let debitAccountId: string;
-      let creditAccountId: string;
+      // Build split list:
+      // - If body.splits provided & non-empty → multi-account distribution
+      //   (e.g. invoice 280jt → BCA 270jt + Petty 7.5jt + Beban Komisi 2.5jt)
+      // - Otherwise fall back to single accountId for backward compat
+      const useSplits = Array.isArray(body.splits) && body.splits.length > 0;
+      const splits = useSplits
+        ? body.splits!
+        : [{ accountId: body.accountId, amount: numAmount, notes: null as string | null }];
 
-      if (body.paymentType === 'Receive') {
-        debitAccountId = body.accountId;       // Bank/Kas
-        creditAccountId = arAccount.id;        // AR
-      } else {
-        debitAccountId = apAccount.id;         // AP
-        creditAccountId = body.accountId;      // Bank/Kas
+      // Validate sum equals payment amount (within rounding tolerance)
+      const splitsSum = splits.reduce((s, sp) => s.plus(new Decimal(sp.amount)), new Decimal(0));
+      if (splitsSum.minus(new Decimal(numAmount)).abs().gt(new Decimal('0.01'))) {
+        throw new BusinessError(
+          `Total split (${splitsSum.toFixed(2)}) tidak sama dengan jumlah pembayaran (${numAmount.toFixed(2)}).`,
+        );
+      }
+
+      // Persist split records (always — even single-account paths get 1 row, simplifies cancel)
+      if (useSplits) {
+        await tx.paymentSplit.createMany({
+          data: splits.map((sp) => ({
+            paymentId: payment.id,
+            accountId: sp.accountId,
+            amount: sp.amount,
+            notes: sp.notes ?? null,
+          })),
+        });
       }
 
       // Check journal entry number uniqueness before creating
@@ -276,6 +291,32 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
       if (existingJV) {
         throw new BusinessError(`Nomor jurnal ${jvNumber} sudah ada. Silakan coba lagi.`);
       }
+
+      // Build journal items:
+      //   Receive: each split → DR (account); single CR AR for total
+      //   Pay:     each split → CR (account); single DR AP for total
+      const splitItems = splits.map((sp) => ({
+        accountId: sp.accountId,
+        partyId: body.paymentType === 'Pay' ? body.partyId : null,
+        debit: body.paymentType === 'Receive' ? sp.amount : 0,
+        credit: body.paymentType === 'Receive' ? 0 : sp.amount,
+        description: `Pembayaran: ${paymentNumber}${sp.notes ? ` — ${sp.notes}` : ''}`,
+      }));
+      const arApItem = body.paymentType === 'Receive'
+        ? {
+            accountId: arAccount.id,
+            partyId: body.partyId,
+            debit: 0,
+            credit: numAmount,
+            description: `Pembayaran: ${paymentNumber}`,
+          }
+        : {
+            accountId: apAccount.id,
+            partyId: body.partyId,
+            debit: numAmount,
+            credit: 0,
+            description: `Pembayaran: ${paymentNumber}`,
+          };
 
       const journalEntry = await tx.journalEntry.create({
         data: {
@@ -287,55 +328,44 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
           createdBy: req.user!.userId,
           submittedAt: new Date(),
           items: {
-            create: [
-              {
-                accountId: debitAccountId,
-                partyId: body.paymentType === 'Pay' ? body.partyId : null,
-                debit: numAmount,
-                credit: 0,
-                description: `Pembayaran: ${paymentNumber}`,
-              },
-              {
-                accountId: creditAccountId,
-                partyId: body.paymentType === 'Receive' ? body.partyId : null,
-                debit: 0,
-                credit: numAmount,
-                description: `Pembayaran: ${paymentNumber}`,
-              },
-            ],
+            create: [...splitItems, arApItem],
           },
         },
       });
 
+      // Ledger entries — mirror journal items
       await tx.accountingLedgerEntry.createMany({
         data: [
-          {
+          ...splitItems.map((it) => ({
             date: parsedDate,
-            accountId: debitAccountId,
-            partyId: body.paymentType === 'Pay' ? body.partyId : null,
-            debit: numAmount,
-            credit: 0,
+            accountId: it.accountId,
+            partyId: it.partyId,
+            debit: Number(it.debit),
+            credit: Number(it.credit),
             referenceType: 'JournalEntry',
             referenceId: journalEntry.id,
-            description: `Pembayaran: ${paymentNumber}`,
+            description: it.description,
             fiscalYearId: fiscalYear.id,
-          },
+          })),
           {
             date: parsedDate,
-            accountId: creditAccountId,
-            partyId: body.paymentType === 'Receive' ? body.partyId : null,
-            debit: 0,
-            credit: numAmount,
+            accountId: arApItem.accountId,
+            partyId: arApItem.partyId,
+            debit: Number(arApItem.debit),
+            credit: Number(arApItem.credit),
             referenceType: 'JournalEntry',
             referenceId: journalEntry.id,
-            description: `Pembayaran: ${paymentNumber}`,
+            description: arApItem.description,
             fiscalYearId: fiscalYear.id,
           },
         ],
       });
 
-      await updateAccountBalance(tx, debitAccountId, numAmount, 0);
-      await updateAccountBalance(tx, creditAccountId, 0, numAmount);
+      // Update balances per split
+      for (const it of splitItems) {
+        await updateAccountBalance(tx, it.accountId, Number(it.debit), Number(it.credit));
+      }
+      await updateAccountBalance(tx, arApItem.accountId, Number(arApItem.debit), Number(arApItem.credit));
 
       // Auto-allocate payment to oldest outstanding invoices
       const unallocatedAmount = await autoAllocatePayment(tx, payment.id, body.partyId, body.paymentType, numAmount);
@@ -515,17 +545,28 @@ router.post('/:id/cancel', roleMiddleware(['Admin']), async (req: AuthRequest, r
         });
       }
 
-      // Reverse account balances
+      // Reverse account balances — load splits if any, else fall back to single accountId
       const arAccount = await systemAccounts.getAccount('AR');
       const apAccount = await systemAccounts.getAccount('AP');
       const numAmountVal = numAmount.toNumber();
 
+      const paymentSplits = await tx.paymentSplit.findMany({ where: { paymentId: payment.id } });
+      const reverseSplits = paymentSplits.length > 0
+        ? paymentSplits.map((s) => ({ accountId: s.accountId, amount: Number(s.amount) }))
+        : [{ accountId: payment.accountId, amount: numAmountVal }];
+
       if (payment.paymentType === 'Receive') {
-        await updateAccountBalance(tx, payment.accountId, 0, numAmountVal); // reverse bank debit
-        await updateAccountBalance(tx, arAccount.id, numAmountVal, 0); // reverse AR credit
+        // Original: each split DR; AR CR. Reverse: each split CR; AR DR.
+        for (const sp of reverseSplits) {
+          await updateAccountBalance(tx, sp.accountId, 0, sp.amount);
+        }
+        await updateAccountBalance(tx, arAccount.id, numAmountVal, 0);
       } else {
-        await updateAccountBalance(tx, apAccount.id, 0, numAmountVal); // reverse AP debit
-        await updateAccountBalance(tx, payment.accountId, numAmountVal, 0); // reverse bank credit
+        // Original: each split CR; AP DR. Reverse: each split DR; AP CR.
+        for (const sp of reverseSplits) {
+          await updateAccountBalance(tx, sp.accountId, sp.amount, 0);
+        }
+        await updateAccountBalance(tx, apAccount.id, 0, numAmountVal);
       }
 
       // Reverse party outstanding — full payment amount (matches GL reversal)
