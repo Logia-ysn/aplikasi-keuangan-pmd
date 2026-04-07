@@ -100,26 +100,9 @@ router.post(
   },
 );
 
-// ─── GET /api/attachments/:referenceType/:referenceId ────────────────────────
-router.get('/:referenceType/:referenceId', async (req: AuthRequest, res: Response) => {
-  try {
-    const referenceType = req.params.referenceType as string;
-    const referenceId = req.params.referenceId as string;
-    const attachments = await prisma.transactionAttachment.findMany({
-      where: { referenceType, referenceId },
-      orderBy: { createdAt: 'asc' },
-      include: {
-        user: { select: { fullName: true } },
-      },
-    });
-
-    return res.json(attachments);
-  } catch (error) {
-    return handleRouteError(res, error, 'GET /attachments/:type/:id', 'Gagal mengambil daftar lampiran.');
-  }
-});
-
 // ─── GET /api/attachments/file/:id — serve file (auth-gated) ─────────────────
+// NOTE: Must be registered BEFORE the /:referenceType/:referenceId route below,
+// otherwise Express matches /:referenceType/:referenceId first (with type='file').
 router.get('/file/:id', async (req: AuthRequest, res: Response) => {
   try {
     const id = req.params.id as string;
@@ -142,6 +125,25 @@ router.get('/file/:id', async (req: AuthRequest, res: Response) => {
     return res.sendFile(fullPath);
   } catch (error) {
     return handleRouteError(res, error, 'GET /attachments/file/:id', 'Gagal mengambil file.');
+  }
+});
+
+// ─── GET /api/attachments/:referenceType/:referenceId ────────────────────────
+router.get('/:referenceType/:referenceId', async (req: AuthRequest, res: Response) => {
+  try {
+    const referenceType = req.params.referenceType as string;
+    const referenceId = req.params.referenceId as string;
+    const attachments = await prisma.transactionAttachment.findMany({
+      where: { referenceType, referenceId },
+      orderBy: { createdAt: 'asc' },
+      include: {
+        user: { select: { fullName: true } },
+      },
+    });
+
+    return res.json(attachments);
+  } catch (error) {
+    return handleRouteError(res, error, 'GET /attachments/:type/:id', 'Gagal mengambil daftar lampiran.');
   }
 });
 
