@@ -42,12 +42,12 @@ const InvoiceItemSchema = z.object({
   serviceItemId: z.string().uuid().nullable().optional(),
   accountId: z.string().uuid().nullable().optional(),
   quantity: z.coerce.number().positive('Jumlah harus lebih dari 0.'),
-  unit: z.string().optional(),
+  unit: z.string().nullable().optional(),
   rate: z.coerce.number().min(0, 'Harga tidak boleh negatif.'),
   discount: z.coerce.number().min(0).max(100).optional().default(0), // persen diskon per baris
   taxPct: z.coerce.number().min(0).max(100).optional().default(0),   // PPN % per baris
   pphPct: z.coerce.number().min(0).max(100).optional().default(0),   // PPh % per baris
-  description: z.string().optional(),
+  description: z.string().nullable().optional(),
 });
 
 export const CreateSalesInvoiceSchema = z.object({

@@ -1,10 +1,11 @@
 import { useState, useMemo } from 'react';
+import { toast } from 'sonner';
 import {
   Plus, Search, Package, Loader2, ChevronLeft, ChevronRight,
   DollarSign, AlertTriangle, CheckCircle2, Receipt,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '../lib/api';
 import { formatRupiah, formatDate } from '../lib/formatters';
 import PurchaseInvoiceModal from '../components/PurchaseInvoiceModal';
@@ -29,6 +30,55 @@ export const PurchaseInvoices = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isPayOpen, setIsPayOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [editPrefill, setEditPrefill] = useState<any>(null);
+  const queryClient = useQueryClient();
+
+  // "Edit Lengkap" workflow: cancel old invoice, then open modal prefilled with its data
+  const handleEditFull = async (invoice: any) => {
+    if (!invoice?.id) return;
+    if (!confirm(`Edit invoice ${invoice.invoiceNumber}?\n\nInvoice lama akan dibatalkan dan kamu akan membuat invoice baru dengan data yang sudah terisi. Nomor invoice akan berubah.`)) {
+      return;
+    }
+    try {
+      await api.post(`/purchase/invoices/${invoice.id}/cancel`);
+      toast.success(`Invoice ${invoice.invoiceNumber} dibatalkan. Silakan edit & simpan ulang.`);
+
+      // Map invoice items → InvoiceItem shape used by PurchaseInvoiceModal
+      const prefillItems = (invoice.items ?? []).map((it: any) => {
+        const isService = !it.inventoryItemId && Number(it.timbanganDiterima ?? 0) === 0;
+        return {
+          id: crypto.randomUUID(),
+          itemType: isService ? 'service' : 'material',
+          itemName: it.itemName ?? '',
+          inventoryItemId: it.inventoryItemId ?? '',
+          description: it.description ?? '',
+          unit: it.unit ?? (isService ? 'pcs' : 'Kg'),
+          kualitas: it.kualitas ?? '',
+          refaksi: Number(it.refaksi ?? 0),
+          timbanganTruk: Number(it.timbanganTruk ?? 0),
+          timbanganDiterima: Number(it.timbanganDiterima ?? it.quantity ?? 0),
+          rate: Number(it.rate ?? 0),
+          taxPct: Number(it.taxPct ?? 0),
+          pphPct: Number(it.pphPct ?? 0),
+          potonganItem: Number(it.potonganItem ?? 0),
+        };
+      });
+
+      setEditPrefill({
+        date: invoice.date ? new Date(invoice.date).toISOString().split('T')[0] : undefined,
+        dueDate: invoice.dueDate ? new Date(invoice.dueDate).toISOString().split('T')[0] : undefined,
+        partyId: invoice.partyId,
+        notes: invoice.notes ?? '',
+        biayaLain: Number(invoice.biayaLain ?? 0),
+        items: prefillItems,
+      });
+      setSelectedId(null);
+      setIsModalOpen(true);
+      queryClient.invalidateQueries({ queryKey: ['purchase-invoices'] });
+    } catch (err: any) {
+      toast.error(err.response?.data?.error ?? 'Gagal membatalkan invoice.');
+    }
+  };
 
   const { data: raw, isLoading } = useQuery({
     queryKey: ['purchase-invoices'],
@@ -313,13 +363,15 @@ export const PurchaseInvoices = () => {
 
       <PurchaseInvoiceModal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={() => { setIsModalOpen(false); setEditPrefill(null); }}
+        prefill={editPrefill}
       />
 
       <InvoiceDetailDrawer
         type="purchase"
         invoiceId={selectedId}
         onClose={() => setSelectedId(null)}
+        onEditFull={handleEditFull}
       />
 
       <PaymentModal

@@ -19,6 +19,11 @@ interface Props {
   type: 'sales' | 'purchase';
   invoiceId: string | null;
   onClose: () => void;
+  /**
+   * Called when user wants to "edit lengkap" a purchase invoice.
+   * Parent should: cancel the invoice, then open PurchaseInvoiceModal with prefill.
+   */
+  onEditFull?: (invoice: any) => void;
 }
 
 const statusConfig: Record<string, { label: string; badge: string; icon: React.ReactNode }> = {
@@ -30,7 +35,7 @@ const statusConfig: Record<string, { label: string; badge: string; icon: React.R
   Overdue:      { label: 'Jatuh Tempo',    badge: 'badge badge-red',    icon: <AlertTriangle size={13} /> },
 };
 
-const InvoiceDetailDrawer: React.FC<Props> = ({ type, invoiceId, onClose }) => {
+const InvoiceDetailDrawer: React.FC<Props> = ({ type, invoiceId, onClose, onEditFull }) => {
   const company = useCompanyPDF();
   const queryClient = useQueryClient();
   const isSales = type === 'sales';
@@ -269,9 +274,18 @@ const InvoiceDetailDrawer: React.FC<Props> = ({ type, invoiceId, onClose }) => {
               <button
                 onClick={startEditing}
                 className="p-1.5 rounded-lg hover:bg-blue-50 text-gray-400 hover:text-blue-600 transition-colors"
-                title="Edit invoice"
+                title="Edit catatan & jatuh tempo"
               >
                 <Pencil size={16} />
+              </button>
+            )}
+            {!isSales && canEdit && onEditFull && Number(invoice?.outstanding ?? 0) === Number(invoice?.grandTotal ?? 0) && (
+              <button
+                onClick={() => onEditFull(invoice)}
+                className="px-2 py-1 rounded-lg hover:bg-amber-50 text-[11px] font-medium text-amber-600 hover:text-amber-700 border border-amber-200 transition-colors"
+                title="Batalkan dan buat ulang invoice ini"
+              >
+                Edit Lengkap
               </button>
             )}
             {canCancel && (

@@ -53,7 +53,9 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'"],
+      // 'unsafe-eval' diperlukan oleh @react-pdf/renderer + fontkit (Emscripten WASM)
+      // untuk merge PDF + lampiran. App internal LAN, risiko XSS rendah.
+      scriptSrc: ["'self'", "'wasm-unsafe-eval'", "'unsafe-eval'"],
       styleSrc: ["'self'", "'unsafe-inline'"],
       imgSrc: ["'self'", "data:", "blob:"],
       fontSrc: ["'self'", "data:"],

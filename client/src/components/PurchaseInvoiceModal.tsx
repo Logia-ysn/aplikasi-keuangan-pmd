@@ -7,17 +7,20 @@ import { formatRupiah } from '../lib/formatters';
 // Rice-mill purchase invoice item.
 // Flow: timbanganTruk (info only) → refaksi (kg deducted) → timbanganDiterima (net received)
 // → rate → ppn/pph → potonganItem → hargaAkhir.
+type ItemType = 'material' | 'service';
+
 interface InvoiceItem {
   id: string;
+  itemType: ItemType;          // 'material' = bahan baku w/ timbangan; 'service' = jasa/biaya
   itemName: string;
   inventoryItemId: string;
   description: string;
   unit: string;
   kualitas: string;
-  refaksi: number;            // kg, optional
-  timbanganTruk: number;       // kg, informational only
-  timbanganDiterima: number;   // kg, source of truth for qty
-  rate: number;                // harga per kg
+  refaksi: number;            // kg, optional (material only)
+  timbanganTruk: number;       // kg, informational only (material only)
+  timbanganDiterima: number;   // kg (material) atau qty (service) — selalu jadi quantity
+  rate: number;                // harga per kg (material) atau total harga per unit (service)
   taxPct: number;              // PPN % per item
   pphPct: number;              // PPh % per item
   potonganItem: number;        // IDR per item
@@ -27,16 +30,17 @@ const MAX_ATTACHMENTS = 5;
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 const ALLOWED_MIME = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
 
-const defaultItem = (): InvoiceItem => ({
+const defaultItem = (type: ItemType = 'material'): InvoiceItem => ({
   id: crypto.randomUUID(),
+  itemType: type,
   itemName: '',
   inventoryItemId: '',
   description: '',
-  unit: 'Kg',
+  unit: type === 'service' ? 'pcs' : 'Kg',
   kualitas: '',
   refaksi: 0,
   timbanganTruk: 0,
-  timbanganDiterima: 0,
+  timbanganDiterima: type === 'service' ? 1 : 0,
   rate: 0,
   taxPct: 0,
   pphPct: 0,
@@ -62,13 +66,40 @@ const computeLine = (item: InvoiceItem): LineCalc => {
   return { effectiveQty: qty, subtotal, ppn, pph, hargaAkhir };
 };
 
-const PurchaseInvoiceModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, onClose }) => {
-  const [invoiceDate, setInvoiceDate] = useState(() => new Date().toISOString().split('T')[0]);
-  const [dueDate, setDueDate] = useState(() => new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0]);
-  const [partyId, setPartyId] = useState('');
-  const [notes, setNotes] = useState('');
-  const [biayaLain, setBiayaLain] = useState(0);
-  const [items, setItems] = useState<InvoiceItem[]>([defaultItem()]);
+interface PurchaseInvoiceModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  /** When provided, modal opens with these values prefilled (re-create after cancel). */
+  prefill?: {
+    date?: string;
+    dueDate?: string;
+    partyId?: string;
+    notes?: string;
+    biayaLain?: number;
+    items?: InvoiceItem[];
+  } | null;
+}
+
+const PurchaseInvoiceModal: React.FC<PurchaseInvoiceModalProps> = ({ isOpen, onClose, prefill }) => {
+  const [invoiceDate, setInvoiceDate] = useState(() => prefill?.date ?? new Date().toISOString().split('T')[0]);
+  const [dueDate, setDueDate] = useState(() => prefill?.dueDate ?? new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0]);
+  const [partyId, setPartyId] = useState(prefill?.partyId ?? '');
+  const [notes, setNotes] = useState(prefill?.notes ?? '');
+  const [biayaLain, setBiayaLain] = useState(prefill?.biayaLain ?? 0);
+  const [items, setItems] = useState<InvoiceItem[]>(prefill?.items && prefill.items.length > 0 ? prefill.items : [defaultItem()]);
+
+  // Reset state when prefill changes (e.g. user edits a different invoice)
+  React.useEffect(() => {
+    if (isOpen && prefill) {
+      setInvoiceDate(prefill.date ?? new Date().toISOString().split('T')[0]);
+      setDueDate(prefill.dueDate ?? new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0]);
+      setPartyId(prefill.partyId ?? '');
+      setNotes(prefill.notes ?? '');
+      setBiayaLain(prefill.biayaLain ?? 0);
+      if (prefill.items && prefill.items.length > 0) setItems(prefill.items);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, prefill]);
   const [stagedFiles, setStagedFiles] = useState<File[]>([]);
   const [error, setError] = useState('');
 
@@ -134,7 +165,8 @@ const PurchaseInvoiceModal: React.FC<{ isOpen: boolean; onClose: () => void }> =
     onError: (err: any) => setError(err.response?.data?.error || 'Gagal menyimpan invoice.'),
   });
 
-  const addItem = () => setItems([...items, defaultItem()]);
+  const addItem = () => setItems([...items, defaultItem('material')]);
+  const addServiceItem = () => setItems([...items, defaultItem('service')]);
   const removeItem = (i: number) => setItems(items.filter((_, idx) => idx !== i));
   const updateItem = (i: number, field: keyof InvoiceItem, value: any) => {
     const next = [...items];
@@ -186,9 +218,14 @@ const PurchaseInvoiceModal: React.FC<{ isOpen: boolean; onClose: () => void }> =
   const totalPph = lineCalcs.reduce((s, c) => s + c.pph, 0);
   const totalPotongan = items.reduce((s, i) => s + (i.potonganItem || 0), 0);
   const grandTotal = subtotalItems + biayaLain;
+  // Every row must be valid; at least one row must produce value.
+  const allRowsValid = items.every(
+    (i) => i.itemName.trim().length > 0 && i.rate > 0 && i.timbanganDiterima > 0,
+  );
   const canSubmit =
     partyId &&
-    items.some((i) => i.itemName && i.rate > 0 && i.timbanganDiterima > 0) &&
+    items.length > 0 &&
+    allRowsValid &&
     grandTotal > 0 &&
     !mutation.isPending;
 
@@ -244,9 +281,14 @@ const PurchaseInvoiceModal: React.FC<{ isOpen: boolean; onClose: () => void }> =
           <div className="px-4 sm:px-6 pt-5 pb-4">
             <div className="flex items-center justify-between mb-3">
               <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Daftar Barang</p>
-              <button onClick={addItem} className="flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-700">
-                <Plus size={13} /> Tambah Baris
-              </button>
+              <div className="flex items-center gap-3">
+                <button onClick={addItem} className="flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-700">
+                  <Plus size={13} /> Tambah Bahan
+                </button>
+                <button onClick={addServiceItem} className="flex items-center gap-1 text-xs font-medium text-emerald-600 hover:text-emerald-700">
+                  <Plus size={13} /> Tambah Jasa/Biaya
+                </button>
+              </div>
             </div>
 
             {/* Desktop: horizontal scroll table */}
@@ -254,13 +296,13 @@ const PurchaseInvoiceModal: React.FC<{ isOpen: boolean; onClose: () => void }> =
               <table className="w-full text-sm min-w-[1400px]">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-200 text-[10px] font-semibold text-gray-400 uppercase tracking-wide">
-                    <th className="text-left px-2 py-2 w-6">#</th>
-                    <th className="text-left px-2 py-2 min-w-[180px]">Jenis Barang</th>
-                    <th className="text-left px-2 py-2 w-32">Kualitas</th>
+                    <th className="text-left px-2 py-2 w-14">Tipe</th>
+                    <th className="text-left px-2 py-2 min-w-[180px]">Item / Jasa</th>
+                    <th className="text-left px-2 py-2 w-32">Kualitas / Catatan</th>
                     <th className="text-right px-2 py-2 w-24">Refaksi (kg)</th>
                     <th className="text-right px-2 py-2 w-28">Timb. Truk (kg)</th>
-                    <th className="text-right px-2 py-2 w-28">Timb. Diterima</th>
-                    <th className="text-right px-2 py-2 w-28">Harga/kg</th>
+                    <th className="text-right px-2 py-2 w-28">Qty / Diterima</th>
+                    <th className="text-right px-2 py-2 w-28">Harga / unit</th>
                     <th className="text-right px-2 py-2 w-16">PPN %</th>
                     <th className="text-right px-2 py-2 w-16">PPh %</th>
                     <th className="text-right px-2 py-2 w-28">Potongan</th>
@@ -271,31 +313,54 @@ const PurchaseInvoiceModal: React.FC<{ isOpen: boolean; onClose: () => void }> =
                 <tbody>
                   {items.map((item, idx) => {
                     const calc = lineCalcs[idx];
+                    const isService = item.itemType === 'service';
                     return (
-                      <tr key={item.id} className="border-b border-gray-50 last:border-0 hover:bg-gray-50/50">
-                        <td className="px-2 py-2 text-center text-xs text-gray-300">{idx + 1}</td>
+                      <tr key={item.id} className={`border-b border-gray-50 last:border-0 hover:bg-gray-50/50 ${isService ? 'bg-emerald-50/30' : ''}`}>
+                        <td className="px-2 py-2 text-center text-[10px]">
+                          <span className={`inline-block px-1.5 py-0.5 rounded ${isService ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>
+                            {isService ? 'Jasa' : 'Bahan'}
+                          </span>
+                        </td>
                         <td className="px-2 py-2">
-                          <select value={item.inventoryItemId} onChange={(e) => selectInventoryItem(idx, e.target.value)} className="w-full bg-transparent text-xs text-gray-800 border-none focus:ring-0 focus:outline-none p-0 cursor-pointer">
-                            <option value="">— Pilih dari Stok —</option>
-                            {inventoryItems?.map((inv: any) => (
-                              <option key={inv.id} value={inv.id}>{inv.code} — {inv.name}</option>
-                            ))}
-                          </select>
-                          {!item.inventoryItemId && (
-                            <input type="text" value={item.itemName} onChange={(e) => updateItem(idx, 'itemName', e.target.value)} placeholder="atau manual..." className="w-full bg-transparent text-[11px] text-gray-500 border-none focus:ring-0 focus:outline-none p-0 placeholder:text-gray-300" />
+                          {isService ? (
+                            <input type="text" value={item.itemName} onChange={(e) => updateItem(idx, 'itemName', e.target.value)} placeholder="Biaya angkutan, jasa giling..." className="w-full bg-transparent text-xs text-gray-800 border-none focus:ring-0 focus:outline-none p-0 placeholder:text-gray-300" />
+                          ) : (
+                            <>
+                              <select value={item.inventoryItemId} onChange={(e) => selectInventoryItem(idx, e.target.value)} className="w-full bg-transparent text-xs text-gray-800 border-none focus:ring-0 focus:outline-none p-0 cursor-pointer">
+                                <option value="">— Pilih dari Stok —</option>
+                                {inventoryItems?.map((inv: any) => (
+                                  <option key={inv.id} value={inv.id}>{inv.code} — {inv.name}</option>
+                                ))}
+                              </select>
+                              {!item.inventoryItemId && (
+                                <input type="text" value={item.itemName} onChange={(e) => updateItem(idx, 'itemName', e.target.value)} placeholder="atau manual..." className="w-full bg-transparent text-[11px] text-gray-500 border-none focus:ring-0 focus:outline-none p-0 placeholder:text-gray-300" />
+                              )}
+                            </>
                           )}
                         </td>
                         <td className="px-2 py-2">
-                          <input type="text" value={item.kualitas} onChange={(e) => updateItem(idx, 'kualitas', e.target.value)} placeholder="KA 18%..." className="w-full bg-transparent text-xs text-gray-700 border-none focus:ring-0 focus:outline-none p-0 placeholder:text-gray-300" />
+                          {isService ? (
+                            <input type="text" value={item.description} onChange={(e) => updateItem(idx, 'description', e.target.value)} placeholder="catatan..." className="w-full bg-transparent text-xs text-gray-700 border-none focus:ring-0 focus:outline-none p-0 placeholder:text-gray-300" />
+                          ) : (
+                            <input type="text" value={item.kualitas} onChange={(e) => updateItem(idx, 'kualitas', e.target.value)} placeholder="KA 18%..." className="w-full bg-transparent text-xs text-gray-700 border-none focus:ring-0 focus:outline-none p-0 placeholder:text-gray-300" />
+                          )}
                         </td>
                         <td className="px-2 py-2 text-right">
-                          <input type="number" value={item.refaksi || ''} onChange={(e) => updateItem(idx, 'refaksi', Number(e.target.value))} placeholder="0" className="w-full bg-transparent text-xs text-amber-600 text-right font-mono border-none focus:ring-0 focus:outline-none p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+                          {isService ? (
+                            <span className="text-[11px] text-gray-300">—</span>
+                          ) : (
+                            <input type="number" value={item.refaksi || ''} onChange={(e) => updateItem(idx, 'refaksi', Number(e.target.value))} placeholder="0" className="w-full bg-transparent text-xs text-amber-600 text-right font-mono border-none focus:ring-0 focus:outline-none p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+                          )}
                         </td>
                         <td className="px-2 py-2 text-right">
-                          <input type="number" value={item.timbanganTruk || ''} onChange={(e) => updateItem(idx, 'timbanganTruk', Number(e.target.value))} placeholder="0" className="w-full bg-transparent text-xs text-gray-500 text-right font-mono border-none focus:ring-0 focus:outline-none p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+                          {isService ? (
+                            <span className="text-[11px] text-gray-300">—</span>
+                          ) : (
+                            <input type="number" value={item.timbanganTruk || ''} onChange={(e) => updateItem(idx, 'timbanganTruk', Number(e.target.value))} placeholder="0" className="w-full bg-transparent text-xs text-gray-500 text-right font-mono border-none focus:ring-0 focus:outline-none p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+                          )}
                         </td>
                         <td className="px-2 py-2 text-right">
-                          <input type="number" value={item.timbanganDiterima || ''} onChange={(e) => updateItem(idx, 'timbanganDiterima', Number(e.target.value))} placeholder="0" className="w-full bg-transparent text-xs text-gray-900 font-semibold text-right font-mono border-none focus:ring-0 focus:outline-none p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+                          <input type="number" value={item.timbanganDiterima || ''} onChange={(e) => updateItem(idx, 'timbanganDiterima', Number(e.target.value))} placeholder={isService ? '1' : '0'} className="w-full bg-transparent text-xs text-gray-900 font-semibold text-right font-mono border-none focus:ring-0 focus:outline-none p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
                         </td>
                         <td className="px-2 py-2 text-right">
                           <input type="number" value={item.rate || ''} onChange={(e) => updateItem(idx, 'rate', Number(e.target.value))} placeholder="0" className="w-full bg-transparent text-xs text-gray-800 text-right font-mono border-none focus:ring-0 focus:outline-none p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
@@ -330,10 +395,13 @@ const PurchaseInvoiceModal: React.FC<{ isOpen: boolean; onClose: () => void }> =
             <div className="md:hidden space-y-3">
               {items.map((item, idx) => {
                 const calc = lineCalcs[idx];
+                const isService = item.itemType === 'service';
                 return (
-                  <div key={item.id} className="border border-gray-200 rounded-xl p-3 space-y-2 bg-white">
+                  <div key={item.id} className={`border rounded-xl p-3 space-y-2 ${isService ? 'border-emerald-200 bg-emerald-50/30' : 'border-gray-200 bg-white'}`}>
                     <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-semibold text-gray-400 uppercase">Item {idx + 1}</span>
+                      <span className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded ${isService ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>
+                        {isService ? 'Jasa / Biaya' : 'Bahan Baku'} #{idx + 1}
+                      </span>
                       {items.length > 1 && (
                         <button onClick={() => removeItem(idx)} className="p-1 text-gray-400 hover:text-red-500">
                           <Trash2 size={14} />
@@ -341,36 +409,50 @@ const PurchaseInvoiceModal: React.FC<{ isOpen: boolean; onClose: () => void }> =
                       )}
                     </div>
                     <div>
-                      <label className="block text-[10px] text-gray-400 mb-1">Jenis Barang</label>
-                      <select value={item.inventoryItemId} onChange={(e) => selectInventoryItem(idx, e.target.value)} className="w-full border border-gray-200 rounded-lg py-2 px-2 text-sm">
-                        <option value="">— Pilih dari Stok —</option>
-                        {inventoryItems?.map((inv: any) => (
-                          <option key={inv.id} value={inv.id}>{inv.name}</option>
-                        ))}
-                      </select>
-                      {!item.inventoryItemId && (
-                        <input type="text" value={item.itemName} onChange={(e) => updateItem(idx, 'itemName', e.target.value)} placeholder="Nama manual..." className="w-full mt-1 border border-gray-200 rounded-lg py-2 px-2 text-sm" />
+                      <label className="block text-[10px] text-gray-400 mb-1">{isService ? 'Nama Jasa/Biaya' : 'Jenis Barang'}</label>
+                      {isService ? (
+                        <input type="text" value={item.itemName} onChange={(e) => updateItem(idx, 'itemName', e.target.value)} placeholder="Biaya angkutan, jasa giling..." className="w-full border border-gray-200 rounded-lg py-2 px-2 text-sm" />
+                      ) : (
+                        <>
+                          <select value={item.inventoryItemId} onChange={(e) => selectInventoryItem(idx, e.target.value)} className="w-full border border-gray-200 rounded-lg py-2 px-2 text-sm">
+                            <option value="">— Pilih dari Stok —</option>
+                            {inventoryItems?.map((inv: any) => (
+                              <option key={inv.id} value={inv.id}>{inv.name}</option>
+                            ))}
+                          </select>
+                          {!item.inventoryItemId && (
+                            <input type="text" value={item.itemName} onChange={(e) => updateItem(idx, 'itemName', e.target.value)} placeholder="Nama manual..." className="w-full mt-1 border border-gray-200 rounded-lg py-2 px-2 text-sm" />
+                          )}
+                        </>
                       )}
                     </div>
                     <div>
-                      <label className="block text-[10px] text-gray-400 mb-1">Kualitas</label>
-                      <input type="text" value={item.kualitas} onChange={(e) => updateItem(idx, 'kualitas', e.target.value)} placeholder="KA 18%, bersih..." className="w-full border border-gray-200 rounded-lg py-2 px-2 text-sm" />
+                      <label className="block text-[10px] text-gray-400 mb-1">{isService ? 'Catatan' : 'Kualitas'}</label>
+                      {isService ? (
+                        <input type="text" value={item.description} onChange={(e) => updateItem(idx, 'description', e.target.value)} placeholder="catatan..." className="w-full border border-gray-200 rounded-lg py-2 px-2 text-sm" />
+                      ) : (
+                        <input type="text" value={item.kualitas} onChange={(e) => updateItem(idx, 'kualitas', e.target.value)} placeholder="KA 18%, bersih..." className="w-full border border-gray-200 rounded-lg py-2 px-2 text-sm" />
+                      )}
                     </div>
                     <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="block text-[10px] text-gray-400 mb-1">Timb. Truk (kg)</label>
-                        <input type="number" value={item.timbanganTruk || ''} onChange={(e) => updateItem(idx, 'timbanganTruk', Number(e.target.value))} className="w-full border border-gray-200 rounded-lg py-2 px-2 text-sm font-mono" />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] text-gray-400 mb-1">Refaksi (kg)</label>
-                        <input type="number" value={item.refaksi || ''} onChange={(e) => updateItem(idx, 'refaksi', Number(e.target.value))} className="w-full border border-gray-200 rounded-lg py-2 px-2 text-sm font-mono text-amber-600" />
-                      </div>
+                      {!isService && (
+                        <>
+                          <div>
+                            <label className="block text-[10px] text-gray-400 mb-1">Timb. Truk (kg)</label>
+                            <input type="number" value={item.timbanganTruk || ''} onChange={(e) => updateItem(idx, 'timbanganTruk', Number(e.target.value))} className="w-full border border-gray-200 rounded-lg py-2 px-2 text-sm font-mono" />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] text-gray-400 mb-1">Refaksi (kg)</label>
+                            <input type="number" value={item.refaksi || ''} onChange={(e) => updateItem(idx, 'refaksi', Number(e.target.value))} className="w-full border border-gray-200 rounded-lg py-2 px-2 text-sm font-mono text-amber-600" />
+                          </div>
+                        </>
+                      )}
                       <div className="col-span-2">
-                        <label className="block text-[10px] text-gray-400 mb-1">Timbangan Diterima (kg) *</label>
+                        <label className="block text-[10px] text-gray-400 mb-1">{isService ? 'Jumlah *' : 'Timbangan Diterima (kg) *'}</label>
                         <input type="number" value={item.timbanganDiterima || ''} onChange={(e) => updateItem(idx, 'timbanganDiterima', Number(e.target.value))} className="w-full border border-gray-300 rounded-lg py-2 px-2 text-sm font-mono font-semibold" />
                       </div>
                       <div>
-                        <label className="block text-[10px] text-gray-400 mb-1">Harga/kg *</label>
+                        <label className="block text-[10px] text-gray-400 mb-1">{isService ? 'Harga *' : 'Harga/kg *'}</label>
                         <input type="number" value={item.rate || ''} onChange={(e) => updateItem(idx, 'rate', Number(e.target.value))} className="w-full border border-gray-200 rounded-lg py-2 px-2 text-sm font-mono" />
                       </div>
                       <div>
