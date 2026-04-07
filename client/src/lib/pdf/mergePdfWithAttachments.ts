@@ -32,6 +32,7 @@ export async function mergeInvoicePdfWithAttachments(
 ): Promise<Blob> {
   const invoiceBytes = await invoicePdfBlob.arrayBuffer();
   const merged = await PDFDocument.load(invoiceBytes);
+  const failures: string[] = [];
 
   for (const att of attachments) {
     try {
@@ -80,9 +81,16 @@ export async function mergeInvoicePdfWithAttachments(
         height: drawH,
       });
     } catch (err) {
-      // Log and continue — one bad attachment shouldn't break the whole merge
       console.warn(`Gagal merge lampiran ${att.fileName}:`, err);
+      failures.push(`${att.fileName}: ${(err as Error)?.message || 'unknown'}`);
     }
+  }
+
+  if (failures.length === attachments.length && attachments.length > 0) {
+    throw new Error(`Semua lampiran gagal di-merge:\n${failures.join('\n')}`);
+  }
+  if (failures.length > 0) {
+    console.error('Sebagian lampiran gagal:', failures);
   }
 
   const out = await merged.save();
