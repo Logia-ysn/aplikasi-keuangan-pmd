@@ -228,8 +228,13 @@ const InvoiceDetailDrawer: React.FC<Props> = ({ type, invoiceId, onClose, onEdit
       }));
       const merged = await mergeInvoicePdfWithAttachments(invoiceBlob, refs, {
         fetchBinary: async (url) => {
-          const res = await api.get(url, { responseType: 'arraybuffer' });
-          return res.data as ArrayBuffer;
+          const res = await fetch(`/api${url}`, { credentials: 'include' });
+          if (!res.ok) throw new Error(`fetch ${url} → HTTP ${res.status}`);
+          const buf = await res.arrayBuffer();
+          const head = new Uint8Array(buf.slice(0, 4));
+          const sig = String.fromCharCode(...head);
+          console.log(`[merge] ${url} bytes=${buf.byteLength} sig="${sig}"`);
+          return buf;
         },
       });
       const url = URL.createObjectURL(merged);
