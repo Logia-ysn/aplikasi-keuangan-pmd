@@ -544,8 +544,8 @@ const PurchaseInvoiceModal: React.FC<PurchaseInvoiceModalProps> = ({ isOpen, onC
                 <div className="flex items-center gap-2">
                   <span className="flex-1 text-gray-500">Biaya Lain</span>
                   <div className="flex items-center gap-1 shrink-0">
-                    <span className="text-gray-400 text-xs">+</span>
-                    <input type="number" value={biayaLain || ''} onChange={(e) => setBiayaLain(Math.max(0, Number(e.target.value)))} placeholder="0" className="w-28 text-right font-mono text-gray-700 bg-transparent border-none focus:ring-0 focus:outline-none p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none tabular-nums" />
+                    <span className="text-gray-400 text-xs">{biayaLain < 0 ? '−' : '+'}</span>
+                    <input type="number" value={biayaLain || ''} onChange={(e) => setBiayaLain(Number(e.target.value) || 0)} placeholder="0" title="Boleh negatif untuk potong tagihan" className="w-28 text-right font-mono text-gray-700 bg-transparent border-none focus:ring-0 focus:outline-none p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none tabular-nums" />
                   </div>
                 </div>
                 <div className="border-t border-gray-200 pt-2.5 flex justify-between items-baseline">

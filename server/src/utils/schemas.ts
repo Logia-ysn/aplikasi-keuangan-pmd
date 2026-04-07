@@ -58,7 +58,7 @@ export const CreateSalesInvoiceSchema = z.object({
   notes: z.string().nullable().optional(),
   taxPct: z.coerce.number().min(0).max(100).optional().default(0),    // PPN %
   potongan: z.coerce.number().min(0).optional().default(0),           // potongan amount
-  biayaLain: z.coerce.number().min(0).optional().default(0),          // biaya tambahan
+  biayaLain: z.coerce.number().optional().default(0),          // biaya tambahan (boleh negatif = potongan)
   labelPotongan: z.string().nullable().optional(),
   labelBiaya: z.string().nullable().optional(),
   terms: z.string().nullable().optional(),
@@ -84,7 +84,7 @@ export const CreatePurchaseInvoiceSchema = z.object({
   dueDate: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
   taxPct: z.coerce.number().min(0).max(100).optional().default(0),
-  biayaLain: z.coerce.number().min(0).optional().default(0),
+  biayaLain: z.coerce.number().optional().default(0),  // boleh negatif (potongan tagihan)
   // `potongan` at header level is a derived cache (SUM items.potonganItem).
   // Accept it for backward compat but the service layer recomputes from items.
   potongan: z.coerce.number().min(0).optional().default(0),
@@ -280,7 +280,7 @@ const InvoiceTemplateDataSchema = z.object({
   partyId: z.string().uuid().optional(),
   taxPct: z.coerce.number().min(0).max(100).optional(),
   potongan: z.coerce.number().min(0).optional(),
-  biayaLain: z.coerce.number().min(0).optional(),
+  biayaLain: z.coerce.number().optional(),
   notes: z.string().optional(),
   items: z.array(InvoiceTemplateItemSchema).min(1, 'Minimal 1 item.'),
 });
