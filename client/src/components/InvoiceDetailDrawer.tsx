@@ -297,7 +297,17 @@ const InvoiceDetailDrawer: React.FC<Props> = ({ type, invoiceId, onClose, onEdit
                 <XCircle size={16} />
               </button>
             )}
-            {invoice && (
+            {invoice && (canHaveAttachments && attachments.length > 0 ? (
+              <button
+                onClick={downloadMergedPdf}
+                disabled={isMerging}
+                className="btn-secondary btn-sm flex items-center gap-1.5 disabled:opacity-50"
+                title={`Unduh PDF invoice + ${attachments.length} lampiran dalam 1 file`}
+              >
+                {isMerging ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+                <span className="hidden sm:inline">Unduh PDF +{attachments.length}</span>
+              </button>
+            ) : (
               <PDFDownloadButton
                 variant="button"
                 fileName={`${invoice.invoiceNumber}.pdf`}
@@ -339,18 +349,7 @@ const InvoiceDetailDrawer: React.FC<Props> = ({ type, invoiceId, onClose, onEdit
                   />
                 }
               />
-            )}
-            {invoice && canHaveAttachments && attachments.length > 0 && (
-              <button
-                onClick={downloadMergedPdf}
-                disabled={isMerging}
-                className="btn-secondary btn-sm flex items-center gap-1.5 disabled:opacity-50"
-                title="Unduh PDF invoice + semua lampiran dalam 1 file"
-              >
-                {isMerging ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
-                <span className="hidden sm:inline">PDF + Lampiran</span>
-              </button>
-            )}
+            ))}
             <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 transition-colors">
               <X size={18} />
             </button>
