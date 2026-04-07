@@ -155,6 +155,14 @@ const InvoiceDetailDrawer: React.FC<Props> = ({ type, invoiceId, onClose, onEdit
   const biayaLain = Number(invoice?.biayaLain ?? 0);
   const allocations = invoice?.paymentAllocations ?? [];
   const depositApplications = invoice?.depositApplications ?? [];
+  // Payment breakdown: deposit-applied vs cash-paid
+  const paidFromDeposit = depositApplications
+    .filter((a: any) => !a.isCancelled)
+    .reduce((s: number, a: any) => s + Number(a.appliedAmount ?? 0), 0);
+  const paidFromCash = Math.max(0, (Number(invoice?.grandTotal ?? 0) - Number(invoice?.outstanding ?? 0)) - paidFromDeposit);
+  const partyDepositBalance = Number(
+    (isSales ? party?.customerDepositBalance : party?.depositBalance) ?? 0,
+  );
 
   const sc = statusConfig[invoice?.status] ?? statusConfig.Draft;
 
@@ -399,6 +407,17 @@ const InvoiceDetailDrawer: React.FC<Props> = ({ type, invoiceId, onClose, onEdit
                     <span>{paidPct}% terbayar</span>
                     {outstanding > 0 && <span className="text-red-400 font-medium">Sisa: {formatRupiah(outstanding)}</span>}
                   </div>
+                  {/* Payment breakdown */}
+                  {(paidFromCash > 0 || paidFromDeposit > 0) && (
+                    <div className="flex items-center gap-3 text-[10px] text-gray-500 pt-1">
+                      {paidFromCash > 0 && (
+                        <span>💵 Tunai/Bank: <span className="font-mono text-gray-700">{formatRupiah(paidFromCash)}</span></span>
+                      )}
+                      {paidFromDeposit > 0 && (
+                        <span>💰 Uang Muka: <span className="font-mono text-gray-700">{formatRupiah(paidFromDeposit)}</span></span>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -717,17 +736,26 @@ const InvoiceDetailDrawer: React.FC<Props> = ({ type, invoiceId, onClose, onEdit
 
               {/* Apply Deposit Banner (has outstanding) */}
               {outstanding > 0.01 && invoice.status !== 'Cancelled' && (
-                <div className="px-6 py-3 border-b border-gray-100">
+                <div className="px-6 py-3 border-b border-gray-100 space-y-2">
+                  {partyDepositBalance > 0 && (
+                    <div className="flex items-center justify-between text-xs bg-amber-50/60 border border-amber-100 rounded-lg px-3 py-2">
+                      <span className="text-amber-700">Saldo Uang Muka {partyLabel}</span>
+                      <span className="font-mono font-semibold text-amber-800">{formatRupiah(partyDepositBalance)}</span>
+                    </div>
+                  )}
                   <button
                     onClick={() => isSales ? setIsApplyCustomerDepositOpen(true) : setIsApplyDepositOpen(true)}
+                    disabled={partyDepositBalance <= 0}
                     className={cn(
-                      'w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium border transition-colors',
+                      'w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium border transition-colors disabled:opacity-50 disabled:cursor-not-allowed',
                       isSales
                         ? 'bg-teal-50 hover:bg-teal-100 text-teal-700 border-teal-200'
                         : 'bg-amber-50 hover:bg-amber-100 text-amber-700 border-amber-200'
                     )}
+                    title={partyDepositBalance <= 0 ? `${partyLabel} belum punya saldo uang muka` : undefined}
                   >
                     <Wallet size={14} /> Gunakan Uang Muka
+                    {partyDepositBalance <= 0 && <span className="text-[10px] opacity-70">(saldo 0)</span>}
                   </button>
                 </div>
               )}
