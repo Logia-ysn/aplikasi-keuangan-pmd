@@ -426,73 +426,15 @@ router.post('/:id/cancel', roleMiddleware(['Admin']), async (req: AuthRequest, r
 
       const numAmount = new Decimal(payment.amount.toString());
 
-      // ── VendorDeposit cancel branch ─────────────────────────────────────
+      // VendorDeposit / CustomerDeposit harus dibatalkan via endpoint khusus
+      // (PATCH /vendor-deposits/:id/cancel atau PATCH /customer-deposits/:id/cancel).
+      // Branch ini sebelumnya menyebabkan double-cancel & GL drift bila dipanggil
+      // bersamaan dengan endpoint khusus.
       if (payment.paymentType === 'VendorDeposit') {
-        const activeApps = await tx.vendorDepositApplication.count({
-          where: { depositPaymentId: payment.id, isCancelled: false },
-        });
-        if (activeApps > 0) {
-          throw new BusinessError('Deposit memiliki alokasi aktif. Batalkan alokasi terlebih dahulu.');
-        }
-
-        const jvNumber = `JV-${payment.paymentNumber}`;
-        const journal = await tx.journalEntry.findUnique({ where: { entryNumber: jvNumber } });
-        if (journal) {
-          await tx.journalEntry.update({ where: { id: journal.id }, data: { status: 'Cancelled', cancelledAt: new Date() } });
-          await tx.accountingLedgerEntry.updateMany({ where: { referenceId: journal.id }, data: { isCancelled: true } });
-        }
-
-        const depositAccount = await systemAccounts.getAccount('VENDOR_DEPOSIT');
-        const numAmountVal = numAmount.toNumber();
-        // Reverse: original was DR Deposit / CR Cash → now DR Cash / CR Deposit
-        await updateAccountBalance(tx, depositAccount.id, 0, numAmountVal);  // CR Deposit (reverse DR)
-        await updateAccountBalance(tx, payment.accountId, numAmountVal, 0);  // DR Cash (reverse CR)
-
-        await tx.party.update({
-          where: { id: payment.partyId },
-          data: { depositBalance: { decrement: numAmountVal } },
-        });
-
-        await tx.payment.update({
-          where: { id: payment.id },
-          data: { status: 'Cancelled', cancelledAt: new Date() },
-        });
-
-        return { id: payment.id, status: 'Cancelled' };
+        throw new BusinessError('Gunakan endpoint Uang Muka Vendor untuk membatalkan deposit.');
       }
-
-      // ── CustomerDeposit cancel branch ─────────────────────────────────
       if (payment.paymentType === 'CustomerDeposit') {
-        const activeApps = await tx.customerDepositApplication.count({
-          where: { depositPaymentId: payment.id, isCancelled: false },
-        });
-        if (activeApps > 0) {
-          throw new BusinessError('Deposit pelanggan memiliki alokasi aktif. Batalkan alokasi terlebih dahulu.');
-        }
-
-        const jvNumber = `JV-${payment.paymentNumber}`;
-        const journal = await tx.journalEntry.findUnique({ where: { entryNumber: jvNumber } });
-        if (journal) {
-          await tx.journalEntry.update({ where: { id: journal.id }, data: { status: 'Cancelled', cancelledAt: new Date() } });
-          await tx.accountingLedgerEntry.updateMany({ where: { referenceId: journal.id }, data: { isCancelled: true } });
-        }
-
-        const depositAccount = await systemAccounts.getAccount('CUSTOMER_DEPOSIT');
-        const numAmountVal = numAmount.toNumber();
-        await updateAccountBalance(tx, depositAccount.id, numAmountVal, 0); // reverse CR
-        await updateAccountBalance(tx, payment.accountId, 0, numAmountVal); // reverse DR
-
-        await tx.party.update({
-          where: { id: payment.partyId },
-          data: { customerDepositBalance: { decrement: numAmountVal } },
-        });
-
-        await tx.payment.update({
-          where: { id: payment.id },
-          data: { status: 'Cancelled', cancelledAt: new Date() },
-        });
-
-        return { id: payment.id, status: 'Cancelled' };
+        throw new BusinessError('Gunakan endpoint Uang Muka Pelanggan untuk membatalkan deposit.');
       }
 
       // ── Receive / Pay cancel branch ─────────────────────────────────────
