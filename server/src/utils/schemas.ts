@@ -69,6 +69,9 @@ export const CreateSalesInvoiceSchema = z.object({
 // `quantity` remains the source of truth for stock movement, but the service
 // layer will set quantity := timbanganDiterima when the latter is provided.
 const PurchaseInvoiceItemSchema = InvoiceItemSchema.extend({
+  // Override base: rate boleh negatif untuk baris jasa/biaya yang mengurangi tagihan
+  // (mis. potongan jasa angkutan vendor pakai armada perusahaan).
+  rate: z.coerce.number(),
   kualitas: z.string().nullable().optional(),
   refaksi: z.coerce.number().min(0).nullable().optional(),
   timbanganTruk: z.coerce.number().min(0).nullable().optional(),

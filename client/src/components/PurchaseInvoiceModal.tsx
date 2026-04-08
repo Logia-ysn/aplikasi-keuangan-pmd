@@ -221,8 +221,9 @@ const PurchaseInvoiceModal: React.FC<PurchaseInvoiceModalProps> = ({ isOpen, onC
   const totalPotongan = items.reduce((s, i) => s + (i.potonganItem || 0), 0);
   const grandTotal = subtotalItems + biayaLain;
   // Every row must be valid; at least one row must produce value.
+  // rate boleh negatif (baris jasa/biaya yang mengurangi tagihan), tapi tidak boleh 0.
   const allRowsValid = items.every(
-    (i) => i.itemName.trim().length > 0 && i.rate > 0 && i.timbanganDiterima > 0,
+    (i) => i.itemName.trim().length > 0 && i.rate !== 0 && i.timbanganDiterima > 0,
   );
   const canSubmit =
     partyId &&
