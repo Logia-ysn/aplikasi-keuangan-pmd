@@ -27,7 +27,7 @@ const upload = multer({
 // ─── POST /api/attachments/upload ────────────────────────────────────────────
 router.post(
   '/upload',
-  roleMiddleware(['Admin', 'Accountant']),
+  roleMiddleware(['Admin', 'Accountant', 'StaffProduksi']),
   upload.array('files', MAX_FILES),
   async (req: AuthRequest, res: Response) => {
     try {
@@ -42,6 +42,11 @@ router.post(
         return res.status(400).json({
           error: `referenceType harus salah satu dari: ${ALLOWED_REF_TYPES.join(', ')}.`,
         });
+      }
+
+      // StaffProduksi hanya boleh upload lampiran untuk invoice pembelian
+      if (req.user?.role === 'StaffProduksi' && referenceType !== 'purchase_invoice') {
+        return res.status(403).json({ error: 'Akses ditolak untuk tipe referensi ini.' });
       }
 
       // Validate reference exists
