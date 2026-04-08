@@ -132,6 +132,13 @@ export interface InvoicePDFItem {
   pphPct?: number | string;
   amount: number | string;
   description?: string | null;
+  // Purchase-specific fields (raw material weighing flow)
+  kualitas?: string | null;
+  nomorMobil?: string | null;
+  timbanganTruk?: number | string | null;
+  refaksi?: number | string | null;
+  timbanganDiterima?: number | string | null;
+  potonganItem?: number | string | null;
 }
 
 export interface InvoicePDFProps {
@@ -306,6 +313,25 @@ const InvoicePDF: React.FC<InvoicePDFProps> = (props) => {
                 {item.description && (
                   <Text style={[S.tableCell, { color: C.muted, marginTop: 1 }]}>{item.description}</Text>
                 )}
+                {!isSales && (() => {
+                  const parts: string[] = [];
+                  if (item.nomorMobil) parts.push(`Mobil: ${item.nomorMobil}`);
+                  if (item.kualitas) parts.push(`Kualitas: ${item.kualitas}`);
+                  const truk = Number(item.timbanganTruk ?? 0);
+                  const refaksi = Number(item.refaksi ?? 0);
+                  const diterima = Number(item.timbanganDiterima ?? 0);
+                  if (truk > 0 || refaksi > 0) {
+                    parts.push(`Timbangan: ${truk.toLocaleString('id-ID')} − ${refaksi.toLocaleString('id-ID')} = ${diterima.toLocaleString('id-ID')} kg`);
+                  }
+                  const pot = Number(item.potonganItem ?? 0);
+                  if (pot > 0) parts.push(`Potongan: ${idr(pot)}`);
+                  if (parts.length === 0) return null;
+                  return (
+                    <Text style={[S.tableCell, { color: C.muted, fontSize: 7, marginTop: 1 }]}>
+                      {parts.join('  •  ')}
+                    </Text>
+                  );
+                })()}
               </View>
               <Text style={[S.tableCell, S.tableMono, S.colQty]}>
                 {Number(item.quantity).toLocaleString('id-ID')}

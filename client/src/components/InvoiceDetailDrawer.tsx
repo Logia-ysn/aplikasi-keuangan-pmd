@@ -227,6 +227,12 @@ const InvoiceDetailDrawer: React.FC<Props> = ({ type, invoiceId, onClose, onEdit
             pphPct: it.pphPct ?? 0,
             amount: it.amount,
             description: it.description,
+            kualitas: it.kualitas,
+            nomorMobil: it.nomorMobil,
+            timbanganTruk: it.timbanganTruk,
+            refaksi: it.refaksi,
+            timbanganDiterima: it.timbanganDiterima,
+            potonganItem: it.potonganItem,
           }))}
           company={company}
         />
@@ -360,6 +366,12 @@ const InvoiceDetailDrawer: React.FC<Props> = ({ type, invoiceId, onClose, onEdit
                       pphPct: it.pphPct ?? 0,
                       amount: it.amount,
                       description: it.description,
+                      kualitas: it.kualitas,
+                      nomorMobil: it.nomorMobil,
+                      timbanganTruk: it.timbanganTruk,
+                      refaksi: it.refaksi,
+                      timbanganDiterima: it.timbanganDiterima,
+                      potonganItem: it.potonganItem,
                     }))}
                     company={company}
                   />
