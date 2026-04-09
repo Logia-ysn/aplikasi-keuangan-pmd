@@ -190,7 +190,17 @@ router.patch('/:id/cancel', roleMiddleware(['Admin', 'Accountant']), async (req:
 
     if (!entry) return res.status(404).json({ error: 'Jurnal tidak ditemukan.' });
     if (entry.status === 'Cancelled') return res.status(400).json({ error: 'Jurnal sudah dibatalkan.' });
-    if (entry.payment) return res.status(400).json({ error: 'Jurnal ini terkait pembayaran. Batalkan pembayaran terlebih dahulu.' });
+    if (entry.payment) return res.status(400).json({ error: 'Jurnal ini terkait pembayaran. Batalkan dari modul Pembayaran.' });
+
+    // Safety net: block cancel for any journal auto-generated from a source document.
+    // Pola entryNumber: JV-PAY-* (pembayaran), JV-SI-* (faktur penjualan),
+    // JV-PI-* (faktur pembelian), JV-COGS-* (HPP otomatis).
+    if (/^JV-(PAY|SI|PI|COGS)/.test(entry.entryNumber)) {
+      return res.status(400).json({
+        error:
+          'Jurnal ini dibuat otomatis dari transaksi sumber (Pembayaran/Faktur/HPP). Batalkan dari modul asalnya, bukan dari Buku Besar.',
+      });
+    }
 
     await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       // Reverse account balances

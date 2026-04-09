@@ -193,6 +193,8 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
           data: { depositBalance: { increment: numAmount } },
         });
 
+        await tx.payment.update({ where: { id: payment.id }, data: { journalEntryId: journalEntry.id } });
+
         return { ...payment, party, unallocatedAmount: 0 };
       }
 
@@ -248,6 +250,8 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
           where: { id: body.partyId },
           data: { customerDepositBalance: { increment: numAmount } },
         });
+
+        await tx.payment.update({ where: { id: payment.id }, data: { journalEntryId: journalEntry.id } });
 
         return { ...payment, party, unallocatedAmount: 0 };
       }
@@ -366,6 +370,9 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
         await updateAccountBalance(tx, it.accountId, Number(it.debit), Number(it.credit));
       }
       await updateAccountBalance(tx, arApItem.accountId, Number(arApItem.debit), Number(arApItem.credit));
+
+      // Link payment → journal entry so cancel-from-GL guard can detect it
+      await tx.payment.update({ where: { id: payment.id }, data: { journalEntryId: journalEntry.id } });
 
       // Auto-allocate payment to oldest outstanding invoices
       const unallocatedAmount = await autoAllocatePayment(tx, payment.id, body.partyId, body.paymentType, numAmount);

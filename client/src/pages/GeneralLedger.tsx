@@ -76,6 +76,18 @@ export const GeneralLedger = () => {
         </div>
       </div>
 
+      {/* Info: cara kerja pembatalan jurnal */}
+      <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
+        <p className="font-semibold mb-1">Cara kerja pembatalan jurnal</p>
+        <p className="leading-relaxed">
+          Jurnal yang dibuat otomatis dari modul lain (Pembayaran <span className="font-mono">JV-PAY-*</span>,
+          Faktur Penjualan <span className="font-mono">JV-SI-*</span>, Faktur Pembelian <span className="font-mono">JV-PI-*</span>,
+          HPP <span className="font-mono">JV-COGS-*</span>) <b>tidak bisa dibatalkan dari halaman Buku Besar</b>.
+          Silakan batalkan dari modul asalnya agar status faktur, alokasi pembayaran, dan saldo kas/piutang ikut terupdate.
+          Pembatalan dari Buku Besar hanya untuk jurnal manual.
+        </p>
+      </div>
+
       {/* Search */}
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative flex-1 max-w-sm">
