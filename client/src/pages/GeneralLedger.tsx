@@ -21,13 +21,36 @@ export const GeneralLedger = () => {
   const [cancelTarget, setCancelTarget] = useState<{ id: string; entryNumber: string } | null>(null);
   const queryClient = useQueryClient();
 
-  const setThisMonth = () => {
+  const fmt = (d: Date) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+
+  const applyPreset = (preset: 'today' | 'week' | 'month' | 'lastMonth' | 'year') => {
     const now = new Date();
-    const y = now.getFullYear();
-    const m = String(now.getMonth() + 1).padStart(2, '0');
-    setStartDate(`${y}-${m}-01`);
-    const lastDay = new Date(y, now.getMonth() + 1, 0).getDate();
-    setEndDate(`${y}-${m}-${String(lastDay).padStart(2, '0')}`);
+    if (preset === 'today') {
+      const s = fmt(now);
+      setStartDate(s); setEndDate(s);
+    } else if (preset === 'week') {
+      // Minggu ini (Senin–hari ini)
+      const day = now.getDay(); // 0=Sun
+      const diffToMon = (day + 6) % 7;
+      const monday = new Date(now); monday.setDate(now.getDate() - diffToMon);
+      setStartDate(fmt(monday)); setEndDate(fmt(now));
+    } else if (preset === 'month') {
+      const first = new Date(now.getFullYear(), now.getMonth(), 1);
+      const last = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      setStartDate(fmt(first)); setEndDate(fmt(last));
+    } else if (preset === 'lastMonth') {
+      const first = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const last = new Date(now.getFullYear(), now.getMonth(), 0);
+      setStartDate(fmt(first)); setEndDate(fmt(last));
+    } else if (preset === 'year') {
+      setStartDate(fmt(new Date(now.getFullYear(), 0, 1)));
+      setEndDate(fmt(now));
+    }
   };
 
   const clearDateFilter = () => {
@@ -88,26 +111,49 @@ export const GeneralLedger = () => {
         </p>
       </div>
 
-      {/* Search */}
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="relative flex-1 max-w-sm">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Cari referensi atau keterangan..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
+      {/* Search + periode */}
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative flex-1 max-w-sm">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Cari referensi atau keterangan..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <div className="flex items-center gap-1.5">
+            <CalendarIcon size={14} className="text-gray-400" />
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="text-xs py-2 px-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <span className="text-xs text-gray-400">s/d</span>
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="text-xs py-2 px-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            {(startDate || endDate) && (
+              <button onClick={clearDateFilter} className="btn-secondary text-xs py-2 px-3 text-red-600">
+                Reset
+              </button>
+            )}
+          </div>
         </div>
-        <button onClick={setThisMonth} className={cn('btn-secondary text-xs py-2 px-3', startDate && 'ring-2 ring-blue-300')}>
-          <CalendarIcon size={14} /> Bulan Ini
-        </button>
-        {startDate && (
-          <button onClick={clearDateFilter} className="btn-secondary text-xs py-2 px-3 text-red-600">
-            Hapus Filter
-          </button>
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs text-gray-400">Preset:</span>
+          <button onClick={() => applyPreset('today')} className="btn-secondary text-xs py-1.5 px-3">Hari Ini</button>
+          <button onClick={() => applyPreset('week')} className="btn-secondary text-xs py-1.5 px-3">Minggu Ini</button>
+          <button onClick={() => applyPreset('month')} className={cn('btn-secondary text-xs py-1.5 px-3', startDate && 'ring-1 ring-blue-200')}>Bulan Ini</button>
+          <button onClick={() => applyPreset('lastMonth')} className="btn-secondary text-xs py-1.5 px-3">Bulan Lalu</button>
+          <button onClick={() => applyPreset('year')} className="btn-secondary text-xs py-1.5 px-3">Tahun Ini (YTD)</button>
+        </div>
       </div>
 
       {/* Table */}
