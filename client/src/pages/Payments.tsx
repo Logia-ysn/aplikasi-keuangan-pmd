@@ -1,13 +1,21 @@
 import { useState, useMemo } from 'react';
-import { Search, MoreHorizontal, CreditCard, Loader2, TrendingDown, TrendingUp, ArrowRightLeft, FileText, Wallet, Paperclip } from 'lucide-react';
+import { Search, XCircle, CreditCard, Loader2, TrendingDown, TrendingUp, ArrowRightLeft, FileText, Wallet, Paperclip } from 'lucide-react';
 import { cn } from '../lib/utils';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
+import { useNavigate } from 'react-router-dom';
 import api from '../lib/api';
 import { formatRupiah, formatDate } from '../lib/formatters';
 import PaymentModal from '../components/PaymentModal';
 import TransferModal from '../components/TransferModal';
 import ExpenseModal from '../components/ExpenseModal';
 import VendorDepositModal from '../components/VendorDepositModal';
+import { ConfirmDialog } from '../components/ConfirmDialog';
+
+const getUserRole = (): string | null => {
+  try { return JSON.parse(localStorage.getItem('user') || 'null')?.role ?? null; }
+  catch { return null; }
+};
 
 interface CashTransaction {
   id: string;
@@ -28,6 +36,26 @@ export const Payments = () => {
   const [isExpenseOpen, setIsExpenseOpen] = useState(false);
   const [isTransferOpen, setIsTransferOpen] = useState(false);
   const [isDepositOpen, setIsDepositOpen] = useState(false);
+  const [cancelTarget, setCancelTarget] = useState<CashTransaction | null>(null);
+
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const role = getUserRole();
+  const canCancel = role === 'Admin';
+
+  const cancelPaymentMutation = useMutation({
+    mutationFn: (id: string) => api.post(`/payments/${id}/cancel`),
+    onSuccess: () => {
+      toast.success('Pembayaran berhasil dibatalkan.');
+      queryClient.invalidateQueries({ queryKey: ['payments'] });
+      queryClient.invalidateQueries({ queryKey: ['cash-journals'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['coa'] });
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.error || 'Gagal membatalkan pembayaran.');
+    },
+  });
 
   const { data: payments, isLoading: loadingPayments } = useQuery({
     queryKey: ['payments'],
@@ -152,6 +180,17 @@ export const Payments = () => {
         </div>
       </div>
 
+      {/* Info: cara kerja edit & pembatalan */}
+      <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
+        <p className="font-semibold mb-1">Cara kerja edit & pembatalan</p>
+        <p className="leading-relaxed">
+          Transaksi bank/kas tidak bisa diedit untuk menjaga integritas Buku Besar. Bila ada kesalahan,
+          <b> batalkan transaksi lalu buat ulang</b>. Uang Muka Vendor/Pelanggan wajib dibatalkan dari modulnya
+          masing-masing. Transaksi yang berasal dari jurnal manual (Beban, Pinbuk) dibatalkan dari Buku Besar.
+          Hanya role <b>Admin</b> yang boleh membatalkan.
+        </p>
+      </div>
+
       {/* Search */}
       <div className="relative max-w-sm">
         <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -244,9 +283,27 @@ export const Payments = () => {
                       <span className={cn('badge', txn.status === 'Cancelled' ? 'badge-red' : 'badge-blue')}>{txn.status}</span>
                     </td>
                     <td>
-                      <button className="p-1.5 hover:bg-gray-100 rounded text-gray-400 hover:text-gray-600 transition-colors">
-                        <MoreHorizontal size={16} />
-                      </button>
+                      {txn.status === 'Cancelled' ? null : !canCancel ? null : (
+                        <button
+                          onClick={() => {
+                            if (txn.type === 'VendorDeposit') {
+                              toast.info('Batalkan dari modul Uang Muka Vendor.');
+                              navigate('/vendor-deposits');
+                              return;
+                            }
+                            if (txn.source === 'journal') {
+                              toast.info('Transaksi ini dibuat dari jurnal. Batalkan dari Buku Besar.');
+                              navigate('/gl');
+                              return;
+                            }
+                            setCancelTarget(txn);
+                          }}
+                          className="p-1.5 hover:bg-red-50 rounded text-gray-400 hover:text-red-500 transition-colors"
+                          title="Batalkan"
+                        >
+                          <XCircle size={16} />
+                        </button>
+                      )}
                     </td>
                   </tr>
                 );
@@ -277,6 +334,20 @@ export const Payments = () => {
       <VendorDepositModal
         isOpen={isDepositOpen}
         onClose={() => setIsDepositOpen(false)}
+      />
+      <ConfirmDialog
+        open={cancelTarget !== null}
+        onCancel={() => setCancelTarget(null)}
+        onConfirm={() => {
+          if (cancelTarget) {
+            cancelPaymentMutation.mutate(cancelTarget.id);
+            setCancelTarget(null);
+          }
+        }}
+        title="Batalkan Transaksi"
+        message={`Batalkan ${cancelTarget?.number}? Alokasi ke faktur, saldo kas/bank, dan jurnal akan otomatis di-reverse. Tindakan tidak dapat dibatalkan.`}
+        confirmLabel="Ya, Batalkan"
+        variant="danger"
       />
     </div>
   );
