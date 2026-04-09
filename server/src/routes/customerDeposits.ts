@@ -7,7 +7,7 @@ import { updateAccountBalance } from '../utils/accountBalance';
 import { generateDocumentNumber } from '../utils/documentNumber';
 import { getOpenFiscalYear } from '../utils/fiscalYear';
 import { validateBody } from '../utils/validate';
-import { ApplyCustomerDepositSchema } from '../utils/schemas';
+import { ApplyCustomerDepositSchema, RefundCustomerDepositSchema } from '../utils/schemas';
 import { BusinessError, handleRouteError } from '../utils/errors';
 import { systemAccounts } from '../services/systemAccounts';
 import { logger } from '../lib/logger';
@@ -41,10 +41,12 @@ router.get('/', async (req, res) => {
         (sum, app) => sum.plus(new Decimal(app.appliedAmount.toString())),
         new Decimal(0)
       );
-      const remaining = new Decimal(d.amount.toString()).minus(totalApplied);
+      const refunded = new Decimal((d as any).refundedAmount?.toString() ?? '0');
+      const remaining = new Decimal(d.amount.toString()).minus(totalApplied).minus(refunded);
       return {
         ...d,
         totalApplied: totalApplied.toNumber(),
+        totalRefunded: refunded.toNumber(),
         remaining: remaining.toNumber(),
       };
     });
@@ -78,7 +80,8 @@ router.get('/balance/:partyId', async (req, res) => {
         (sum, app) => sum.plus(new Decimal(app.appliedAmount.toString())),
         new Decimal(0)
       );
-      const remaining = new Decimal(d.amount.toString()).minus(totalApplied);
+      const refunded = new Decimal((d as any).refundedAmount?.toString() ?? '0');
+      const remaining = new Decimal(d.amount.toString()).minus(totalApplied).minus(refunded);
       return {
         id: d.id,
         paymentNumber: d.paymentNumber,
@@ -398,6 +401,203 @@ router.post('/apply/:id/cancel', roleMiddleware(['Admin']), async (req: AuthRequ
     return res.json(result);
   } catch (error: any) {
     return handleRouteError(res, error, 'POST /customer-deposits/apply/:id/cancel', 'Gagal membatalkan aplikasi uang muka pelanggan.');
+  }
+});
+
+// POST /api/customer-deposits/:id/refund — selesaikan sisa uang muka via
+// offset piutang (FIFO ke faktur terlama) dan/atau refund kas ke bank.
+router.post('/:id/refund', roleMiddleware(['Admin', 'Accountant']), async (req: AuthRequest, res) => {
+  const body = validateBody(RefundCustomerDepositSchema, req.body, res);
+  if (!body) return;
+
+  try {
+    const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      const depositId = req.params.id as string;
+      await tx.$queryRaw`SELECT id FROM payments WHERE id = ${depositId} FOR UPDATE`;
+
+      const deposit = await tx.payment.findUnique({
+        where: { id: depositId },
+        include: {
+          party: true,
+          customerDepositApplications: { where: { isCancelled: false } },
+        },
+      });
+      if (!deposit) throw new BusinessError('Uang muka tidak ditemukan.');
+      if (deposit.paymentType !== 'CustomerDeposit') throw new BusinessError('Bukan tipe uang muka pelanggan.');
+      if (deposit.status !== 'Submitted') throw new BusinessError('Uang muka sudah dibatalkan.');
+
+      const totalApplied = deposit.customerDepositApplications.reduce(
+        (sum, app) => sum.plus(new Decimal(app.appliedAmount.toString())),
+        new Decimal(0),
+      );
+      const alreadyRefunded = new Decimal(deposit.refundedAmount.toString());
+      const remaining = new Decimal(deposit.amount.toString()).minus(totalApplied).minus(alreadyRefunded);
+
+      const offsetReq = new Decimal(body.offsetAmount);
+      const cashReq = new Decimal(body.cashAmount);
+      const totalReq = offsetReq.plus(cashReq);
+      if (totalReq.gt(remaining.plus(new Decimal('0.01')))) {
+        throw new BusinessError(`Total ${totalReq.toFixed(2)} melebihi sisa uang muka ${remaining.toFixed(2)}.`);
+      }
+
+      const parsedDate = new Date(body.date);
+      if (isNaN(parsedDate.getTime())) throw new BusinessError('Format tanggal tidak valid.');
+      const fiscalYear = await getOpenFiscalYear(tx, parsedDate);
+
+      const depositAccount = await systemAccounts.getAccount('CUSTOMER_DEPOSIT');
+      const arAccount = await systemAccounts.getAccount('AR');
+
+      const createdApplications: string[] = [];
+      let cashJournalId: string | null = null;
+
+      // ── 1. Offset ke piutang (FIFO oldest-first) ─────────────────────────
+      if (offsetReq.gt(0)) {
+        await tx.$queryRaw`SELECT id FROM sales_invoices WHERE party_id = ${deposit.partyId} AND status IN ('Submitted','PartiallyPaid','Overdue') FOR UPDATE`;
+
+        const invoices = await tx.salesInvoice.findMany({
+          where: {
+            partyId: deposit.partyId,
+            status: { in: ['Submitted', 'PartiallyPaid', 'Overdue'] },
+          },
+          orderBy: { date: 'asc' },
+        });
+
+        let remainingOffset = offsetReq;
+        for (const inv of invoices) {
+          if (remainingOffset.lte(0)) break;
+          const invOut = new Decimal(inv.outstanding.toString());
+          if (invOut.lte(0)) continue;
+          const apply = Decimal.min(invOut, remainingOffset);
+          const applyNum = apply.toNumber();
+
+          const jvNumber = await generateDocumentNumber(tx, 'JV', parsedDate, fiscalYear.id);
+          const je = await tx.journalEntry.create({
+            data: {
+              entryNumber: jvNumber,
+              date: parsedDate,
+              narration: `Offset UM Pelanggan: ${deposit.paymentNumber} → ${inv.invoiceNumber}`,
+              status: 'Submitted',
+              fiscalYearId: fiscalYear.id,
+              createdBy: req.user!.userId,
+              submittedAt: new Date(),
+              items: {
+                create: [
+                  { accountId: depositAccount.id, partyId: deposit.partyId, debit: applyNum, credit: 0, description: `Offset UM Pelanggan: ${deposit.paymentNumber}` },
+                  { accountId: arAccount.id, partyId: deposit.partyId, debit: 0, credit: applyNum, description: `Offset piutang: ${inv.invoiceNumber}` },
+                ],
+              },
+            },
+          });
+
+          await tx.accountingLedgerEntry.createMany({
+            data: [
+              { date: parsedDate, accountId: depositAccount.id, partyId: deposit.partyId, debit: applyNum, credit: 0, referenceType: 'JournalEntry', referenceId: je.id, description: `Offset UM Pelanggan: ${deposit.paymentNumber}`, fiscalYearId: fiscalYear.id },
+              { date: parsedDate, accountId: arAccount.id, partyId: deposit.partyId, debit: 0, credit: applyNum, referenceType: 'JournalEntry', referenceId: je.id, description: `Offset piutang: ${inv.invoiceNumber}`, fiscalYearId: fiscalYear.id },
+            ],
+          });
+
+          await updateAccountBalance(tx, depositAccount.id, applyNum, 0);
+          await updateAccountBalance(tx, arAccount.id, 0, applyNum);
+
+          const newOut = invOut.minus(apply);
+          await tx.salesInvoice.update({
+            where: { id: inv.id },
+            data: {
+              outstanding: newOut.toNumber(),
+              status: newOut.lte(new Decimal('0.01')) ? 'Paid' : 'PartiallyPaid',
+            },
+          });
+
+          const app = await tx.customerDepositApplication.create({
+            data: {
+              depositPaymentId: deposit.id,
+              salesInvoiceId: inv.id,
+              appliedAmount: applyNum,
+              journalEntryId: je.id,
+              createdBy: req.user!.userId,
+            },
+          });
+          createdApplications.push(app.id);
+
+          await tx.party.update({
+            where: { id: deposit.partyId },
+            data: {
+              outstandingAmount: { decrement: applyNum },
+              customerDepositBalance: { decrement: applyNum },
+            },
+          });
+
+          remainingOffset = remainingOffset.minus(apply);
+        }
+
+        if (remainingOffset.gt(new Decimal('0.01'))) {
+          throw new BusinessError(
+            `Piutang pelanggan tidak cukup untuk offset. Sisa offset yang tidak teralokasi: Rp ${remainingOffset.toFixed(2)}.`,
+          );
+        }
+      }
+
+      // ── 2. Refund kas ke bank ────────────────────────────────────────────
+      if (cashReq.gt(0)) {
+        const cashAccount = await tx.account.findUnique({ where: { id: body.cashAccountId! } });
+        if (!cashAccount) throw new BusinessError('Akun kas/bank tidak ditemukan.');
+        const isCash = await systemAccounts.isCashAccount(cashAccount.accountNumber);
+        if (!isCash) throw new BusinessError('Akun yang dipilih bukan kas/bank.');
+
+        const cashNum = cashReq.toNumber();
+        const jvNumber = await generateDocumentNumber(tx, 'JV', parsedDate, fiscalYear.id);
+        const je = await tx.journalEntry.create({
+          data: {
+            entryNumber: jvNumber,
+            date: parsedDate,
+            narration: `Refund UM Pelanggan: ${deposit.paymentNumber} - ${deposit.party.name}`,
+            status: 'Submitted',
+            fiscalYearId: fiscalYear.id,
+            createdBy: req.user!.userId,
+            submittedAt: new Date(),
+            items: {
+              create: [
+                { accountId: depositAccount.id, partyId: deposit.partyId, debit: cashNum, credit: 0, description: `Refund UM Pelanggan: ${deposit.paymentNumber}` },
+                { accountId: cashAccount.id, debit: 0, credit: cashNum, description: `Refund UM Pelanggan: ${deposit.paymentNumber}` },
+              ],
+            },
+          },
+        });
+        cashJournalId = je.id;
+
+        await tx.accountingLedgerEntry.createMany({
+          data: [
+            { date: parsedDate, accountId: depositAccount.id, partyId: deposit.partyId, debit: cashNum, credit: 0, referenceType: 'JournalEntry', referenceId: je.id, description: `Refund UM Pelanggan: ${deposit.paymentNumber}`, fiscalYearId: fiscalYear.id },
+            { date: parsedDate, accountId: cashAccount.id, debit: 0, credit: cashNum, referenceType: 'JournalEntry', referenceId: je.id, description: `Refund UM Pelanggan: ${deposit.paymentNumber}`, fiscalYearId: fiscalYear.id },
+          ],
+        });
+
+        await updateAccountBalance(tx, depositAccount.id, cashNum, 0);
+        await updateAccountBalance(tx, cashAccount.id, 0, cashNum);
+
+        await tx.party.update({
+          where: { id: deposit.partyId },
+          data: { customerDepositBalance: { decrement: cashNum } },
+        });
+
+        await tx.payment.update({
+          where: { id: deposit.id },
+          data: { refundedAmount: { increment: cashNum } },
+        });
+      }
+
+      return {
+        message: 'Uang muka berhasil diselesaikan.',
+        offsetApplied: offsetReq.toNumber(),
+        cashRefunded: cashReq.toNumber(),
+        applications: createdApplications,
+        cashJournalId,
+      };
+    }, { timeout: 20000 });
+
+    return res.json(result);
+  } catch (error: any) {
+    return handleRouteError(res, error, 'POST /customer-deposits/:id/refund', 'Gagal memproses refund/offset uang muka.');
   }
 });
 

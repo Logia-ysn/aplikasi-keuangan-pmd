@@ -288,6 +288,7 @@ model Payment {
   accountId     String              @map("account_id")
   account       Account             @relation("PaymentAccount", fields: [accountId], references: [id])
   amount        Decimal             @db.Decimal(15, 2)
+  refundedAmount Decimal            @default(0) @db.Decimal(15, 2) @map("refunded_amount")
   status        DocumentStatus      @default(Draft)
   referenceNo   String?             @map("reference_number")
   notes         String?

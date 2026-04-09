@@ -133,6 +133,27 @@ export const ApplyCustomerDepositSchema = z.object({
   amount: z.coerce.number().positive('Jumlah harus lebih dari 0.'),
 });
 
+// ─── Customer Deposit Refund / Offset ─────────────────────────────────────────
+// Menyelesaikan sisa uang muka pelanggan dengan kombinasi:
+//   - offset terhadap piutang (otomatis FIFO ke invoice terlama), dan/atau
+//   - pengembalian kas ke rekening bank/kas.
+// Minimal salah satu dari offsetAmount / cashAmount > 0.
+export const RefundCustomerDepositSchema = z
+  .object({
+    date: z.string().min(1, 'Tanggal wajib diisi.'),
+    offsetAmount: z.coerce.number().min(0).default(0),
+    cashAmount: z.coerce.number().min(0).default(0),
+    cashAccountId: z.string().uuid().optional().nullable(),
+    notes: z.string().optional().nullable(),
+  })
+  .refine((d) => d.offsetAmount + d.cashAmount > 0, {
+    message: 'Masukkan jumlah offset piutang atau refund kas minimal salah satu.',
+  })
+  .refine((d) => d.cashAmount === 0 || !!d.cashAccountId, {
+    message: 'Pilih akun kas/bank untuk refund kas.',
+    path: ['cashAccountId'],
+  });
+
 // ─── Party ────────────────────────────────────────────────────────────────────
 export const CreatePartySchema = z.object({
   name: z.string().min(1, 'Nama wajib diisi.'),

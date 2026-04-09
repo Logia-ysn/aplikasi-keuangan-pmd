@@ -1,10 +1,11 @@
 import { useState, useMemo } from 'react';
-import { Search, Wallet, Loader2, CheckCircle2, DollarSign, AlertTriangle, XCircle } from 'lucide-react';
+import { Search, Wallet, Loader2, CheckCircle2, DollarSign, AlertTriangle, XCircle, Undo2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../lib/api';
 import { formatRupiah, formatDate } from '../lib/formatters';
 import CustomerDepositModal from '../components/CustomerDepositModal';
+import RefundCustomerDepositModal from '../components/RefundCustomerDepositModal';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { toast } from 'sonner';
 
@@ -12,6 +13,7 @@ export const CustomerDeposits = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [cancelTarget, setCancelTarget] = useState<{ id: string; paymentNumber: string } | null>(null);
+  const [refundTarget, setRefundTarget] = useState<any | null>(null);
   const queryClient = useQueryClient();
 
   const { data: deposits, isLoading } = useQuery({
@@ -205,13 +207,24 @@ export const CustomerDeposits = () => {
                       </td>
                       <td>
                         {!isCancelled && (
-                          <button
-                            onClick={() => setCancelTarget({ id: dep.id, paymentNumber: dep.paymentNumber })}
-                            className="p-1.5 hover:bg-red-50 rounded text-gray-400 hover:text-red-500 transition-colors"
-                            title="Batalkan"
-                          >
-                            <XCircle size={16} />
-                          </button>
+                          <div className="flex items-center gap-0.5">
+                            {remaining > 0.01 && (
+                              <button
+                                onClick={() => setRefundTarget(dep)}
+                                className="p-1.5 hover:bg-teal-50 rounded text-gray-400 hover:text-teal-600 transition-colors"
+                                title="Refund / Offset"
+                              >
+                                <Undo2 size={16} />
+                              </button>
+                            )}
+                            <button
+                              onClick={() => setCancelTarget({ id: dep.id, paymentNumber: dep.paymentNumber })}
+                              className="p-1.5 hover:bg-red-50 rounded text-gray-400 hover:text-red-500 transition-colors"
+                              title="Batalkan"
+                            >
+                              <XCircle size={16} />
+                            </button>
+                          </div>
                         )}
                       </td>
                     </tr>
@@ -226,6 +239,12 @@ export const CustomerDeposits = () => {
       <CustomerDepositModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
+      />
+
+      <RefundCustomerDepositModal
+        isOpen={refundTarget !== null}
+        onClose={() => setRefundTarget(null)}
+        deposit={refundTarget}
       />
 
       <ConfirmDialog
