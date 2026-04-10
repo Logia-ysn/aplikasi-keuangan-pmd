@@ -9,6 +9,8 @@ import { formatRupiah, formatDate } from '../lib/formatters';
 import PaymentModal from '../components/PaymentModal';
 import TransferModal from '../components/TransferModal';
 import ExpenseModal from '../components/ExpenseModal';
+import BulkExpenseModal from '../components/BulkExpenseModal';
+import { Layers } from 'lucide-react';
 import VendorDepositModal from '../components/VendorDepositModal';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 
@@ -34,6 +36,7 @@ export const Payments = () => {
   const [isReceiveOpen, setIsReceiveOpen] = useState(false);
   const [isPayOpen, setIsPayOpen] = useState(false);
   const [isExpenseOpen, setIsExpenseOpen] = useState(false);
+  const [isBulkExpenseOpen, setIsBulkExpenseOpen] = useState(false);
   const [isTransferOpen, setIsTransferOpen] = useState(false);
   const [isDepositOpen, setIsDepositOpen] = useState(false);
   const [cancelTarget, setCancelTarget] = useState<CashTransaction | null>(null);
@@ -176,6 +179,13 @@ export const Payments = () => {
             onClick={() => setIsExpenseOpen(true)}
           >
             <FileText size={15} /> Catat Pengeluaran
+          </button>
+          <button
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-medium bg-amber-500 hover:bg-amber-600 text-white transition-colors"
+            onClick={() => setIsBulkExpenseOpen(true)}
+            title="Input banyak pengeluaran sekaligus (petty cash)"
+          >
+            <Layers size={15} /> Input Banyak
           </button>
         </div>
       </div>
@@ -326,6 +336,10 @@ export const Payments = () => {
       <ExpenseModal
         isOpen={isExpenseOpen}
         onClose={() => setIsExpenseOpen(false)}
+      />
+      <BulkExpenseModal
+        isOpen={isBulkExpenseOpen}
+        onClose={() => setIsBulkExpenseOpen(false)}
       />
       <TransferModal
         isOpen={isTransferOpen}
