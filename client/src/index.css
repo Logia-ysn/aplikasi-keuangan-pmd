@@ -298,12 +298,12 @@ body {
     display: block !important;
   }
 
-  /* Clean card borders for print */
+  /* Clean card borders for print — allow page breaks inside large sections */
   .card, .glass,
   .bg-white.border {
-    border: 1px solid #e5e7eb !important;
+    border: none !important;
     box-shadow: none !important;
-    break-inside: avoid;
+    break-inside: auto;
   }
 
   /* Table print styles */
@@ -364,10 +364,13 @@ body {
     display: block !important;
   }
   .grid.grid-cols-1.lg\:grid-cols-2 > * {
-    margin-bottom: 12px !important;
+    margin-bottom: 16px !important;
   }
 
-  /* Ensure page breaks are clean */
+  /* Each account row stays together, but the whole section can split */
+  .border-b {
+    break-inside: avoid;
+  }
   h1, h2, h3 {
     break-after: avoid;
   }
@@ -381,6 +384,11 @@ body {
     break-after: avoid;
   }
 
+  /* Section totals stay with last few rows */
+  .border-t.border-gray-100 {
+    break-before: avoid;
+  }
+
   /* Show full text — no truncation during print */
   .truncate {
     overflow: visible !important;
@@ -388,9 +396,12 @@ body {
     white-space: normal !important;
   }
 
-  /* Remove rounded corners for cleaner print */
+  /* Remove rounded corners and overflow hidden for cleaner print */
   .rounded-xl, .rounded-lg {
-    border-radius: 4px !important;
+    border-radius: 0 !important;
+  }
+  .overflow-hidden {
+    overflow: visible !important;
   }
 
   /* Page margins */
