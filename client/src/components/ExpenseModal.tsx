@@ -5,6 +5,8 @@ import { X, Loader2, AlertCircle, TrendingUp, CheckCircle2, Paperclip } from 'lu
 import { formatRupiah } from '../lib/formatters';
 import AttachmentUpload from './AttachmentUpload';
 import AttachmentPreview from './AttachmentPreview';
+import SearchableSelect from './SearchableSelect';
+import type { SelectOption } from './SearchableSelect';
 
 interface ExpenseModalProps {
   isOpen: boolean;
@@ -69,10 +71,9 @@ const ExpenseModal: React.FC<ExpenseModalProps> = ({ isOpen, onClose }) => {
     [allAccounts]
   );
 
-  // Group debit-side accounts by accountType for <optgroup>
-  const groupedDebitAccounts = useMemo(() => {
+  // Group debit-side accounts by accountType for SearchableSelect
+  const debitOptions = useMemo((): SelectOption[] => {
     if (!allAccounts) return [];
-    // Exclude cash/bank accounts from debit side (those go in credit dropdown)
     const debitCandidates = allAccounts.filter(
       (a: any) => !(a.accountType === 'ASSET' && a.accountNumber.startsWith('1.1'))
     );
@@ -82,12 +83,22 @@ const ExpenseModal: React.FC<ExpenseModalProps> = ({ isOpen, onClose }) => {
       if (!groups[type]) groups[type] = [];
       groups[type].push(acc);
     }
-    // Sort: EXPENSE first, then LIABILITY, then everything else
     const order = ['EXPENSE', 'LIABILITY', 'ASSET', 'EQUITY', 'REVENUE'];
     return order
       .filter((t) => groups[t]?.length)
-      .map((t) => ({ type: t, label: ACCOUNT_TYPE_LABELS[t] || t, accounts: groups[t] }));
+      .flatMap((t) =>
+        groups[t].map((a: any) => ({
+          value: a.id,
+          label: `${a.accountNumber} — ${a.name}`,
+          group: ACCOUNT_TYPE_LABELS[t] || t,
+        }))
+      );
   }, [allAccounts]);
+
+  const cashOptions = useMemo((): SelectOption[] =>
+    cashAccounts.map((a: any) => ({ value: a.id, label: `${a.accountNumber} — ${a.name}` })),
+    [cashAccounts],
+  );
 
   // Parties (optional — all types)
   const { data: parties } = useQuery({
@@ -98,6 +109,11 @@ const ExpenseModal: React.FC<ExpenseModalProps> = ({ isOpen, onClose }) => {
     },
     enabled: isOpen,
   });
+
+  const partyOptions = useMemo((): SelectOption[] =>
+    (parties ?? []).map((p: any) => ({ value: p.id, label: `${p.name}${p.partyType ? ` (${p.partyType})` : ''}` })),
+    [parties],
+  );
 
   const debitAccount = allAccounts?.find((a: any) => a.id === debitAccountId);
   const creditAccount = cashAccounts?.find((a: any) => a.id === creditAccountId);
@@ -201,22 +217,12 @@ const ExpenseModal: React.FC<ExpenseModalProps> = ({ isOpen, onClose }) => {
             <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">
               Akun Pengeluaran (Debit)
             </label>
-            <select
+            <SearchableSelect
+              options={debitOptions}
               value={debitAccountId}
-              onChange={e => setDebitAccountId(e.target.value)}
-              className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">— Pilih Akun Pengeluaran —</option>
-              {groupedDebitAccounts.map((group) => (
-                <optgroup key={group.type} label={group.label}>
-                  {group.accounts.map((a: any) => (
-                    <option key={a.id} value={a.id}>
-                      {a.accountNumber} — {a.name}
-                    </option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
+              onChange={setDebitAccountId}
+              placeholder="— Pilih Akun Pengeluaran —"
+            />
             <p className="text-[10px] text-gray-400 mt-1">Contoh: Beban Listrik, Beban Gaji, Hutang Usaha, dll.</p>
           </div>
 
@@ -225,18 +231,12 @@ const ExpenseModal: React.FC<ExpenseModalProps> = ({ isOpen, onClose }) => {
             <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">
               Dibayar Dari (Kredit)
             </label>
-            <select
+            <SearchableSelect
+              options={cashOptions}
               value={creditAccountId}
-              onChange={e => setCreditAccountId(e.target.value)}
-              className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">— Pilih Akun Kas/Bank —</option>
-              {cashAccounts.map((a: any) => (
-                <option key={a.id} value={a.id}>
-                  {a.accountNumber} — {a.name}
-                </option>
-              ))}
-            </select>
+              onChange={setCreditAccountId}
+              placeholder="— Pilih Akun Kas/Bank —"
+            />
           </div>
 
           {/* Party (optional) */}
@@ -244,19 +244,12 @@ const ExpenseModal: React.FC<ExpenseModalProps> = ({ isOpen, onClose }) => {
             <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">
               Pihak Terkait <span className="font-normal normal-case">(opsional)</span>
             </label>
-            <select
+            <SearchableSelect
+              options={partyOptions}
               value={partyId}
-              onChange={e => setPartyId(e.target.value)}
-              className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">— Tanpa Pihak Terkait —</option>
-              {parties?.map((p: any) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                  {p.partyType ? ` (${p.partyType})` : ''}
-                </option>
-              ))}
-            </select>
+              onChange={setPartyId}
+              placeholder="— Tanpa Pihak Terkait —"
+            />
           </div>
 
           {/* Amount */}

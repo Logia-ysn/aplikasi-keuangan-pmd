@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../lib/api';
 import { X, Loader2, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
+import SearchableSelect from './SearchableSelect';
+import type { SelectOption } from './SearchableSelect';
 
 interface StockMovementModalProps {
   isOpen: boolean;
@@ -77,6 +79,16 @@ export function StockMovementModal({ isOpen, onClose, editMovement }: StockMovem
   const nonGroupAccounts = (coaData ?? []).filter((a: any) => !a.isGroup);
 
   const selectedItem = items.find((i: any) => i.id === form.itemId);
+
+  const itemOptions = useMemo((): SelectOption[] =>
+    items.map((i: any) => ({ value: i.id, label: `${i.code} — ${i.name} (${i.unit})` })),
+    [items],
+  );
+
+  const accountOptions = useMemo((): SelectOption[] =>
+    nonGroupAccounts.map((a: any) => ({ value: a.id, label: `${a.accountNumber} — ${a.name}` })),
+    [nonGroupAccounts],
+  );
 
   const qty = Number(form.quantity) || 0;
   const unitCost = Number(form.unitCost) || 0;
@@ -209,23 +221,12 @@ export function StockMovementModal({ isOpen, onClose, editMovement }: StockMovem
                   className="w-full border border-gray-100 rounded-lg py-2 px-3 text-sm text-gray-500 bg-gray-50 cursor-not-allowed"
                 />
               ) : (
-                <select
-                  id="mov-item"
-                  required
+                <SearchableSelect
+                  options={itemOptions}
                   value={form.itemId}
-                  onChange={e => {
-                    const selectedItemId = e.target.value;
-                    setForm(f => ({ ...f, itemId: selectedItemId }));
-                  }}
-                  className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">— Pilih Item —</option>
-                  {items.map((item: any) => (
-                    <option key={item.id} value={item.id}>
-                      {item.code} — {item.name} ({item.unit})
-                    </option>
-                  ))}
-                </select>
+                  onChange={(v) => setForm(f => ({ ...f, itemId: v }))}
+                  placeholder="— Pilih Item —"
+                />
               )}
             </div>
 
@@ -311,21 +312,13 @@ export function StockMovementModal({ isOpen, onClose, editMovement }: StockMovem
                 Akun Lawan {totalValue > 0 && <span className="text-red-500">*</span>}
                 <span className="ml-1.5 text-[10px] font-normal text-blue-500">Untuk posting ke COA</span>
               </label>
-              <select
-                id="mov-offset-account"
-                required={totalValue > 0}
+              <SearchableSelect
+                options={accountOptions}
                 value={form.offsetAccountId}
-                onChange={e => setForm(f => ({ ...f, offsetAccountId: e.target.value }))}
+                onChange={(v) => setForm(f => ({ ...f, offsetAccountId: v }))}
+                placeholder="— Pilih Akun Lawan —"
                 disabled={isProductionLinked}
-                className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-400"
-              >
-                <option value="">— Pilih Akun Lawan —</option>
-                {nonGroupAccounts.map((a: any) => (
-                  <option key={a.id} value={a.id}>
-                    {a.accountNumber} — {a.name}
-                  </option>
-                ))}
-              </select>
+              />
               {totalValue > 0 && !form.offsetAccountId && (
                 <p className="text-[11px] text-amber-600 mt-1">
                   Pilih akun lawan agar nilai stok tercatat di COA.

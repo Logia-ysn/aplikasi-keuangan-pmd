@@ -1,8 +1,10 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { X, Plus, Trash2 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import api from '../lib/api';
 import { toast } from 'sonner';
+import SearchableSelect from './SearchableSelect';
+import type { SelectOption } from './SearchableSelect';
 
 interface LineItem {
   itemId: string;
@@ -81,6 +83,14 @@ export function ProductionRunModal({ isOpen, onClose, items, editRun }: Props) {
       return () => document.removeEventListener('keydown', handleKeyDown);
     }
   }, [isOpen, handleKeyDown]);
+
+  const itemOptions = useMemo((): SelectOption[] =>
+    items.filter((i: any) => i.isActive !== false).map((i: any) => ({
+      value: i.id,
+      label: `${i.code} — ${i.name}`,
+    })),
+    [items],
+  );
 
   if (!isOpen) return null;
 
@@ -244,18 +254,12 @@ export function ProductionRunModal({ isOpen, onClose, items, editRun }: Props) {
                   return (
                     <div key={idx} className="flex gap-2 items-start">
                       <div className="flex-1">
-                        <select
+                        <SearchableSelect
+                          options={itemOptions}
                           value={row.itemId}
-                          onChange={e => updateInput(idx, 'itemId', e.target.value)}
-                          className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        >
-                          <option value="">— Pilih Item —</option>
-                          {items.filter(i => i.isActive !== false).map((i: any) => (
-                            <option key={i.id} value={i.id}>
-                              {i.code} — {i.name}
-                            </option>
-                          ))}
-                        </select>
+                          onChange={(v) => updateInput(idx, 'itemId', v)}
+                          placeholder="— Pilih Item —"
+                        />
                         {item && (
                           <p className="text-[10px] text-gray-400 mt-0.5 ml-1">
                             Stok: {Number(item.currentStock).toLocaleString('id-ID', { maximumFractionDigits: 3 })} {item.unit}
@@ -313,18 +317,12 @@ export function ProductionRunModal({ isOpen, onClose, items, editRun }: Props) {
                     <div key={idx} className={`border rounded-lg p-2.5 space-y-2 ${row.isByProduct ? 'border-amber-200 bg-amber-50/50' : 'border-gray-100 bg-gray-50/50'}`}>
                       <div className="flex gap-2 items-start">
                         <div className="flex-1">
-                          <select
+                          <SearchableSelect
+                            options={itemOptions}
                             value={row.itemId}
-                            onChange={e => updateOutput(idx, 'itemId', e.target.value)}
-                            className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          >
-                            <option value="">— Pilih Item —</option>
-                            {items.filter(i => i.isActive !== false).map((i: any) => (
-                              <option key={i.id} value={i.id}>
-                                {i.code} — {i.name}
-                              </option>
-                            ))}
-                          </select>
+                            onChange={(v) => updateOutput(idx, 'itemId', v)}
+                            placeholder="— Pilih Item —"
+                          />
                         </div>
                         <div className="w-28 flex gap-1 items-center">
                           <input

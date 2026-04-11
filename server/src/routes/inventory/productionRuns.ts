@@ -6,7 +6,7 @@ import { validateBody } from '../../utils/validate';
 import { CreateProductionRunSchema, UpdateProductionRunSchema } from '../../utils/schemas';
 import { BusinessError, handleRouteError } from '../../utils/errors';
 import { generateDocumentNumber } from '../../utils/documentNumber';
-import { updateAccountBalance } from '../../utils/accountBalance';
+import { updateAccountBalance, recalculateAccountBalances } from '../../utils/accountBalance';
 import { cancelJournalsByPrefix } from '../../utils/journalCancel';
 import { systemAccounts } from '../../services/systemAccounts';
 import { logger } from '../../lib/logger';
@@ -636,16 +636,20 @@ router.put('/:id', roleMiddleware(['Admin', 'Accountant', 'StaffProduksi']), asy
             description: ji.description, fiscalYearId: fiscalYear.id,
           })),
         });
+      }
 
-        const balanceMap = new Map<string, { debit: number; credit: number }>();
-        for (const ji of journalItems) {
-          const entry = balanceMap.get(ji.accountId) || { debit: 0, credit: 0 };
-          entry.debit += ji.debit;
-          entry.credit += ji.credit;
-          balanceMap.set(ji.accountId, entry);
-        }
-        for (const [acctId, bal] of balanceMap) {
-          await updateAccountBalance(tx, acctId, bal.debit, bal.credit);
+      // Recalculate balances from JE sums for ALL accounts affected by this production run
+      // (both old cancelled JEs and new JE). This prevents drift from incremental updates.
+      {
+        const allRelatedJEItems = await tx.journalItem.findMany({
+          where: {
+            journalEntry: { entryNumber: { startsWith: oldJvNumber } },
+          },
+          select: { accountId: true },
+        });
+        const affectedAccountIds = [...new Set(allRelatedJEItems.map(ji => ji.accountId))];
+        if (affectedAccountIds.length > 0) {
+          await recalculateAccountBalances(tx, affectedAccountIds);
         }
       }
 
@@ -766,7 +770,22 @@ router.put('/:id/cancel', roleMiddleware(['Admin']), async (req: AuthRequest, re
 
       // Cancel ALL related journals + ledger entries (including revisions)
       const jvNumber = `JV-${run.runNumber}`;
+
+      // Collect affected account IDs BEFORE cancelling (while JEs are still active)
+      const relatedJEItems = await tx.journalItem.findMany({
+        where: {
+          journalEntry: { entryNumber: { startsWith: jvNumber }, status: { not: 'Cancelled' } },
+        },
+        select: { accountId: true },
+      });
+      const cancelAffectedAccountIds = [...new Set(relatedJEItems.map(ji => ji.accountId))];
+
       await cancelJournalsByPrefix(tx, jvNumber);
+
+      // Recalculate balances from JE sums (prevents drift from incremental reversal)
+      if (cancelAffectedAccountIds.length > 0) {
+        await recalculateAccountBalances(tx, cancelAffectedAccountIds);
+      }
 
       // Mark run as cancelled
       await tx.productionRun.update({

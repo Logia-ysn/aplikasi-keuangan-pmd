@@ -50,3 +50,45 @@ export async function updateBalancesForItems(
     await updateAccountBalance(tx, item.accountId, item.debit, item.credit);
   }
 }
+
+/**
+ * Recalculate account balances from the sum of all active (non-cancelled) journal entries.
+ * This fixes any drift caused by incremental balance updates.
+ *
+ * @param accountIds - Array of account IDs to recalculate. If empty, recalculates ALL accounts.
+ */
+export async function recalculateAccountBalances(
+  tx: Prisma.TransactionClient,
+  accountIds?: string[]
+): Promise<void> {
+  const whereClause = accountIds?.length ? { id: { in: accountIds } } : {};
+  const accounts = await tx.account.findMany({
+    where: whereClause,
+    select: { id: true, rootType: true },
+  });
+
+  for (const account of accounts) {
+    const totals = await tx.journalItem.aggregate({
+      where: {
+        accountId: account.id,
+        journalEntry: { status: { not: 'Cancelled' } },
+      },
+      _sum: { debit: true, credit: true },
+    });
+
+    const totalDebit = new Decimal((totals._sum.debit ?? 0).toString());
+    const totalCredit = new Decimal((totals._sum.credit ?? 0).toString());
+
+    let balance: number;
+    if (account.rootType === 'ASSET' || account.rootType === 'EXPENSE') {
+      balance = totalDebit.minus(totalCredit).toNumber();
+    } else {
+      balance = totalCredit.minus(totalDebit).toNumber();
+    }
+
+    await tx.account.update({
+      where: { id: account.id },
+      data: { balance },
+    });
+  }
+}

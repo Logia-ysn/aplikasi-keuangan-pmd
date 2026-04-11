@@ -6,7 +6,7 @@ import { validateBody } from '../utils/validate';
 import { CreateStockOpnameSchema, SubmitStockOpnameSchema } from '../utils/schemas';
 import { BusinessError, handleRouteError } from '../utils/errors';
 import { generateDocumentNumber } from '../utils/documentNumber';
-import { updateAccountBalance } from '../utils/accountBalance';
+import { updateAccountBalance, recalculateAccountBalances } from '../utils/accountBalance';
 import { cancelJournalsByPrefix } from '../utils/journalCancel';
 import { systemAccounts } from '../services/systemAccounts';
 import { logger } from '../lib/logger';
@@ -242,17 +242,9 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
             })),
           });
 
-          // Update account balances
-          const balanceMap = new Map<string, { debit: number; credit: number }>();
-          for (const ji of journalItems) {
-            const entry = balanceMap.get(ji.accountId) || { debit: 0, credit: 0 };
-            entry.debit += ji.debit;
-            entry.credit += ji.credit;
-            balanceMap.set(ji.accountId, entry);
-          }
-          for (const [acctId, bal] of balanceMap) {
-            await updateAccountBalance(tx, acctId, bal.debit, bal.credit);
-          }
+          // Recalculate balances from JE sums for affected accounts (prevents drift)
+          const affectedAccountIds = [...new Set(journalItems.map(ji => ji.accountId))];
+          await recalculateAccountBalances(tx, affectedAccountIds);
         }
 
         // Update movementId on opname items
@@ -326,7 +318,22 @@ router.put('/:id/cancel', roleMiddleware(['Admin']), async (req: AuthRequest, re
 
       // Cancel ALL related journals + ledger entries (including any revisions)
       const jvNumber = `JV-${so.opnameNumber}`;
+
+      // Collect affected account IDs BEFORE cancelling
+      const relatedJEItems = await tx.journalItem.findMany({
+        where: {
+          journalEntry: { entryNumber: { startsWith: jvNumber }, status: { not: 'Cancelled' } },
+        },
+        select: { accountId: true },
+      });
+      const cancelAffectedAccountIds = [...new Set(relatedJEItems.map(ji => ji.accountId))];
+
       await cancelJournalsByPrefix(tx, jvNumber);
+
+      // Recalculate balances from JE sums (prevents drift)
+      if (cancelAffectedAccountIds.length > 0) {
+        await recalculateAccountBalances(tx, cancelAffectedAccountIds);
+      }
 
       await tx.stockOpname.update({
         where: { id },

@@ -348,6 +348,25 @@ body {
     background-color: #f9fafb !important;
   }
 
+  /* Remove scroll containers — show ALL content when printing */
+  .overflow-y-auto,
+  .overflow-auto,
+  .overflow-x-auto {
+    overflow: visible !important;
+    max-height: none !important;
+  }
+  [class*="max-h-"] {
+    max-height: none !important;
+  }
+
+  /* Two-column report layout → single column for print */
+  .grid.grid-cols-1.lg\:grid-cols-2 {
+    display: block !important;
+  }
+  .grid.grid-cols-1.lg\:grid-cols-2 > * {
+    margin-bottom: 12px !important;
+  }
+
   /* Ensure page breaks are clean */
   h1, h2, h3 {
     break-after: avoid;
@@ -357,6 +376,16 @@ body {
   }
   tr {
     break-inside: avoid;
+  }
+  .section-header {
+    break-after: avoid;
+  }
+
+  /* Show full text — no truncation during print */
+  .truncate {
+    overflow: visible !important;
+    text-overflow: unset !important;
+    white-space: normal !important;
   }
 
   /* Remove rounded corners for cleaner print */

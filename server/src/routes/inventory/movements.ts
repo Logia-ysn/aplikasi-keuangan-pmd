@@ -6,7 +6,7 @@ import { validateBody } from '../../utils/validate';
 import { CreateStockMovementSchema, UpdateStockMovementSchema } from '../../utils/schemas';
 import { BusinessError, handleRouteError } from '../../utils/errors';
 import { generateDocumentNumber } from '../../utils/documentNumber';
-import { updateAccountBalance } from '../../utils/accountBalance';
+import { updateAccountBalance, recalculateAccountBalances } from '../../utils/accountBalance';
 import { systemAccounts } from '../../services/systemAccounts';
 import { logger } from '../../lib/logger';
 import { calcWeightedAverage } from '../../utils/weightedAverage';
@@ -288,15 +288,14 @@ router.put('/:id', roleMiddleware(['Admin', 'Accountant']), async (req: AuthRequ
       });
 
       // 3. Reverse old GL entries if exist
+      const oldAffectedAccountIds: string[] = [];
       if (oldMov.journalEntryId) {
         const oldJe = await tx.journalEntry.findUnique({
           where: { id: oldMov.journalEntryId },
           include: { items: true },
         });
         if (oldJe) {
-          for (const jeItem of oldJe.items) {
-            await updateAccountBalance(tx, jeItem.accountId, Number(jeItem.credit), Number(jeItem.debit));
-          }
+          oldAffectedAccountIds.push(...oldJe.items.map(ji => ji.accountId));
           await tx.accountingLedgerEntry.updateMany({
             where: { referenceId: oldMov.journalEntryId },
             data: { isCancelled: true },
@@ -405,10 +404,14 @@ router.put('/:id', roleMiddleware(['Admin', 'Accountant']), async (req: AuthRequ
           ],
         });
 
-        await updateAccountBalance(tx, debitAccountId, newTotalValue, 0);
-        await updateAccountBalance(tx, creditAccountId, 0, newTotalValue);
+        // Recalculate balances for all affected accounts (old + new)
+        const allAffectedIds = [...new Set([...oldAffectedAccountIds, debitAccountId, creditAccountId])];
+        await recalculateAccountBalances(tx, allAffectedIds);
 
         newJournalEntryId = je.id;
+      } else if (oldAffectedAccountIds.length > 0) {
+        // No new GL but old was cancelled — recalculate old affected accounts
+        await recalculateAccountBalances(tx, [...new Set(oldAffectedAccountIds)]);
       }
 
       // 6. Update the movement record
@@ -471,6 +474,10 @@ router.put('/:id/cancel', roleMiddleware(['Admin']), async (req: AuthRequest, re
 
       // Cancel journal entry if exists
       if (movement.journalEntryId) {
+        const je = await tx.journalEntry.findUnique({
+          where: { id: movement.journalEntryId },
+          include: { items: true },
+        });
         await tx.journalEntry.update({
           where: { id: movement.journalEntryId },
           data: { status: 'Cancelled', cancelledAt: new Date() },
@@ -479,15 +486,10 @@ router.put('/:id/cancel', roleMiddleware(['Admin']), async (req: AuthRequest, re
           where: { referenceId: movement.journalEntryId },
           data: { isCancelled: true },
         });
-        // Reverse account balances
-        const je = await tx.journalEntry.findUnique({
-          where: { id: movement.journalEntryId },
-          include: { items: true },
-        });
+        // Recalculate affected account balances from JE sums
         if (je) {
-          for (const jeItem of je.items) {
-            await updateAccountBalance(tx, jeItem.accountId, Number(jeItem.credit), Number(jeItem.debit));
-          }
+          const affectedIds = [...new Set(je.items.map(ji => ji.accountId))];
+          await recalculateAccountBalances(tx, affectedIds);
         }
       }
 

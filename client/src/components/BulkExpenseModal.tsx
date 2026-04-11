@@ -5,6 +5,8 @@ import { toast } from 'sonner';
 import api from '../lib/api';
 import { formatRupiah } from '../lib/formatters';
 import { uploadAttachments, validateAttachmentFiles } from '../lib/attachments';
+import SearchableSelect from './SearchableSelect';
+import type { SelectOption } from './SearchableSelect';
 
 interface Props {
   isOpen: boolean;
@@ -97,7 +99,7 @@ const BulkExpenseModal = ({ isOpen, onClose }: Props) => {
     [allAccounts],
   );
 
-  const groupedDebitAccounts = useMemo(() => {
+  const debitOptions = useMemo((): SelectOption[] => {
     if (!allAccounts) return [];
     const debitCandidates = allAccounts.filter(
       (a: any) => !(a.accountType === 'ASSET' && a.accountNumber.startsWith('1.1')),
@@ -111,8 +113,24 @@ const BulkExpenseModal = ({ isOpen, onClose }: Props) => {
     const order = ['EXPENSE', 'LIABILITY', 'ASSET', 'EQUITY', 'REVENUE'];
     return order
       .filter((t) => groups[t]?.length)
-      .map((t) => ({ type: t, label: ACCOUNT_TYPE_LABELS[t] ?? t, accounts: groups[t] }));
+      .flatMap((t) =>
+        groups[t].map((a: any) => ({
+          value: a.id,
+          label: `${a.accountNumber} — ${a.name}`,
+          group: ACCOUNT_TYPE_LABELS[t] ?? t,
+        }))
+      );
   }, [allAccounts]);
+
+  const cashOptions = useMemo((): SelectOption[] =>
+    cashAccounts.map((a: any) => ({ value: a.id, label: `${a.accountNumber} — ${a.name}` })),
+    [cashAccounts],
+  );
+
+  const partyOptions = useMemo((): SelectOption[] =>
+    (parties ?? []).map((p: any) => ({ value: p.id, label: p.name })),
+    [parties],
+  );
 
   const updateRow = (tempId: string, patch: Partial<ExpenseRow>) => {
     setRows((prev) => prev.map((r) => (r.tempId === tempId ? { ...r, ...patch } : r)));
@@ -297,19 +315,13 @@ const BulkExpenseModal = ({ isOpen, onClose }: Props) => {
           </div>
           <div>
             <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-widest mb-1">Sumber Kas</label>
-            <select
+            <SearchableSelect
+              options={cashOptions}
               value={cashAccountId}
-              onChange={(e) => setCashAccountId(e.target.value)}
+              onChange={setCashAccountId}
+              placeholder="— Pilih Akun Kas/Bank —"
               disabled={isSubmitting || hasSubmitted}
-              className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:bg-gray-100"
-            >
-              <option value="">— Pilih Akun Kas/Bank —</option>
-              {cashAccounts.map((a: any) => (
-                <option key={a.id} value={a.id}>
-                  {a.accountNumber} — {a.name}
-                </option>
-              ))}
-            </select>
+            />
           </div>
           <div>
             <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-widest mb-1">Batch Note</label>
@@ -349,23 +361,13 @@ const BulkExpenseModal = ({ isOpen, onClose }: Props) => {
                   }`}
                 >
                   <div className="md:col-span-3">
-                    <select
+                    <SearchableSelect
+                      options={debitOptions}
                       value={row.debitAccountId}
-                      onChange={(e) => updateRow(row.tempId, { debitAccountId: e.target.value })}
+                      onChange={(v) => updateRow(row.tempId, { debitAccountId: v })}
+                      placeholder="— Pilih Akun —"
                       disabled={locked}
-                      className="w-full border border-gray-200 rounded-md py-1.5 px-2 text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-orange-500 disabled:bg-gray-50"
-                    >
-                      <option value="">— Pilih Akun —</option>
-                      {groupedDebitAccounts.map((group) => (
-                        <optgroup key={group.type} label={group.label}>
-                          {group.accounts.map((a: any) => (
-                            <option key={a.id} value={a.id}>
-                              {a.accountNumber} — {a.name}
-                            </option>
-                          ))}
-                        </optgroup>
-                      ))}
-                    </select>
+                    />
                   </div>
                   <div className="md:col-span-3">
                     <input
@@ -378,19 +380,13 @@ const BulkExpenseModal = ({ isOpen, onClose }: Props) => {
                     />
                   </div>
                   <div className="md:col-span-2">
-                    <select
+                    <SearchableSelect
+                      options={partyOptions}
                       value={row.partyId}
-                      onChange={(e) => updateRow(row.tempId, { partyId: e.target.value })}
+                      onChange={(v) => updateRow(row.tempId, { partyId: v })}
+                      placeholder="— Tidak ada —"
                       disabled={locked}
-                      className="w-full border border-gray-200 rounded-md py-1.5 px-2 text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-orange-500 disabled:bg-gray-50"
-                    >
-                      <option value="">— Tidak ada —</option>
-                      {parties?.map((p: any) => (
-                        <option key={p.id} value={p.id}>
-                          {p.name}
-                        </option>
-                      ))}
-                    </select>
+                    />
                   </div>
                   <div className="md:col-span-2">
                     <input

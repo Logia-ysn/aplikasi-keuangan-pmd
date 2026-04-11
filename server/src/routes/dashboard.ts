@@ -21,15 +21,10 @@ router.get('/metrics', async (req, res) => {
 
     const [arMapping, inventoryValueResult, totalLiabilities, vendorDepositSum] = await Promise.all([
       systemAccounts.getAccount('AR'),
-      prisma.$queryRaw<[{ total: bigint }]>`
-        SELECT COALESCE(SUM(
-          CASE WHEN sm.movement_type IN ('In', 'AdjustmentIn') THEN sm.total_value
-               ELSE -sm.total_value END
-        ), 0) AS total
-        FROM stock_movements sm
-        JOIN inventory_items ii ON sm.item_id = ii.id
-        WHERE ii.is_active = true AND sm.is_cancelled = false
-      `,
+      prisma.account.aggregate({
+        where: { accountNumber: { startsWith: '1.4.' }, isGroup: false, isActive: true },
+        _sum: { balance: true },
+      }),
       // Sum all LIABILITY account balances for total hutang
       prisma.account.aggregate({
         where: { rootType: 'LIABILITY' as any, isGroup: false, isActive: true },
@@ -68,7 +63,7 @@ router.get('/metrics', async (req, res) => {
       accountsReceivable: Math.max(0, Number(arAcc?.balance || 0)),
       accountsPayable: Math.max(0, Number(totalLiabilities._sum?.balance || 0)),
       vendorDeposit: Math.max(0, Number(vendorDepositSum._sum?.depositBalance || 0)),
-      inventoryValue: Math.max(0, Number(inventoryValueResult[0]?.total || 0)),
+      inventoryValue: Math.max(0, Number(inventoryValueResult._sum?.balance || 0)),
       netProfit,
     });
   } catch (error) {
