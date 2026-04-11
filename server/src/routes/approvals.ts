@@ -1,0 +1,199 @@
+import { Router } from 'express';
+import { prisma } from '../lib/prisma';
+import { roleMiddleware, AuthRequest } from '../middleware/auth';
+import { logger } from '../lib/logger';
+
+const router = Router();
+
+// ── Rules Management (Admin only) ────────────────────────────────────────────
+
+// GET /rules — list all approval rules
+router.get('/rules', roleMiddleware(['Admin']), async (_req, res) => {
+  try {
+    const rules = await prisma.approvalRule.findMany({
+      orderBy: [{ documentType: 'asc' }, { minAmount: 'asc' }],
+    });
+    res.json(rules);
+  } catch (error) {
+    logger.error(error, 'GET /approvals/rules error');
+    res.status(500).json({ error: 'Gagal mengambil aturan approval.' });
+  }
+});
+
+// POST /rules — create approval rule
+router.post('/rules', roleMiddleware(['Admin']), async (req, res) => {
+  try {
+    const { documentType, minAmount, requiredRole } = req.body;
+    const rule = await prisma.approvalRule.create({
+      data: { documentType, minAmount: Number(minAmount), requiredRole },
+    });
+    res.status(201).json(rule);
+  } catch (error) {
+    logger.error(error, 'POST /approvals/rules error');
+    res.status(500).json({ error: 'Gagal membuat aturan approval.' });
+  }
+});
+
+// PUT /rules/:id — update rule
+router.put('/rules/:id', roleMiddleware(['Admin']), async (req, res) => {
+  try {
+    const { documentType, minAmount, requiredRole, isActive } = req.body;
+    const rule = await prisma.approvalRule.update({
+      where: { id: req.params.id as string },
+      data: { documentType, minAmount: Number(minAmount), requiredRole, isActive },
+    });
+    res.json(rule);
+  } catch (error) {
+    logger.error(error, 'PUT /approvals/rules error');
+    res.status(500).json({ error: 'Gagal memperbarui aturan.' });
+  }
+});
+
+// DELETE /rules/:id
+router.delete('/rules/:id', roleMiddleware(['Admin']), async (req, res) => {
+  try {
+    await prisma.approvalRule.delete({ where: { id: req.params.id as string } });
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Gagal menghapus aturan.' });
+  }
+});
+
+// ── Approval Requests ────────────────────────────────────────────────────────
+
+// GET /requests — list approval requests (pending first)
+router.get('/requests', roleMiddleware(['Admin', 'Accountant']), async (req: AuthRequest, res) => {
+  try {
+    const { status } = req.query;
+    const where: any = {};
+    if (status) where.status = status;
+
+    const requests = await prisma.approvalRequest.findMany({
+      where,
+      include: {
+        requester: { select: { fullName: true, role: true } },
+        approver: { select: { fullName: true } },
+        rejecter: { select: { fullName: true } },
+      },
+      orderBy: [{ status: 'asc' }, { createdAt: 'desc' }],
+      take: 100,
+    });
+    res.json(requests);
+  } catch (error) {
+    logger.error(error, 'GET /approvals/requests error');
+    res.status(500).json({ error: 'Gagal mengambil daftar approval.' });
+  }
+});
+
+// POST /requests — submit approval request
+router.post('/requests', roleMiddleware(['Admin', 'Accountant']), async (req: AuthRequest, res) => {
+  try {
+    const { documentType, documentId, documentNumber, amount } = req.body;
+
+    // Check if approval rule matches
+    const rule = await prisma.approvalRule.findFirst({
+      where: {
+        documentType,
+        minAmount: { lte: Number(amount) },
+        isActive: true,
+      },
+      orderBy: { minAmount: 'desc' },
+    });
+
+    if (!rule) {
+      return res.json({ required: false, message: 'Tidak perlu approval.' });
+    }
+
+    // Check existing pending request
+    const existing = await prisma.approvalRequest.findFirst({
+      where: { documentType, documentId, status: 'Pending' },
+    });
+    if (existing) {
+      return res.status(400).json({ error: 'Sudah ada request approval yang pending.' });
+    }
+
+    const request = await prisma.approvalRequest.create({
+      data: {
+        documentType,
+        documentId,
+        documentNumber,
+        amount: Number(amount),
+        requestedBy: req.user!.userId,
+      },
+    });
+
+    res.status(201).json({ required: true, request });
+  } catch (error) {
+    logger.error(error, 'POST /approvals/requests error');
+    res.status(500).json({ error: 'Gagal membuat request approval.' });
+  }
+});
+
+// POST /requests/:id/approve
+router.post('/requests/:id/approve', roleMiddleware(['Admin']), async (req: AuthRequest, res) => {
+  try {
+    const request = await prisma.approvalRequest.findUnique({ where: { id: req.params.id as string } });
+    if (!request) return res.status(404).json({ error: 'Request tidak ditemukan.' });
+    if (request.status !== 'Pending') return res.status(400).json({ error: 'Request sudah diproses.' });
+
+    const updated = await prisma.approvalRequest.update({
+      where: { id: request.id },
+      data: {
+        status: 'Approved',
+        approvedBy: req.user!.userId,
+        notes: req.body.notes,
+        decidedAt: new Date(),
+      },
+    });
+
+    res.json(updated);
+  } catch (error) {
+    logger.error(error, 'POST /approvals/requests/:id/approve error');
+    res.status(500).json({ error: 'Gagal approve request.' });
+  }
+});
+
+// POST /requests/:id/reject
+router.post('/requests/:id/reject', roleMiddleware(['Admin']), async (req: AuthRequest, res) => {
+  try {
+    const request = await prisma.approvalRequest.findUnique({ where: { id: req.params.id as string } });
+    if (!request) return res.status(404).json({ error: 'Request tidak ditemukan.' });
+    if (request.status !== 'Pending') return res.status(400).json({ error: 'Request sudah diproses.' });
+
+    const updated = await prisma.approvalRequest.update({
+      where: { id: request.id },
+      data: {
+        status: 'Rejected',
+        rejectedBy: req.user!.userId,
+        notes: req.body.notes,
+        decidedAt: new Date(),
+      },
+    });
+
+    res.json(updated);
+  } catch (error) {
+    logger.error(error, 'POST /approvals/requests/:id/reject error');
+    res.status(500).json({ error: 'Gagal reject request.' });
+  }
+});
+
+// GET /check — check if a document needs approval
+router.get('/check', roleMiddleware(['Admin', 'Accountant']), async (req, res) => {
+  try {
+    const { documentType, amount } = req.query;
+    const rule = await prisma.approvalRule.findFirst({
+      where: {
+        documentType: documentType as string,
+        minAmount: { lte: Number(amount) },
+        isActive: true,
+      },
+      orderBy: { minAmount: 'desc' },
+    });
+
+    res.json({ required: !!rule, rule });
+  } catch (error) {
+    res.status(500).json({ error: 'Gagal cek approval.' });
+  }
+});
+
+export default router;

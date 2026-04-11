@@ -23,6 +23,8 @@ import {
   X,
   ClipboardCheck,
   HeartPulse,
+  Building2,
+  ShieldCheck,
 } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '../lib/utils';
@@ -46,7 +48,9 @@ const allNavItems: NavItem[] = [
   { icon: Scale, label: 'Rekonsiliasi Bank', href: '/reconciliation', roles: ['Admin', 'Accountant'] },
   { icon: Users, label: 'Pelanggan & Vendor', href: '/parties', roles: ['Admin', 'Accountant', 'StaffProduksi'] },
   { icon: Repeat, label: 'Transaksi Berulang', href: '/recurring', roles: ['Admin', 'Accountant'] },
+  { icon: Building2, label: 'Aset Tetap', href: '/fixed-assets', roles: ['Admin', 'Accountant'] },
   { icon: FileBarChart, label: 'Laporan Keuangan', href: '/reports', roles: ['Admin', 'Accountant', 'Viewer'] },
+  { icon: ShieldCheck, label: 'Approval', href: '/approvals', roles: ['Admin', 'Accountant'] },
   { icon: Settings, label: 'Pengaturan', href: '/settings', roles: ['Admin'] },
   { icon: Shield, label: 'Manajemen User', href: '/users', roles: ['Admin'] },
   { icon: ScrollText, label: 'Jejak Audit', href: '/audit', roles: ['Admin'] },

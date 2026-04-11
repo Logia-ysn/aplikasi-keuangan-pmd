@@ -47,6 +47,9 @@ model Account {
   reconciliations     BankReconciliation[]     @relation("ReconciliationAccount")
   serviceItems        ServiceItem[]            @relation("ServiceItemAccount")
   systemAccountMappings SystemAccountMapping[] @relation("MappedAccount")
+  fixedAssetsAsAsset    FixedAsset[]             @relation("AssetAccount")
+  fixedAssetsAsDepr     FixedAsset[]             @relation("DepreciationAccount")
+  fixedAssetsAsAccDep   FixedAsset[]             @relation("AccumulatedDepAccount")
   createdAt           DateTime                 @default(now())
   updatedAt           DateTime                 @updatedAt
 
@@ -126,6 +129,7 @@ model JournalEntry {
   payment              Payment?
   depositApplication   VendorDepositApplication?
   customerDepositApplication CustomerDepositApplication?
+  depreciationEntries        DepreciationEntry[]
   submittedAt   DateTime?        @map("submitted_at")
   cancelledAt   DateTime?        @map("cancelled_at")
   createdAt     DateTime         @default(now()) @map("created_at")
@@ -359,6 +363,7 @@ model FiscalYear {
   stockMovements   StockMovement[]
   productionRuns   ProductionRun[]
   stockOpnames     StockOpname[]
+  fixedAssets       FixedAsset[]
   createdAt        DateTime                @default(now()) @map("created_at")
 
   @@map("fiscal_years")
@@ -388,6 +393,10 @@ model User {
   tokenBlacklist               TokenBlacklist[]
   attachments                  TransactionAttachment[]
   stockOpnames                 StockOpname[]                @relation("OpnameCreatedBy")
+  fixedAssets                  FixedAsset[]                 @relation("AssetCreatedBy")
+  approvalRequests             ApprovalRequest[]            @relation("ApprovalRequester")
+  approvalApprovals            ApprovalRequest[]            @relation("ApprovalApprover")
+  approvalRejections           ApprovalRequest[]            @relation("ApprovalRejecter")
   createdAt            DateTime              @default(now()) @map("created_at")
   updatedAt            DateTime              @updatedAt @map("updated_at")
 
@@ -793,4 +802,91 @@ model TransactionAttachment {
   @@index([referenceType, referenceId])
   @@index([uploadedBy])
   @@map("transaction_attachments")
+}
+
+model FixedAsset {
+  id                     String              @id @default(uuid())
+  assetNumber            String              @unique @map("asset_number")
+  name                   String
+  category               String
+  description            String?
+  acquisitionDate        DateTime            @map("acquisition_date")
+  acquisitionCost        Decimal             @db.Decimal(20, 2) @map("acquisition_cost")
+  usefulLifeMonths       Int                 @map("useful_life_months")
+  salvageValue           Decimal             @default(0) @db.Decimal(20, 2) @map("salvage_value")
+  depreciationMethod     String              @default("straight_line") @map("depreciation_method")
+  accumulatedDepreciation Decimal            @default(0) @db.Decimal(20, 2) @map("accumulated_depreciation")
+  bookValue              Decimal             @db.Decimal(20, 2) @map("book_value")
+  status                 String              @default("Active")
+  disposalDate           DateTime?           @map("disposal_date")
+  disposalAmount         Decimal?            @db.Decimal(20, 2) @map("disposal_amount")
+  assetAccountId         String              @map("asset_account_id")
+  assetAccount           Account             @relation("AssetAccount", fields: [assetAccountId], references: [id])
+  depreciationAccountId  String              @map("depreciation_account_id")
+  depreciationAccount    Account             @relation("DepreciationAccount", fields: [depreciationAccountId], references: [id])
+  accumulatedDepAccountId String             @map("accumulated_dep_account_id")
+  accumulatedDepAccount  Account             @relation("AccumulatedDepAccount", fields: [accumulatedDepAccountId], references: [id])
+  fiscalYearId           String              @map("fiscal_year_id")
+  fiscalYear             FiscalYear          @relation(fields: [fiscalYearId], references: [id])
+  createdBy              String              @map("created_by")
+  user                   User                @relation("AssetCreatedBy", fields: [createdBy], references: [id])
+  depreciationEntries    DepreciationEntry[]
+  createdAt              DateTime            @default(now()) @map("created_at")
+  updatedAt              DateTime            @updatedAt @map("updated_at")
+
+  @@index([category])
+  @@index([status])
+  @@map("fixed_assets")
+}
+
+model DepreciationEntry {
+  id            String      @id @default(uuid())
+  fixedAssetId  String      @map("fixed_asset_id")
+  fixedAsset    FixedAsset  @relation(fields: [fixedAssetId], references: [id], onDelete: Cascade)
+  periodDate    DateTime    @map("period_date")
+  amount        Decimal     @db.Decimal(20, 2)
+  journalEntryId String?   @map("journal_entry_id")
+  journalEntry  JournalEntry? @relation(fields: [journalEntryId], references: [id], onDelete: SetNull)
+  isPosted      Boolean     @default(false) @map("is_posted")
+  createdAt     DateTime    @default(now()) @map("created_at")
+
+  @@index([fixedAssetId])
+  @@index([periodDate])
+  @@map("depreciation_entries")
+}
+
+model ApprovalRule {
+  id            String   @id @default(uuid())
+  documentType  String   @map("document_type")
+  minAmount     Decimal  @default(0) @db.Decimal(20, 2) @map("min_amount")
+  requiredRole  String   @map("required_role")
+  isActive      Boolean  @default(true) @map("is_active")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@index([documentType])
+  @@map("approval_rules")
+}
+
+model ApprovalRequest {
+  id             String    @id @default(uuid())
+  documentType   String    @map("document_type")
+  documentId     String    @map("document_id")
+  documentNumber String    @map("document_number")
+  amount         Decimal   @db.Decimal(20, 2)
+  status         String    @default("Pending")
+  requestedBy    String    @map("requested_by")
+  requester      User      @relation("ApprovalRequester", fields: [requestedBy], references: [id])
+  approvedBy     String?   @map("approved_by")
+  approver       User?     @relation("ApprovalApprover", fields: [approvedBy], references: [id])
+  rejectedBy     String?   @map("rejected_by")
+  rejecter       User?     @relation("ApprovalRejecter", fields: [rejectedBy], references: [id])
+  notes          String?
+  decidedAt      DateTime? @map("decided_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  @@index([documentType, documentId])
+  @@index([status])
+  @@index([requestedBy])
+  @@map("approval_requests")
 }

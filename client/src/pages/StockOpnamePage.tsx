@@ -5,6 +5,9 @@ import api from '../lib/api';
 import { formatDate, formatRupiah } from '../lib/formatters';
 import { toast } from 'sonner';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import PDFDownloadButton from '../components/PDFDownloadButton';
+import StockOpnamePDF from '../lib/pdf/StockOpnamePDF';
+import { useCompanySettings } from '../contexts/CompanySettingsContext';
 
 const formatNumber = (val: number | string, decimals = 3) =>
   Number(val).toLocaleString('id-ID', { maximumFractionDigits: decimals });
@@ -22,6 +25,7 @@ export function StockOpnamePage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [cancelTarget, setCancelTarget] = useState<string | null>(null);
   const queryClient = useQueryClient();
+  const companySettings = useCompanySettings();
 
   const userRole = useMemo(() => {
     try { return JSON.parse(localStorage.getItem('user') || 'null')?.role ?? ''; }
@@ -71,9 +75,37 @@ export function StockOpnamePage() {
             <h2 className="text-lg font-semibold">{detail?.opnameNumber || 'Loading...'}</h2>
             {detail && <span className={statusConfig[detail.status]?.className}>{statusConfig[detail.status]?.label}</span>}
           </div>
-          {detail?.status === 'Submitted' && userRole === 'Admin' && (
-            <button onClick={() => setCancelTarget(detail.id)} className="btn btn-danger text-sm"><XCircle size={16} className="mr-1" /> Batalkan</button>
-          )}
+          <div className="flex items-center gap-2">
+            {detail && (
+              <PDFDownloadButton
+                document={
+                  <StockOpnamePDF
+                    opnameNumber={detail.opnameNumber}
+                    date={detail.date}
+                    status={detail.status}
+                    notes={detail.notes}
+                    createdBy={detail.createdBy?.fullName}
+                    items={detail.items.filter((i: any) => Number(i.difference) !== 0).map((i: any) => ({
+                      code: i.item.code,
+                      name: i.item.name,
+                      unit: i.item.unit,
+                      systemStock: Number(i.systemStock),
+                      actualStock: Number(i.actualStock),
+                      difference: Number(i.difference),
+                      unitCost: Number(i.unitCost),
+                      totalValue: Number(i.totalValue),
+                    }))}
+                    company={{ name: companySettings?.companyName || 'Perusahaan', address: companySettings?.address }}
+                  />
+                }
+                fileName={`stok-opname-${detail.opnameNumber}.pdf`}
+                label="Unduh PDF"
+              />
+            )}
+            {detail?.status === 'Submitted' && userRole === 'Admin' && (
+              <button onClick={() => setCancelTarget(detail.id)} className="btn btn-danger text-sm"><XCircle size={16} className="mr-1" /> Batalkan</button>
+            )}
+          </div>
         </div>
         {detailLoading ? (
           <div className="flex justify-center p-8"><Loader2 className="animate-spin" /></div>

@@ -51,14 +51,14 @@ export default function HealthCheckPage() {
   const { data, isLoading, refetch, isFetching } = useQuery<HealthData>({
     queryKey: ['health-check'],
     queryFn: async () => {
-      const res = await api.get('/api/health-check');
+      const res = await api.get('/health-check');
       return res.data.data;
     },
   });
 
   const fixMutation = useMutation({
     mutationFn: async (checkKey: string) => {
-      const res = await api.post(`/api/health-check/fix/${checkKey}`);
+      const res = await api.post(`/health-check/fix/${checkKey}`);
       return res.data.data;
     },
     onSuccess: (result) => {

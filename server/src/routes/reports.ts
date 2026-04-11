@@ -652,4 +652,170 @@ router.post('/export', async (req, res) => {
   }
 });
 
+// GET /api/reports/hpp — HPP (COGS) per product
+router.get('/hpp', async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+    const start = startDate ? new Date(startDate as string) : new Date(new Date().getFullYear(), 0, 1);
+    const end = endDate ? new Date(endDate as string) : new Date();
+
+    // Get sales with COGS: each sale item with its inventory item cost
+    const salesItems = await prisma.$queryRaw<Array<{
+      item_id: string;
+      item_code: string;
+      item_name: string;
+      category: string;
+      total_qty: number;
+      total_revenue: number;
+      total_cogs: number;
+    }>>`
+      SELECT
+        ii.id AS item_id,
+        ii.code AS item_code,
+        ii.name AS item_name,
+        COALESCE(ii.category, 'Lainnya') AS category,
+        SUM(si.quantity) AS total_qty,
+        SUM(si.amount) AS total_revenue,
+        SUM(si.quantity * ii.average_cost) AS total_cogs
+      FROM sales_invoice_items si
+      JOIN sales_invoices s ON s.id = si.sales_invoice_id
+      LEFT JOIN inventory_items ii ON ii.id = si.inventory_item_id
+      WHERE s.status NOT IN ('Draft', 'Cancelled')
+        AND s.date >= ${start}
+        AND s.date <= ${end}
+        AND si.inventory_item_id IS NOT NULL
+      GROUP BY ii.id, ii.code, ii.name, ii.category
+      ORDER BY SUM(si.amount) DESC
+    `;
+
+    const totalRevenue = salesItems.reduce((s, i) => s + Number(i.total_revenue), 0);
+    const totalCogs = salesItems.reduce((s, i) => s + Number(i.total_cogs), 0);
+
+    res.json({
+      period: { start, end },
+      items: salesItems.map((i) => ({
+        itemId: i.item_id,
+        itemCode: i.item_code,
+        itemName: i.item_name,
+        category: i.category,
+        totalQty: Number(i.total_qty),
+        totalRevenue: Number(i.total_revenue),
+        totalCogs: Number(i.total_cogs),
+        grossMargin: Number(i.total_revenue) - Number(i.total_cogs),
+        marginPct: Number(i.total_revenue) > 0
+          ? +((Number(i.total_revenue) - Number(i.total_cogs)) / Number(i.total_revenue) * 100).toFixed(1)
+          : 0,
+      })),
+      summary: {
+        totalRevenue,
+        totalCogs,
+        grossProfit: totalRevenue - totalCogs,
+        grossMarginPct: totalRevenue > 0 ? +((totalRevenue - totalCogs) / totalRevenue * 100).toFixed(1) : 0,
+      },
+    });
+  } catch (error) {
+    logger.error({ error }, 'GET /reports/hpp error');
+    res.status(500).json({ error: 'Gagal mengambil laporan HPP.' });
+  }
+});
+
+// GET /api/reports/payable-schedule — hutang jatuh tempo & jadwal pembayaran
+router.get('/payable-schedule', async (req, res) => {
+  try {
+    const invoices = await prisma.purchaseInvoice.findMany({
+      where: {
+        outstanding: { gt: 0 },
+        status: { notIn: ['Draft', 'Cancelled'] },
+      },
+      include: {
+        supplier: { select: { id: true, name: true } },
+      },
+      orderBy: { dueDate: 'asc' },
+    });
+
+    const now = new Date();
+    const data = invoices.map((inv) => {
+      const daysUntilDue = inv.dueDate
+        ? Math.ceil((inv.dueDate.getTime() - now.getTime()) / 86400000)
+        : null;
+      return {
+        id: inv.id,
+        invoiceNumber: inv.invoiceNumber,
+        supplierName: inv.supplier.name,
+        supplierId: inv.supplier.id,
+        date: inv.date,
+        dueDate: inv.dueDate,
+        grandTotal: Number(inv.grandTotal),
+        outstanding: Number(inv.outstanding),
+        daysUntilDue,
+        status: !inv.dueDate ? 'no_due_date'
+          : daysUntilDue! < 0 ? 'overdue'
+          : daysUntilDue! <= 7 ? 'due_soon'
+          : 'on_track',
+      };
+    });
+
+    const totalOutstanding = data.reduce((s, i) => s + i.outstanding, 0);
+    const overdueAmount = data.filter((i) => i.status === 'overdue').reduce((s, i) => s + i.outstanding, 0);
+    const dueSoonAmount = data.filter((i) => i.status === 'due_soon').reduce((s, i) => s + i.outstanding, 0);
+
+    res.json({
+      invoices: data,
+      summary: { totalOutstanding, overdueAmount, dueSoonAmount, totalInvoices: data.length },
+    });
+  } catch (error) {
+    logger.error({ error }, 'GET /reports/payable-schedule error');
+    res.status(500).json({ error: 'Gagal mengambil jadwal hutang.' });
+  }
+});
+
+// GET /api/reports/receivable-schedule — piutang jatuh tempo
+router.get('/receivable-schedule', async (req, res) => {
+  try {
+    const invoices = await prisma.salesInvoice.findMany({
+      where: {
+        outstanding: { gt: 0 },
+        status: { notIn: ['Draft', 'Cancelled'] },
+      },
+      include: {
+        customer: { select: { id: true, name: true } },
+      },
+      orderBy: { dueDate: 'asc' },
+    });
+
+    const now = new Date();
+    const data = invoices.map((inv) => {
+      const daysUntilDue = inv.dueDate
+        ? Math.ceil((inv.dueDate.getTime() - now.getTime()) / 86400000)
+        : null;
+      return {
+        id: inv.id,
+        invoiceNumber: inv.invoiceNumber,
+        customerName: inv.customer.name,
+        customerId: inv.customer.id,
+        date: inv.date,
+        dueDate: inv.dueDate,
+        grandTotal: Number(inv.grandTotal),
+        outstanding: Number(inv.outstanding),
+        daysUntilDue,
+        status: !inv.dueDate ? 'no_due_date'
+          : daysUntilDue! < 0 ? 'overdue'
+          : daysUntilDue! <= 7 ? 'due_soon'
+          : 'on_track',
+      };
+    });
+
+    const totalOutstanding = data.reduce((s, i) => s + i.outstanding, 0);
+    const overdueAmount = data.filter((i) => i.status === 'overdue').reduce((s, i) => s + i.outstanding, 0);
+
+    res.json({
+      invoices: data,
+      summary: { totalOutstanding, overdueAmount, totalInvoices: data.length },
+    });
+  } catch (error) {
+    logger.error({ error }, 'GET /reports/receivable-schedule error');
+    res.status(500).json({ error: 'Gagal mengambil jadwal piutang.' });
+  }
+});
+
 export default router;

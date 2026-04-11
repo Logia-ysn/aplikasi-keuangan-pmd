@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, BarChart3, Clock, Users, AlertTriangle, PieChart, PackageX, Package, ArrowLeftRight, Layers, Factory } from 'lucide-react';
+import { X, BarChart3, Clock, Users, AlertTriangle, PieChart, PackageX, Package, ArrowLeftRight, Layers, Factory, TrendingUp, Wallet, Scale } from 'lucide-react';
 
 export interface WidgetConfig {
   id: string;
@@ -22,6 +22,10 @@ export const DEFAULT_WIDGETS: WidgetConfig[] = [
   { id: 'top-items', name: 'Item Stok Terbanyak', description: 'Top 10 item dengan stok terbanyak', icon: Package, enabled: true },
   { id: 'recent-movements', name: 'Gerakan Stok Terkini', description: '10 gerakan stok terakhir', icon: ArrowLeftRight, enabled: true },
   { id: 'production-stats', name: 'Statistik Produksi', description: 'Total produksi dan rata-rata rendemen', icon: Factory, enabled: true },
+  { id: 'financial-ratios', name: 'Rasio Keuangan', description: 'Current ratio, debt-to-equity, dan debt-to-asset', icon: Scale, enabled: true },
+  { id: 'monthly-profit', name: 'Tren Laba Bulanan', description: 'Grafik pendapatan vs beban 12 bulan terakhir', icon: TrendingUp, enabled: true },
+  { id: 'cash-flow-summary', name: 'Arus Kas', description: 'Kas masuk, keluar, dan arus bersih bulan ini', icon: Wallet, enabled: true },
+  { id: 'aging-summary', name: 'Ringkasan Aging', description: 'Aging piutang dan hutang per bucket', icon: Clock, enabled: true },
 ];
 
 interface DashboardSettingsProps {

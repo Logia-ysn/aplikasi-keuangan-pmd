@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { BarChart3, Scale, Clock, ClipboardList, Banknote, ChevronRight, Receipt, BookOpen } from 'lucide-react';
+import { BarChart3, Scale, Clock, ClipboardList, Banknote, ChevronRight, Receipt, BookOpen, Package, CreditCard, FileText } from 'lucide-react';
 
 const reports = [
   {
@@ -50,6 +50,24 @@ const reports = [
     description: 'Ringkasan PPN Keluaran, PPN Masukan, dan PPh berdasarkan periode.',
     icon: Receipt,
     path: '/reports/tax',
+  },
+  {
+    title: 'HPP per Produk',
+    description: 'Analisis Harga Pokok Penjualan per produk, margin, dan profitabilitas.',
+    icon: Package,
+    path: '/reports/hpp',
+  },
+  {
+    title: 'Jadwal Hutang',
+    description: 'Daftar hutang berdasarkan jatuh tempo, status, dan prioritas pembayaran.',
+    icon: CreditCard,
+    path: '/reports/payable-schedule',
+  },
+  {
+    title: 'Jadwal Piutang',
+    description: 'Daftar piutang berdasarkan jatuh tempo dan status penagihan.',
+    icon: FileText,
+    path: '/reports/receivable-schedule',
   },
 ];
 

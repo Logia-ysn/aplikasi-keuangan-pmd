@@ -13,6 +13,7 @@ import BulkExpenseModal from '../components/BulkExpenseModal';
 import { Layers } from 'lucide-react';
 import VendorDepositModal from '../components/VendorDepositModal';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import PaymentDetailDrawer from '../components/PaymentDetailDrawer';
 
 const getUserRole = (): string | null => {
   try { return JSON.parse(localStorage.getItem('user') || 'null')?.role ?? null; }
@@ -40,6 +41,7 @@ export const Payments = () => {
   const [isTransferOpen, setIsTransferOpen] = useState(false);
   const [isDepositOpen, setIsDepositOpen] = useState(false);
   const [cancelTarget, setCancelTarget] = useState<CashTransaction | null>(null);
+  const [detailId, setDetailId] = useState<string | null>(null);
 
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -256,7 +258,11 @@ export const Payments = () => {
                 const icon = isIncoming ? <TrendingDown size={10} /> : isDeposit ? <Wallet size={10} /> : txn.type === 'Transfer' ? <ArrowRightLeft size={10} /> : <TrendingUp size={10} />;
 
                 return (
-                  <tr key={`${txn.source}-${txn.id}`}>
+                  <tr
+                    key={`${txn.source}-${txn.id}`}
+                    className={cn('cursor-pointer', txn.source === 'payment' && 'hover:bg-gray-50 dark:hover:bg-gray-800/30')}
+                    onClick={() => { if (txn.source === 'payment') setDetailId(txn.id); }}
+                  >
                     <td className="text-gray-500 whitespace-nowrap">{formatDate(txn.date)}</td>
                     <td className="whitespace-nowrap">
                       <span className="font-mono text-xs text-gray-800 bg-gray-50 px-1.5 py-0.5 rounded">{txn.number}</span>
@@ -363,6 +369,9 @@ export const Payments = () => {
         confirmLabel="Ya, Batalkan"
         variant="danger"
       />
+      {detailId && (
+        <PaymentDetailDrawer paymentId={detailId} onClose={() => setDetailId(null)} />
+      )}
     </div>
   );
 };

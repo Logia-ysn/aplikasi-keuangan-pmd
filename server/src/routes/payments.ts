@@ -85,6 +85,29 @@ router.get('/cash-journals', async (_req, res) => {
   }
 });
 
+// GET /api/payments/:id — payment detail
+router.get('/:id', async (req, res) => {
+  try {
+    const payment = await prisma.payment.findUnique({
+      where: { id: req.params.id as string },
+      include: {
+        party: true,
+        account: true,
+        splits: { include: { account: true } },
+        allocations: true,
+        journalEntry: {
+          include: { items: { include: { account: true } } },
+        },
+      },
+    });
+    if (!payment) return res.status(404).json({ error: 'Pembayaran tidak ditemukan.' });
+    return res.json(payment);
+  } catch (error) {
+    logger.error({ error }, 'GET /payments/:id error');
+    return res.status(500).json({ error: 'Gagal mengambil detail pembayaran.' });
+  }
+});
+
 // POST /api/payments — record payment/receipt
 router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthRequest, res) => {
   const body = validateBody(CreatePaymentSchema, req.body, res);

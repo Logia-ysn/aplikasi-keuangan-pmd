@@ -18,12 +18,17 @@ import CategoryDistribution from '../components/widgets/CategoryDistribution';
 import TopItemsByStock from '../components/widgets/TopItemsByStock';
 import RecentMovements from '../components/widgets/RecentMovements';
 import ProductionStatsWidget from '../components/widgets/ProductionStatsWidget';
+import FinancialRatios from '../components/widgets/FinancialRatios';
+import MonthlyProfitChart from '../components/widgets/MonthlyProfitChart';
+import CashFlowChart from '../components/widgets/CashFlowChart';
+import AgingSummary from '../components/widgets/AgingSummary';
 import DashboardSettings, { DEFAULT_WIDGETS, type WidgetConfig } from '../components/DashboardSettings';
 
 // Widget IDs only visible to finance roles (not StaffProduksi)
 const FINANCE_WIDGET_IDS = new Set([
   'revenue-chart', 'recent-activities', 'top-customers',
   'overdue-invoices', 'expense-breakdown',
+  'financial-ratios', 'monthly-profit', 'cash-flow-summary', 'aging-summary',
 ]);
 
 const STORAGE_KEY = 'dashboard-widgets';
@@ -165,6 +170,24 @@ export const Dashboard = () => {
             {isEnabled('overdue-invoices') && <OverdueInvoices />}
             {isEnabled('expense-breakdown') && <ExpenseBreakdown />}
           </div>
+
+          {/* Third row: Financial insights */}
+          {(isEnabled('monthly-profit') || isEnabled('cash-flow-summary') || isEnabled('financial-ratios') || isEnabled('aging-summary')) && (
+            <>
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                {isEnabled('monthly-profit') && (
+                  <div className="lg:col-span-2">
+                    <MonthlyProfitChart />
+                  </div>
+                )}
+                {isEnabled('cash-flow-summary') && <CashFlowChart />}
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {isEnabled('financial-ratios') && <FinancialRatios />}
+                {isEnabled('aging-summary') && <AgingSummary />}
+              </div>
+            </>
+          )}
         </>
       )}
 

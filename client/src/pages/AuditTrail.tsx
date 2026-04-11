@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { Search, Loader2, ScrollText, ChevronDown, ChevronRight, ChevronLeft } from 'lucide-react';
+import { Search, Loader2, ScrollText, ChevronDown, ChevronRight, ChevronLeft, Download, BarChart3 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useQuery } from '@tanstack/react-query';
 import api from '../lib/api';
 import { formatDate, formatTime } from '../lib/formatters';
+import { exportToExcel } from '../lib/exportExcel';
 
 interface AuditLogEntry {
   id: string;
@@ -178,15 +179,55 @@ export const AuditTrail = () => {
             />
           </div>
 
-          {/* Reset */}
+          {/* Reset & Export */}
           <button
             onClick={handleResetFilters}
             className="btn-secondary text-xs"
           >
             Reset
           </button>
+          <button
+            onClick={() => {
+              if (!logs.length) return;
+              exportToExcel(
+                logs.map((l) => ({
+                  Waktu: new Date(l.createdAt).toLocaleString('id-ID'),
+                  Pengguna: l.user?.fullName ?? '-',
+                  Email: l.user?.email ?? '-',
+                  Aksi: l.action,
+                  Entitas: l.entityType,
+                  'ID Entitas': l.entityId,
+                  'IP Address': l.ipAddress ?? '-',
+                  Data: l.newValues ? JSON.stringify(l.newValues) : '-',
+                })),
+                `audit-log-${new Date().toISOString().slice(0, 10)}`
+              );
+            }}
+            className="btn-secondary text-xs flex items-center gap-1"
+          >
+            <Download size={13} /> Export
+          </button>
         </div>
       </div>
+
+      {/* Summary Stats */}
+      {!isLoading && total > 0 && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {['CREATE', 'UPDATE', 'DELETE', 'LOGIN'].map((action) => {
+            const count = logs.filter((l) => l.action === action).length;
+            const colors: Record<string, string> = { CREATE: 'text-green-600', UPDATE: 'text-blue-600', DELETE: 'text-red-600', LOGIN: 'text-gray-500' };
+            return (
+              <div key={action} className="card p-3 flex items-center gap-3">
+                <BarChart3 size={16} className={colors[action]} />
+                <div>
+                  <p className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>{action}</p>
+                  <p className={cn('text-lg font-bold', colors[action])}>{count}</p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Table */}
       <div
@@ -252,13 +293,48 @@ export const AuditTrail = () => {
                     {expandedRow === log.id && (
                       <tr key={`${log.id}-detail`} style={{ borderColor: 'var(--color-border)' }} className="border-b">
                         <td colSpan={6} className="px-6 py-4" style={{ backgroundColor: 'var(--color-bg-secondary)' }}>
-                          <div className="space-y-2">
+                          <div className="space-y-3">
                             {log.ipAddress && (
                               <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
                                 <span className="font-medium">IP Address:</span> {log.ipAddress}
+                                {log.userAgent && <span className="ml-3">| {log.userAgent.slice(0, 80)}</span>}
                               </p>
                             )}
-                            {log.newValues && (
+                            {log.action === 'UPDATE' && log.oldValues && log.newValues ? (
+                              <div>
+                                <p className="text-xs font-medium mb-2" style={{ color: 'var(--color-text-secondary)' }}>Perubahan:</p>
+                                <div className="rounded-lg border overflow-hidden" style={{ borderColor: 'var(--color-border)' }}>
+                                  <table className="w-full text-xs">
+                                    <thead>
+                                      <tr style={{ backgroundColor: 'var(--color-bg-tertiary)' }}>
+                                        <th className="text-left px-3 py-1.5 font-medium" style={{ color: 'var(--color-text-muted)' }}>Field</th>
+                                        <th className="text-left px-3 py-1.5 font-medium text-red-500">Sebelum</th>
+                                        <th className="text-left px-3 py-1.5 font-medium text-green-600">Sesudah</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {Object.keys(log.newValues).map((key) => {
+                                        const oldVal = log.oldValues?.[key];
+                                        const newVal = log.newValues[key];
+                                        const changed = JSON.stringify(oldVal) !== JSON.stringify(newVal);
+                                        if (!changed) return null;
+                                        return (
+                                          <tr key={key} className="border-t" style={{ borderColor: 'var(--color-border)' }}>
+                                            <td className="px-3 py-1.5 font-mono" style={{ color: 'var(--color-text-secondary)' }}>{key}</td>
+                                            <td className="px-3 py-1.5 bg-red-50/50 dark:bg-red-950/10" style={{ color: 'var(--color-text-secondary)' }}>
+                                              {oldVal !== undefined ? String(oldVal) : '—'}
+                                            </td>
+                                            <td className="px-3 py-1.5 bg-green-50/50 dark:bg-green-950/10" style={{ color: 'var(--color-text-secondary)' }}>
+                                              {newVal !== undefined ? String(newVal) : '—'}
+                                            </td>
+                                          </tr>
+                                        );
+                                      })}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </div>
+                            ) : log.newValues ? (
                               <div>
                                 <p className="text-xs font-medium mb-1" style={{ color: 'var(--color-text-secondary)' }}>Data:</p>
                                 <pre
@@ -272,8 +348,8 @@ export const AuditTrail = () => {
                                   <code>{JSON.stringify(log.newValues, null, 2)}</code>
                                 </pre>
                               </div>
-                            )}
-                            {!log.newValues && !log.ipAddress && (
+                            ) : null}
+                            {!log.newValues && !log.oldValues && !log.ipAddress && (
                               <p className="text-xs italic" style={{ color: 'var(--color-text-muted)' }}>Tidak ada detail tambahan.</p>
                             )}
                           </div>

@@ -29,6 +29,11 @@ import { CustomerDeposits } from './pages/CustomerDeposits';
 import TaxReport from './pages/reports/TaxReport';
 import LedgerBook from './pages/reports/LedgerBook';
 import HealthCheckPage from './pages/HealthCheckPage';
+import HppReport from './pages/reports/HppReport';
+import PayableSchedule from './pages/reports/PayableSchedule';
+import ReceivableSchedule from './pages/reports/ReceivableSchedule';
+import FixedAssetsPage from './pages/FixedAssetsPage';
+import ApprovalsPage from './pages/ApprovalsPage';
 
 
 const ProtectedRoute = () => {
@@ -90,12 +95,17 @@ function App() {
             <Route path="/reports/aging-ap" element={<FinanceRoute><AgingAnalysis type="Supplier" /></FinanceRoute>} />
             <Route path="/reports/tax" element={<FinanceRoute><TaxReport /></FinanceRoute>} />
             <Route path="/reports/ledger-book" element={<FinanceRoute><LedgerBook /></FinanceRoute>} />
+            <Route path="/reports/hpp" element={<FinanceRoute><HppReport /></FinanceRoute>} />
+            <Route path="/reports/payable-schedule" element={<FinanceRoute><PayableSchedule /></FinanceRoute>} />
+            <Route path="/reports/receivable-schedule" element={<FinanceRoute><ReceivableSchedule /></FinanceRoute>} />
 
             <Route path="/reconciliation" element={<RoleRoute allowed={['Admin', 'Accountant']}><BankReconciliation /></RoleRoute>} />
             <Route path="/settings" element={<AdminRoute><SettingsPage /></AdminRoute>} />
             <Route path="/users" element={<AdminRoute><UserManagement /></AdminRoute>} />
             <Route path="/audit" element={<AdminRoute><AuditTrail /></AdminRoute>} />
             <Route path="/health-check" element={<AdminRoute><HealthCheckPage /></AdminRoute>} />
+            <Route path="/fixed-assets" element={<RoleRoute allowed={['Admin', 'Accountant']}><FixedAssetsPage /></RoleRoute>} />
+            <Route path="/approvals" element={<RoleRoute allowed={['Admin', 'Accountant']}><ApprovalsPage /></RoleRoute>} />
             <Route path="/notifications" element={<Notifications />} />
             <Route path="/recurring" element={<RoleRoute allowed={['Admin', 'Accountant']}><RecurringTransactions /></RoleRoute>} />
             <Route path="*" element={<Navigate to="/" replace />} />

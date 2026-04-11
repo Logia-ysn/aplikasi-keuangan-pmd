@@ -282,4 +282,188 @@ router.get('/stock-alerts', async (req, res) => {
   }
 });
 
+// GET /api/dashboard/cash-flow — daily cash in/out for current month
+router.get('/cash-flow', async (_req, res) => {
+  try {
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    const rows = await prisma.$queryRaw<Array<{ day: Date; cash_in: number; cash_out: number }>>`
+      SELECT date_trunc('day', p.date) AS day,
+             COALESCE(SUM(CASE WHEN p.payment_type = 'Receive' THEN p.amount ELSE 0 END), 0) AS cash_in,
+             COALESCE(SUM(CASE WHEN p.payment_type = 'Pay' THEN p.amount ELSE 0 END), 0) AS cash_out
+        FROM payments p
+       WHERE p.date >= ${startOfMonth}
+         AND p.status = 'Submitted'
+       GROUP BY date_trunc('day', p.date)
+       ORDER BY day
+    `;
+
+    const days = rows.map((r) => ({
+      date: r.day,
+      cashIn: Number(r.cash_in),
+      cashOut: Number(r.cash_out),
+    }));
+
+    const totalIn = days.reduce((s, d) => s + d.cashIn, 0);
+    const totalOut = days.reduce((s, d) => s + d.cashOut, 0);
+
+    res.json({ days, totalIn, totalOut, net: totalIn - totalOut });
+  } catch (error) {
+    logger.error({ error }, 'GET /dashboard/cash-flow error');
+    res.status(500).json({ error: 'Gagal mengambil data cash flow.' });
+  }
+});
+
+// GET /api/dashboard/financial-ratios — key financial ratios
+router.get('/financial-ratios', async (_req, res) => {
+  try {
+    const [currentAssets, currentLiabilities, totalAssets, totalLiabilities, totalEquity] = await Promise.all([
+      prisma.account.aggregate({
+        where: { rootType: 'ASSET' as any, accountNumber: { startsWith: '1.' }, isGroup: false, isActive: true },
+        _sum: { balance: true },
+      }),
+      prisma.account.aggregate({
+        where: { rootType: 'LIABILITY' as any, accountNumber: { startsWith: '2.' }, isGroup: false, isActive: true },
+        _sum: { balance: true },
+      }),
+      prisma.account.aggregate({
+        where: { rootType: 'ASSET' as any, isGroup: false, isActive: true },
+        _sum: { balance: true },
+      }),
+      prisma.account.aggregate({
+        where: { rootType: 'LIABILITY' as any, isGroup: false, isActive: true },
+        _sum: { balance: true },
+      }),
+      prisma.account.aggregate({
+        where: { rootType: 'EQUITY' as any, isGroup: false, isActive: true },
+        _sum: { balance: true },
+      }),
+    ]);
+
+    const ca = Number(currentAssets._sum?.balance || 0);
+    const cl = Number(currentLiabilities._sum?.balance || 0);
+    const ta = Number(totalAssets._sum?.balance || 0);
+    const tl = Number(totalLiabilities._sum?.balance || 0);
+    const te = Number(totalEquity._sum?.balance || 0);
+
+    res.json({
+      currentRatio: cl > 0 ? +(ca / cl).toFixed(2) : 0,
+      debtToEquity: te > 0 ? +(tl / te).toFixed(2) : 0,
+      debtToAsset: ta > 0 ? +(tl / ta).toFixed(2) : 0,
+      totalAssets: ta,
+      totalLiabilities: tl,
+      totalEquity: te,
+    });
+  } catch (error) {
+    logger.error({ error }, 'GET /dashboard/financial-ratios error');
+    res.status(500).json({ error: 'Gagal menghitung rasio keuangan.' });
+  }
+});
+
+// GET /api/dashboard/monthly-profit — monthly profit trend (12 months)
+router.get('/monthly-profit', async (_req, res) => {
+  try {
+    const now = new Date();
+    const twelveMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 11, 1);
+
+    const rows = await prisma.$queryRaw<Array<{ month: Date; revenue: number; expense: number }>>`
+      SELECT
+        date_trunc('month', ale.date) AS month,
+        COALESCE(SUM(CASE WHEN a."rootType" = 'REVENUE' THEN ale.credit - ale.debit ELSE 0 END), 0) AS revenue,
+        COALESCE(SUM(CASE WHEN a."rootType" = 'EXPENSE' THEN ale.debit - ale.credit ELSE 0 END), 0) AS expense
+      FROM accounting_ledger_entries ale
+      JOIN accounts a ON ale.account_id = a.id
+      WHERE ale.date >= ${twelveMonthsAgo}
+        AND ale.is_cancelled = false
+        AND a."rootType" IN ('REVENUE', 'EXPENSE')
+      GROUP BY date_trunc('month', ale.date)
+      ORDER BY month ASC
+    `;
+
+    const months = Array.from({ length: 12 }, (_, i) => {
+      const d = new Date(now.getFullYear(), now.getMonth() - (11 - i), 1);
+      return {
+        key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
+        name: d.toLocaleString('id-ID', { month: 'short', year: '2-digit' }),
+      };
+    });
+
+    const rowMap = new Map(
+      rows.map((r) => {
+        const d = new Date(r.month);
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        return [key, { revenue: Math.max(0, Number(r.revenue)), expense: Math.max(0, Number(r.expense)) }];
+      })
+    );
+
+    const data = months.map((m) => {
+      const vals = rowMap.get(m.key);
+      const revenue = vals?.revenue ?? 0;
+      const expense = vals?.expense ?? 0;
+      return { name: m.name, revenue, expense, profit: revenue - expense };
+    });
+
+    res.json(data);
+  } catch (error) {
+    logger.error({ error }, 'GET /dashboard/monthly-profit error');
+    res.status(500).json({ error: 'Gagal mengambil data profit bulanan.' });
+  }
+});
+
+// GET /api/dashboard/aging-summary — AP/AR aging summary
+router.get('/aging-summary', async (_req, res) => {
+  try {
+    const now = new Date();
+    const aging = (invoices: Array<{ outstanding: any; dueDate: Date | null }>) => {
+      const buckets = { current: 0, days30: 0, days60: 0, days90: 0, over90: 0 };
+      for (const inv of invoices) {
+        const amt = Number(inv.outstanding);
+        if (!inv.dueDate || inv.dueDate >= now) { buckets.current += amt; continue; }
+        const days = Math.ceil((now.getTime() - inv.dueDate.getTime()) / 86400000);
+        if (days <= 30) buckets.days30 += amt;
+        else if (days <= 60) buckets.days60 += amt;
+        else if (days <= 90) buckets.days90 += amt;
+        else buckets.over90 += amt;
+      }
+      return buckets;
+    };
+
+    const [salesInvoices, purchaseInvoices] = await Promise.all([
+      prisma.salesInvoice.findMany({
+        where: { outstanding: { gt: 0 }, status: { notIn: ['Draft', 'Cancelled'] } },
+        select: { outstanding: true, dueDate: true },
+      }),
+      prisma.purchaseInvoice.findMany({
+        where: { outstanding: { gt: 0 }, status: { notIn: ['Draft', 'Cancelled'] } },
+        select: { outstanding: true, dueDate: true },
+      }),
+    ]);
+
+    const arBuckets = aging(salesInvoices);
+    const apBuckets = aging(purchaseInvoices);
+
+    const toBucketArray = (b: typeof arBuckets) => [
+      { label: 'Belum JT', amount: b.current },
+      { label: '1-30 hari', amount: b.days30 },
+      { label: '31-60 hari', amount: b.days60 },
+      { label: '61-90 hari', amount: b.days90 },
+      { label: '>90 hari', amount: b.over90 },
+    ];
+
+    const totalReceivable = Object.values(arBuckets).reduce((s, v) => s + v, 0);
+    const totalPayable = Object.values(apBuckets).reduce((s, v) => s + v, 0);
+
+    res.json({
+      receivable: toBucketArray(arBuckets),
+      payable: toBucketArray(apBuckets),
+      totalReceivable,
+      totalPayable,
+    });
+  } catch (error) {
+    logger.error({ error }, 'GET /dashboard/aging-summary error');
+    res.status(500).json({ error: 'Gagal mengambil data aging.' });
+  }
+});
+
 export default router;
