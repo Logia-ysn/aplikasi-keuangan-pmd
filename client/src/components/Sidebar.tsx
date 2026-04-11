@@ -22,6 +22,7 @@ import {
   Wallet,
   X,
   ClipboardCheck,
+  HeartPulse,
 } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '../lib/utils';
@@ -49,6 +50,7 @@ const allNavItems: NavItem[] = [
   { icon: Settings, label: 'Pengaturan', href: '/settings', roles: ['Admin'] },
   { icon: Shield, label: 'Manajemen User', href: '/users', roles: ['Admin'] },
   { icon: ScrollText, label: 'Jejak Audit', href: '/audit', roles: ['Admin'] },
+  { icon: HeartPulse, label: 'Health Check', href: '/health-check', roles: ['Admin'] },
 ];
 
 interface SidebarProps {

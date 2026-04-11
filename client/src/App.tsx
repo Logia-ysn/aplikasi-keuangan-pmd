@@ -28,6 +28,7 @@ import { VendorDeposits } from './pages/VendorDeposits';
 import { CustomerDeposits } from './pages/CustomerDeposits';
 import TaxReport from './pages/reports/TaxReport';
 import LedgerBook from './pages/reports/LedgerBook';
+import HealthCheckPage from './pages/HealthCheckPage';
 
 
 const ProtectedRoute = () => {
@@ -94,6 +95,7 @@ function App() {
             <Route path="/settings" element={<AdminRoute><SettingsPage /></AdminRoute>} />
             <Route path="/users" element={<AdminRoute><UserManagement /></AdminRoute>} />
             <Route path="/audit" element={<AdminRoute><AuditTrail /></AdminRoute>} />
+            <Route path="/health-check" element={<AdminRoute><HealthCheckPage /></AdminRoute>} />
             <Route path="/notifications" element={<Notifications />} />
             <Route path="/recurring" element={<RoleRoute allowed={['Admin', 'Accountant']}><RecurringTransactions /></RoleRoute>} />
             <Route path="*" element={<Navigate to="/" replace />} />

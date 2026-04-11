@@ -37,6 +37,7 @@ import customerDepositRoutes from './routes/customerDeposits';
 import systemAccountRoutes from './routes/systemAccounts';
 import attachmentRoutes from './routes/attachments';
 import stockOpnameRoutes from './routes/stockOpname';
+import healthCheckRoutes from './routes/healthCheck';
 import { systemAccounts } from './services/systemAccounts';
 
 const app = express();
@@ -152,6 +153,7 @@ app.use('/api/customer-deposits', customerDepositRoutes);
 app.use('/api/system-accounts', systemAccountRoutes);
 app.use('/api/attachments', attachmentRoutes);
 app.use('/api/stock-opname', stockOpnameRoutes);
+app.use('/api/health-check', healthCheckRoutes);
 
 // ─── Serve Frontend (Production) ──────────────────────────────────────────────
 // In production, serve the built React client from ../client/dist
