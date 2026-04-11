@@ -116,8 +116,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen = false, onMobileCl
               />
             ) : (
               <>
-                <div className="w-7 h-7 bg-blue-600 rounded-md flex items-center justify-center flex-shrink-0">
-                  <span className="text-white font-black text-[10px] leading-none">Rp</span>
+                <div className="w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0 overflow-hidden">
+                  <img src="/favicon.svg" alt="Logo" className="w-full h-full" />
                 </div>
                 <span className="text-sm font-bold text-gray-900 tracking-tight truncate">
                   {settings?.companyName || 'Keuangan'}
@@ -134,8 +134,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen = false, onMobileCl
           />
         )}
         {isCollapsed && !mobileOpen && !settings?.logoUrl && (
-          <div className="w-7 h-7 bg-blue-600 rounded-md flex items-center justify-center mx-auto">
-            <span className="text-white font-black text-[9px] leading-none">Rp</span>
+          <div className="w-7 h-7 rounded-md flex items-center justify-center mx-auto overflow-hidden">
+            <img src="/favicon.svg" alt="Logo" className="w-full h-full" />
           </div>
         )}
 
