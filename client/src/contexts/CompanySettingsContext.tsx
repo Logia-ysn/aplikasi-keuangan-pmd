@@ -16,7 +16,7 @@ interface CompanySettings {
 const CompanySettingsContext = createContext<CompanySettings | null>(null);
 
 /** Default favicon path (shipped in /public) */
-const DEFAULT_FAVICON = '/favicon.svg';
+const DEFAULT_FAVICON = '/favicon.png';
 
 export const CompanySettingsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { data } = useQuery<CompanySettings>({
@@ -38,7 +38,7 @@ export const CompanySettingsProvider: React.FC<{ children: React.ReactNode }> = 
       document.title = `Keuangan - ${data.companyName}`;
     }
 
-    // Update favicon to company logo
+    // Favicon always uses the static app icon (not company logo)
     const link: HTMLLinkElement =
       document.querySelector('link[rel="icon"]') ||
       (() => {
@@ -48,15 +48,9 @@ export const CompanySettingsProvider: React.FC<{ children: React.ReactNode }> = 
         return el;
       })();
 
-    if (data.logoUrl) {
-      link.href = data.logoUrl;
-      // Base64 data URLs don't need a type; for external URLs, keep svg+xml
-      link.type = data.logoUrl.startsWith('data:') ? '' : 'image/svg+xml';
-    } else {
-      link.href = DEFAULT_FAVICON;
-      link.type = 'image/svg+xml';
-    }
-  }, [data?.companyName, data?.logoUrl]);
+    link.href = DEFAULT_FAVICON;
+    link.type = 'image/png';
+  }, [data?.companyName]);
 
   return (
     <CompanySettingsContext.Provider value={data ?? null}>

@@ -382,13 +382,12 @@ const LoginPage: React.FC = () => {
                 }}
               />
               <div
-                className="relative inline-flex items-center justify-center w-20 h-20 rounded-2xl shadow-2xl overflow-hidden"
+                className="relative inline-flex items-center justify-center w-28 h-28 rounded-2xl overflow-hidden"
                 style={{
                   animation: 'login-logo-enter 1s cubic-bezier(0.34,1.56,0.64,1) 0.15s both',
-                  boxShadow: '0 8px 32px rgba(37,99,235,0.4), 0 0 60px rgba(37,99,235,0.15)',
                 }}
               >
-                <img src="/favicon.svg" alt="Keuangan PMD" className="w-full h-full" />
+                <img src="/pwa-512x512.png" alt="Keuangan PMD" className="w-full h-full object-contain" />
               </div>
             </div>
             <h1

@@ -114,34 +114,17 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen = false, onMobileCl
       <div className="h-14 flex items-center justify-between px-3 border-b" style={{ borderColor: 'var(--color-border-light)' }}>
         {(!isCollapsed || mobileOpen) && (
           <div className="flex items-center gap-2 overflow-hidden">
-            {settings?.logoUrl ? (
-              <img
-                src={settings.logoUrl}
-                alt="Logo"
-                className="h-8 w-auto object-contain max-w-[120px]"
-              />
-            ) : (
-              <>
-                <div className="w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0 overflow-hidden">
-                  <img src="/favicon.svg" alt="Logo" className="w-full h-full" />
-                </div>
-                <span className="text-sm font-bold text-gray-900 tracking-tight truncate">
-                  {settings?.companyName || 'Keuangan'}
-                </span>
-              </>
-            )}
+            <div className="w-8 h-8 flex items-center justify-center flex-shrink-0 overflow-hidden">
+              <img src="/pwa-192x192.png" alt="Logo" className="w-full h-full object-contain" />
+            </div>
+            <span className="text-sm font-bold tracking-tight truncate" style={{ color: 'var(--color-text-primary)' }}>
+              {settings?.companyName || 'Keuangan'}
+            </span>
           </div>
         )}
-        {isCollapsed && !mobileOpen && settings?.logoUrl && (
-          <img
-            src={settings.logoUrl}
-            alt="Logo"
-            className="h-7 w-7 object-contain mx-auto"
-          />
-        )}
-        {isCollapsed && !mobileOpen && !settings?.logoUrl && (
-          <div className="w-7 h-7 rounded-md flex items-center justify-center mx-auto overflow-hidden">
-            <img src="/favicon.svg" alt="Logo" className="w-full h-full" />
+        {isCollapsed && !mobileOpen && (
+          <div className="w-8 h-8 flex items-center justify-center mx-auto overflow-hidden">
+            <img src="/pwa-192x192.png" alt="Logo" className="w-full h-full object-contain" />
           </div>
         )}
 

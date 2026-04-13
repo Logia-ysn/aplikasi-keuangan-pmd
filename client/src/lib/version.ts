@@ -3,8 +3,8 @@
  * Update file ini setiap kali release baru.
  */
 
-export const APP_VERSION = '2.2.0';
-export const APP_BUILD_DATE = '2026-04-02';
+export const APP_VERSION = '2.3.0';
+export const APP_BUILD_DATE = '2026-04-13';
 export const APP_NAME = 'Keuangan';
 
 export interface ChangelogEntry {
@@ -15,6 +15,21 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '2.3.0',
+    date: '2026-04-13',
+    title: 'Fitur Baru, Perbaikan Bug & Icon Aplikasi',
+    changes: [
+      'Icon aplikasi baru (PMD biru) dengan background transparan untuk favicon, PWA, sidebar & login',
+      'Pisahkan icon aplikasi (statis) dari logo perusahaan (untuk invoice & dokumen)',
+      'Fix Health Check: halaman tidak muncul karena double /api prefix pada endpoint',
+      'Fix Aset Tetap, Persetujuan, HPP, Jadwal Piutang/Hutang: double /api prefix diperbaiki',
+      'Detail Kas & Bank: drawer baru untuk melihat detail pembayaran, jurnal, dan lampiran',
+      'Upload & hapus lampiran langsung dari drawer detail pembayaran (drag & drop)',
+      'Endpoint baru GET /api/payments/:id dengan relasi lengkap (party, account, splits, allocations, journal)',
+      'Grafik Profit Bulanan: fix label bulan yang tidak tampil',
+    ],
+  },
   {
     version: '2.2.0',
     date: '2026-04-02',
