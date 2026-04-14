@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { roleMiddleware } from '../middleware/auth';
+import { roleMiddleware, AuthRequest } from '../middleware/auth';
 import { prisma } from '../lib/prisma';
 import { logger } from '../lib/logger';
 import { recalculateAccountBalances } from '../utils/accountBalance';
@@ -40,11 +40,26 @@ router.get('/', roleMiddleware(['Admin']), async (_req, res) => {
 });
 
 // ── POST /api/health-check/fix/:check — Auto-fix a specific check ────────────
-router.post('/fix/:check', roleMiddleware(['Admin']), async (req, res) => {
-  const { check } = req.params;
+router.post('/fix/:check', roleMiddleware(['Admin']), async (req: AuthRequest, res) => {
+  const check = String(req.params.check ?? '');
+  const userId = req.user?.userId;
+  const userAgent = Array.isArray(req.headers['user-agent'])
+    ? req.headers['user-agent'][0]
+    : req.headers['user-agent'];
 
+  const actionMap: Record<string, string> = {
+    'ale-sync': 'FIX_ALE_SYNC',
+    'account-balance-drift': 'FIX_ACCOUNT_BALANCE_DRIFT',
+    'orphan-ale': 'FIX_ORPHAN_ALE',
+  };
+
+  if (!actionMap[check]) {
+    return res.status(400).json({ success: false, error: 'Check tidak dapat diperbaiki otomatis' });
+  }
+
+  const startedAt = new Date();
   try {
-    let result: { fixed: number; message: string };
+    let result: { fixed: number; message: string; snapshot?: unknown };
 
     switch (check) {
       case 'ale-sync':
@@ -60,10 +75,49 @@ router.post('/fix/:check', roleMiddleware(['Admin']), async (req, res) => {
         return res.status(400).json({ success: false, error: 'Check tidak dapat diperbaiki otomatis' });
     }
 
-    logger.info({ check, result }, 'Health check fix applied');
-    res.json({ success: true, data: result });
+    if (userId) {
+      await prisma.auditLog.create({
+        data: {
+          userId,
+          action: actionMap[check],
+          entityType: 'health-check',
+          entityId: check,
+          newValues: {
+            check,
+            fixed: result.fixed,
+            message: result.message,
+            snapshot: result.snapshot ?? null,
+            startedAt: startedAt.toISOString(),
+            finishedAt: new Date().toISOString(),
+          },
+          ipAddress: req.ip,
+          userAgent,
+        },
+      }).catch((err) => logger.error({ err }, 'Audit log write failed for health fix'));
+    }
+
+    logger.info({ check, userId, fixed: result.fixed }, 'Health check fix applied');
+    res.json({ success: true, data: { fixed: result.fixed, message: result.message } });
   } catch (error) {
     logger.error(error, `Health check fix failed: ${check}`);
+    if (userId) {
+      await prisma.auditLog.create({
+        data: {
+          userId,
+          action: `${actionMap[check]}_FAILED`,
+          entityType: 'health-check',
+          entityId: check,
+          newValues: {
+            check,
+            error: error instanceof Error ? error.message : String(error),
+            startedAt: startedAt.toISOString(),
+            finishedAt: new Date().toISOString(),
+          },
+          ipAddress: req.ip,
+          userAgent,
+        },
+      }).catch((err) => logger.error({ err }, 'Audit log write failed for health fix error'));
+    }
     res.status(500).json({ success: false, error: 'Gagal memperbaiki masalah' });
   }
 });
@@ -323,7 +377,7 @@ async function checkStockMovementMismatch(): Promise<CheckResult> {
 /**
  * Fix ALE sync: delete all JournalEntry ALEs and recreate from JournalItems.
  */
-async function fixAleSync(): Promise<{ fixed: number; message: string }> {
+async function fixAleSync(): Promise<{ fixed: number; message: string; snapshot: unknown }> {
   return await prisma.$transaction(async (tx) => {
     // Delete all JournalEntry ALE entries
     const deleted = await tx.accountingLedgerEntry.deleteMany({
@@ -360,42 +414,129 @@ async function fixAleSync(): Promise<{ fixed: number; message: string }> {
     return {
       fixed: created,
       message: `Dihapus ${deleted.count} ALE lama, dibuat ${created} ALE baru dari JournalItem`,
+      snapshot: {
+        deletedCount: deleted.count,
+        createdCount: created,
+        journalEntriesProcessed: journalEntries.length,
+      },
     };
   }, { timeout: 120000 });
 }
 
 /**
  * Fix account balance drift: recalculate all account balances from JournalItems.
+ * Captures before/after snapshot of drifted accounts for audit.
  */
-async function fixAccountBalanceDrift(): Promise<{ fixed: number; message: string }> {
+async function fixAccountBalanceDrift(): Promise<{ fixed: number; message: string; snapshot: unknown }> {
   return await prisma.$transaction(async (tx) => {
+    // Capture drifted accounts BEFORE recalculation (rootType-aware formula)
+    const beforeDrift = await tx.$queryRaw<Array<{
+      account_code: string;
+      account_name: string;
+      root_type: string;
+      stored_balance: string;
+      computed_balance: string;
+    }>>`
+      WITH computed AS (
+        SELECT jea.account_id,
+               a."rootType" AS root_type,
+               CASE
+                 WHEN a."rootType" IN ('ASSET','EXPENSE')
+                   THEN SUM(jea.debit) - SUM(jea.credit)
+                 ELSE SUM(jea.credit) - SUM(jea.debit)
+               END AS computed_balance
+          FROM journal_entry_accounts jea
+          JOIN journal_entries je ON je.id = jea.journal_entry_id
+          JOIN accounts a ON a.id = jea.account_id
+         WHERE je.status != 'Cancelled'
+         GROUP BY jea.account_id, a."rootType"
+      )
+      SELECT a."accountNumber" AS account_code,
+             a.name AS account_name,
+             c.root_type,
+             a.balance::text AS stored_balance,
+             c.computed_balance::text AS computed_balance
+        FROM computed c
+        JOIN accounts a ON a.id = c.account_id
+       WHERE ABS(a.balance - c.computed_balance) > 0.01
+       ORDER BY ABS(a.balance - c.computed_balance) DESC
+       LIMIT 50
+    `;
+
     await recalculateAccountBalances(tx);
     const count = await tx.account.count();
-    return { fixed: count, message: `Dihitung ulang saldo ${count} akun dari jurnal` };
+
+    return {
+      fixed: count,
+      message: `Dihitung ulang saldo ${count} akun dari jurnal`,
+      snapshot: {
+        driftedAccountsBefore: beforeDrift,
+        totalDrifted: beforeDrift.length,
+        totalAccountsRecalc: count,
+      },
+    };
   }, { timeout: 60000 });
 }
 
 /**
  * Fix orphan ALE: mark orphan entries as cancelled.
+ * Captures snapshot of affected entries for audit.
  */
-async function fixOrphanAle(): Promise<{ fixed: number; message: string }> {
-  const result = await prisma.$executeRaw`
-    UPDATE accounting_ledger_entries ale
-       SET is_cancelled = true
-     WHERE ale.is_cancelled = false
-       AND (
-         (ale.reference_type = 'JournalEntry'
-           AND NOT EXISTS (SELECT 1 FROM journal_entries je WHERE je.id = ale.reference_id))
-         OR
-         (ale.reference_type = 'StockMovement'
-           AND NOT EXISTS (SELECT 1 FROM stock_movements sm WHERE sm.id = ale.reference_id))
-         OR
-         (ale.reference_type = 'StockOpname'
-           AND NOT EXISTS (SELECT 1 FROM stock_opnames so WHERE so.id = ale.reference_id))
-       )
-  `;
+async function fixOrphanAle(): Promise<{ fixed: number; message: string; snapshot: unknown }> {
+  return await prisma.$transaction(async (tx) => {
+    // Capture orphan entries BEFORE marking cancelled
+    const orphansBefore = await tx.$queryRaw<Array<{
+      ale_id: string;
+      reference_type: string;
+      reference_id: string;
+      account_code: string;
+      debit: string;
+      credit: string;
+    }>>`
+      SELECT ale.id AS ale_id,
+             ale.reference_type,
+             ale.reference_id,
+             a."accountNumber" AS account_code,
+             ale.debit::text,
+             ale.credit::text
+        FROM accounting_ledger_entries ale
+        JOIN accounts a ON a.id = ale.account_id
+       WHERE ale.is_cancelled = false
+         AND (
+           (ale.reference_type = 'JournalEntry'
+             AND NOT EXISTS (SELECT 1 FROM journal_entries je WHERE je.id = ale.reference_id))
+           OR
+           (ale.reference_type = 'StockMovement'
+             AND NOT EXISTS (SELECT 1 FROM stock_movements sm WHERE sm.id = ale.reference_id))
+           OR
+           (ale.reference_type = 'StockOpname'
+             AND NOT EXISTS (SELECT 1 FROM stock_opnames so WHERE so.id = ale.reference_id))
+         )
+       LIMIT 100
+    `;
 
-  return { fixed: result, message: `${result} entri ALE orphan ditandai sebagai cancelled` };
+    const result = await tx.$executeRaw`
+      UPDATE accounting_ledger_entries ale
+         SET is_cancelled = true
+       WHERE ale.is_cancelled = false
+         AND (
+           (ale.reference_type = 'JournalEntry'
+             AND NOT EXISTS (SELECT 1 FROM journal_entries je WHERE je.id = ale.reference_id))
+           OR
+           (ale.reference_type = 'StockMovement'
+             AND NOT EXISTS (SELECT 1 FROM stock_movements sm WHERE sm.id = ale.reference_id))
+           OR
+           (ale.reference_type = 'StockOpname'
+             AND NOT EXISTS (SELECT 1 FROM stock_opnames so WHERE so.id = ale.reference_id))
+         )
+    `;
+
+    return {
+      fixed: result,
+      message: `${result} entri ALE orphan ditandai sebagai cancelled`,
+      snapshot: { orphansAffected: orphansBefore, totalAffected: result },
+    };
+  }, { timeout: 60000 });
 }
 
 export default router;
