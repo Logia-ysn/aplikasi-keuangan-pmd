@@ -146,6 +146,30 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
         });
       }
 
+      // Validate stock availability for inventory-linked line items. Aggregate
+      // quantities per inventoryItemId since one invoice may have multiple
+      // lines pointing to the same item.
+      const qtyByItem = new Map<string, number>();
+      for (const it of resolvedItems) {
+        if (!it.inventoryItemId) continue;
+        qtyByItem.set(it.inventoryItemId, (qtyByItem.get(it.inventoryItemId) ?? 0) + it.quantity);
+      }
+      if (qtyByItem.size > 0) {
+        const invItems = await tx.inventoryItem.findMany({
+          where: { id: { in: Array.from(qtyByItem.keys()) } },
+          select: { id: true, name: true, unit: true, currentStock: true, isActive: true },
+        });
+        for (const inv of invItems) {
+          const needed = qtyByItem.get(inv.id) ?? 0;
+          if (!inv.isActive) throw new BusinessError(`Item '${inv.name}' tidak aktif.`);
+          if (Number(inv.currentStock) < needed) {
+            throw new BusinessError(
+              `Stok '${inv.name}' tidak cukup. Tersedia: ${Number(inv.currentStock).toLocaleString('id-ID', { maximumFractionDigits: 3 })} ${inv.unit}, dibutuhkan: ${needed.toLocaleString('id-ID', { maximumFractionDigits: 3 })} ${inv.unit}.`
+            );
+          }
+        }
+      }
+
       const subtotal = resolvedItems.reduce((sum, item) => sum.plus(new Decimal(item.amount)), new Decimal(0));
       // Per-item PPN
       const taxAmount = resolvedItems.reduce((sum, item) => {
@@ -493,15 +517,14 @@ router.post('/:id/cancel', roleMiddleware(['Admin']), async (req: AuthRequest, r
           data: { isCancelled: true },
         });
 
-        // Reverse COGS and inventory balances
-        const hppBeras = await tx.account.findFirst({ where: { accountNumber: '5.1' } });
-        const cogsAccount = hppBeras || await systemAccounts.getAccount('COGS');
-        const inventoryAccount = await systemAccounts.getAccount('INVENTORY');
-        // Sum the COGS amount from journal items
+        // Reverse balances per actual account referenced in the COGS journal.
+        // Each inventory item posts to its own sub-account (1.4.xx), not the
+        // generic INVENTORY parent — use journalItem rows verbatim so every
+        // item-specific account is reversed correctly.
         const cogsItems = await tx.journalItem.findMany({ where: { journalEntryId: cogsJournal.id } });
-        const cogsDebitTotal = cogsItems.reduce((sum, ji) => sum + Number(ji.debit), 0);
-        if (cogsDebitTotal > 0) await updateAccountBalance(tx, cogsAccount.id, 0, cogsDebitTotal);
-        if (cogsDebitTotal > 0) await updateAccountBalance(tx, inventoryAccount.id, cogsDebitTotal, 0);
+        for (const ji of cogsItems) {
+          await updateAccountBalance(tx, ji.accountId, Number(ji.credit), Number(ji.debit));
+        }
       }
 
       // Reverse stock movements created from this invoice

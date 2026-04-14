@@ -354,6 +354,25 @@ export const CreateProductionRunSchema = z.object({
   referenceNumber: z.string().nullable().optional(),
   inputs: z.array(ProductionInputLineSchema).min(1, 'Minimal satu item input.'),
   outputs: z.array(ProductionOutputLineSchema).min(1, 'Minimal satu item output.'),
+}).superRefine((data, ctx) => {
+  // Enforce unit_price > 0 for main Output lines (non-by-product).
+  // This prevents silent dumping of output value into HPP variance when cost is missing.
+  data.outputs.forEach((o, idx) => {
+    if (!o.isByProduct && (o.unitPrice == null || o.unitPrice <= 0)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Harga/HPP produk utama wajib diisi dan lebih dari 0.',
+        path: ['outputs', idx, 'unitPrice'],
+      });
+    }
+    if (o.isByProduct && (o.unitPrice == null || o.unitPrice < 0)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Harga produk sampingan wajib diisi (minimal 0).',
+        path: ['outputs', idx, 'unitPrice'],
+      });
+    }
+  });
 });
 
 export const UpdateProductionRunSchema = CreateProductionRunSchema;

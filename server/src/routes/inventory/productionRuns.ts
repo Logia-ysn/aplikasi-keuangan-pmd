@@ -122,11 +122,16 @@ router.post('/', roleMiddleware(['Admin', 'Accountant', 'StaffProduksi']), async
         }
       }
 
-      // 3. Validate output items exist and are active
+      // 3. Validate output items exist and are active. Enforce unit_price for
+      // main output lines so the value is fully booked to inventory GL (schema
+      // already validates this; this is a defense-in-depth check).
       for (const output of body.outputs) {
         const item = itemMap.get(output.itemId);
         if (!item) throw new BusinessError(`Item output tidak ditemukan.`);
         if (!item.isActive) throw new BusinessError(`Item output '${item.name}' tidak aktif.`);
+        if (!output.isByProduct && (!output.unitPrice || output.unitPrice <= 0)) {
+          throw new BusinessError(`Harga/HPP '${item.name}' wajib diisi dan lebih dari 0.`);
+        }
       }
 
       // 4. Generate run number
@@ -484,6 +489,9 @@ router.put('/:id', roleMiddleware(['Admin', 'Accountant', 'StaffProduksi']), asy
         const item = itemMap.get(output.itemId);
         if (!item) throw new BusinessError('Item output tidak ditemukan.');
         if (!item.isActive) throw new BusinessError(`Item output '${item.name}' tidak aktif.`);
+        if (!output.isByProduct && (!output.unitPrice || output.unitPrice <= 0)) {
+          throw new BusinessError(`Harga/HPP '${item.name}' wajib diisi dan lebih dari 0.`);
+        }
       }
 
       const totalInputQty = body.inputs.reduce((s, i) => s + i.quantity, 0);
