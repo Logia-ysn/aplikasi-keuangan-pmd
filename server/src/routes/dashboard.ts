@@ -466,4 +466,64 @@ router.get('/aging-summary', async (_req, res) => {
   }
 });
 
+// GET /api/dashboard/cash-position — saldo per akun kas/bank
+router.get('/cash-position', async (_req, res) => {
+  try {
+    const cashAccounts = await systemAccounts.getAccounts('CASH');
+    const ids = cashAccounts.map((a) => a.id);
+    if (ids.length === 0) return res.json({ accounts: [], total: 0 });
+
+    const accounts = await prisma.account.findMany({
+      where: { id: { in: ids }, isActive: true, isGroup: false },
+      select: { id: true, accountNumber: true, name: true, balance: true },
+      orderBy: { accountNumber: 'asc' },
+    });
+
+    const data = accounts.map((a) => ({
+      accountId: a.id,
+      accountNumber: a.accountNumber,
+      name: a.name,
+      balance: Number(a.balance),
+    }));
+    const total = data.reduce((s, a) => s + a.balance, 0);
+
+    return res.json({ accounts: data, total });
+  } catch (error) {
+    logger.error({ error }, 'GET /dashboard/cash-position error');
+    return res.status(500).json({ error: 'Gagal mengambil data posisi kas.' });
+  }
+});
+
+// GET /api/dashboard/top-vendors — top 5 vendor by purchase total
+router.get('/top-vendors', async (_req, res) => {
+  try {
+    const results = await prisma.purchaseInvoice.groupBy({
+      by: ['partyId'],
+      where: { status: { notIn: ['Draft', 'Cancelled'] } },
+      _sum: { grandTotal: true },
+      orderBy: { _sum: { grandTotal: 'desc' } },
+      take: 5,
+    });
+
+    const partyIds = results.map((r) => r.partyId);
+    const parties = await prisma.party.findMany({
+      where: { id: { in: partyIds } },
+      select: { id: true, name: true },
+    });
+    const partyMap = new Map(parties.map((p) => [p.id, p.name]));
+
+    const data = results.map((r, i) => ({
+      rank: i + 1,
+      partyId: r.partyId,
+      partyName: partyMap.get(r.partyId) || 'Unknown',
+      total: Number(r._sum.grandTotal || 0),
+    }));
+
+    return res.json(data);
+  } catch (error) {
+    logger.error({ error }, 'GET /dashboard/top-vendors error');
+    return res.status(500).json({ error: 'Gagal mengambil data vendor teratas.' });
+  }
+});
+
 export default router;

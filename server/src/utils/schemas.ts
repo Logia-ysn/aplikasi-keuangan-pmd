@@ -62,6 +62,7 @@ export const CreateSalesInvoiceSchema = z.object({
   labelPotongan: z.string().nullable().optional(),
   labelBiaya: z.string().nullable().optional(),
   terms: z.string().nullable().optional(),
+  allowNegativeStock: z.boolean().optional().default(false),
 });
 
 // ─── Purchase Invoice ─────────────────────────────────────────────────────────

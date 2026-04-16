@@ -1,41 +1,164 @@
 # Keuangan ERP
 
-Aplikasi ERP keuangan berbasis web untuk pengelolaan keuangan perusahaan. Fullstack TypeScript, deploy via Docker.
+**Aplikasi ERP keuangan fullstack TypeScript** untuk pengelolaan akuntansi, penjualan, pembelian, stok, dan pelaporan — dirancang untuk UKM hingga perusahaan manufaktur (*rice mill / pangan*). Double-entry bookkeeping penuh, deploy 1-command via Docker.
 
-## Fitur
+![Stack](https://img.shields.io/badge/stack-React%2019%20%7C%20Express%205%20%7C%20Prisma%207-0ea5e9)
+![Database](https://img.shields.io/badge/database-PostgreSQL%2016-336791)
+![Deploy](https://img.shields.io/badge/deploy-Docker%20Compose-2496ED)
+![License](https://img.shields.io/badge/license-MIT-green)
+
+---
+
+## Daftar Isi
+
+- [Cuplikan Aplikasi](#cuplikan-aplikasi)
+- [Fitur Utama](#fitur-utama)
+- [Tech Stack](#tech-stack)
+- [Quick Start (Docker)](#quick-start-docker)
+- [Perintah Docker Harian](#perintah-docker-harian)
+- [Deploy ke Server / Raspberry Pi](#deploy-ke-server--raspberry-pi)
+- [Arsitektur](#arsitektur-docker)
+- [Akun Sistem (System Account Roles)](#akun-sistem-system-account-roles)
+- [Troubleshooting](#troubleshooting)
+- [Development (tanpa Docker)](#development-tanpa-docker)
+- [Lisensi](#lisensi)
+
+---
+
+## Cuplikan Aplikasi
+
+### Halaman Login
+
+Login modern dengan animasi background jaringan, mendukung role Admin / Accountant / Viewer.
+
+<p align="center">
+  <img src="docs/screenshots/01-login.png" alt="Halaman Login" width="700">
+</p>
+
+### Dashboard
+
+Ringkasan keuangan real-time — kas & bank, piutang, hutang, deposit, persediaan, laba bulan ini — dengan widget yang bisa di-toggle per tab (Overview / Keuangan / Sales / Stok / Produksi).
+
+<p align="center">
+  <img src="docs/screenshots/02-dashboard.png" alt="Dashboard" width="900">
+</p>
+
+### Buku Besar (General Ledger)
+
+Jurnal double-entry dengan filter periode, preset cepat (Hari Ini / Minggu / Bulan / YTD), dan toggle *Sembunyikan yang Dibatalkan* untuk kerapian tampilan.
+
+<p align="center">
+  <img src="docs/screenshots/04-buku-besar.png" alt="Buku Besar" width="900">
+</p>
+
+### Invoice Penjualan & Pembelian
+
+Input per-item dengan PPN, diskon, biaya lain, auto-posting GL (DR Piutang / CR Penjualan atau DR Persediaan / CR Hutang).
+
+<p align="center">
+  <img src="docs/screenshots/05-sales-invoices.png" alt="Invoice Penjualan" width="480">
+  <img src="docs/screenshots/06-purchase-invoices.png" alt="Invoice Pembelian" width="480">
+</p>
+
+### Pembayaran & Alokasi
+
+Penerimaan dan pembayaran dengan auto-alokasi ke invoice outstanding, support split payment (bayar banyak invoice sekaligus), dan refund uang muka.
+
+<p align="center">
+  <img src="docs/screenshots/07-payments.png" alt="Pembayaran" width="900">
+</p>
+
+### Bagan Akun (COA)
+
+Hierarki parent-child, import Excel/CSV dengan saldo awal, ekspor, dan mapping ke 26 role akun sistem (pajak, deposit, depresiasi, dll.).
+
+<p align="center">
+  <img src="docs/screenshots/03-coa.png" alt="COA" width="900">
+</p>
+
+### Pelanggan, Vendor & Stok
+
+Manajemen mitra dengan saldo terutang + deposit, dan inventori dengan produksi rendemen (GKP → beras + bekatul + menir).
+
+<p align="center">
+  <img src="docs/screenshots/08-parties.png" alt="Parties" width="480">
+  <img src="docs/screenshots/09-inventory.png" alt="Inventory" width="480">
+</p>
+
+### Laporan Keuangan
+
+10 laporan siap pakai — Trial Balance, Laba Rugi, Neraca, Arus Kas, Aging (AR/AP), Pajak, Buku Besar, HPP, Jadwal Piutang/Hutang. Semua mendukung drill-down dan export PDF/Excel.
+
+<p align="center">
+  <img src="docs/screenshots/10-reports-index.png" alt="Daftar Laporan" width="900">
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/12-profit-loss.png" alt="Laba Rugi" width="480">
+  <img src="docs/screenshots/13-balance-sheet.png" alt="Neraca" width="480">
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/11-trial-balance.png" alt="Trial Balance" width="480">
+  <img src="docs/screenshots/14-aging-ar.png" alt="Aging Piutang" width="480">
+</p>
+
+### Aset Tetap & Jejak Audit
+
+Register aset tetap dengan depresiasi otomatis per bulan + audit trail setiap mutasi data.
+
+<p align="center">
+  <img src="docs/screenshots/15-fixed-assets.png" alt="Fixed Assets" width="480">
+  <img src="docs/screenshots/16-audit-trail.png" alt="Audit Trail" width="480">
+</p>
+
+### Pengaturan
+
+Kelola profil perusahaan, 26 role akun sistem, backup/restore database, fiscal year, pajak, dan tampilan — semua dari UI tanpa utak-atik kode.
+
+<p align="center">
+  <img src="docs/screenshots/17-settings.png" alt="Settings" width="900">
+</p>
+
+---
+
+## Fitur Utama
 
 | Modul | Deskripsi |
 |---|---|
-| Dashboard | KPI real-time (kas, piutang, hutang, deposit supplier, persediaan, laba), widget toggle, grafik pendapatan vs beban |
-| Bagan Akun | Hierarki COA parent-child, import CSV/Excel dengan saldo awal, auto GL posting |
-| Buku Besar | Jurnal double-entry, filter tanggal, import CSV |
-| Penjualan | Invoice pelanggan, auto-posting GL, PPN, diskon, cancel |
-| Pembelian | Invoice pemasok, auto-posting GL, cancel |
-| Bank & Kas | Penerimaan/pengeluaran, auto-alokasi invoice, cancel |
-| Rekonsiliasi Bank | Cocokkan mutasi bank dengan transaksi buku |
-| Pelanggan & Vendor | Manajemen mitra, saldo terutang, deposit vendor/pelanggan, import Excel dengan saldo awal |
-| Stok & Gudang | Item inventori, mutasi stok, produksi dengan rendemen, import saldo awal stok |
-| Laporan | Trial Balance, Laba Rugi, Neraca, Arus Kas, Aging, Pajak |
-| Drill-down | Klik angka di laporan untuk lihat detail transaksi |
-| Transaksi Berulang | Template jurnal otomatis (harian/mingguan/bulanan) |
-| Notifikasi | Alert invoice overdue, stok rendah, auto-check |
-| Manajemen User | CRUD user, role-based (Admin/Accountant/Viewer) |
-| Jejak Audit | Log aktivitas lengkap dengan filter |
-| Pajak | Konfigurasi PPN/PPh, laporan pajak bulanan |
-| Dark Mode | Toggle light/dark/system |
-| Global Search | Ctrl+K command palette, cari apapun |
-| Keyboard Shortcuts | Ctrl+K, ?, Escape |
-| Onboarding | Setup wizard pertama kali |
-| Backup & Restore | Backup/restore database dari UI, upload backup eksternal |
-| Akun Sistem | 26 role akun konfigurabel (IFRS/GAAP): pajak, diskon, depresiasi, dll |
+| **Dashboard** | KPI real-time, widget toggle, grafik pendapatan vs beban |
+| **Bagan Akun (COA)** | Hierarki parent-child, import/export Excel, auto GL posting |
+| **Buku Besar** | Jurnal double-entry, filter tanggal, hide cancelled, import CSV |
+| **Penjualan** | Invoice pelanggan, auto GL, PPN per-item, diskon, cancel |
+| **Pembelian** | Invoice pemasok, auto GL, cancel |
+| **Bank & Kas** | Penerimaan/pengeluaran, split payment, auto-alokasi invoice |
+| **Rekonsiliasi Bank** | Cocokkan mutasi bank dengan transaksi buku |
+| **Pelanggan & Vendor** | Manajemen mitra, saldo terutang, deposit, import Excel |
+| **Stok & Produksi** | Inventori, mutasi, produksi rendemen, import saldo awal |
+| **Laporan** | Trial Balance, Laba Rugi, Neraca, Arus Kas, Aging, Pajak, HPP |
+| **Drill-down** | Klik angka di laporan → lihat detail transaksi sumber |
+| **Transaksi Berulang** | Template jurnal otomatis (harian/mingguan/bulanan) |
+| **Approval Workflow** | Persetujuan multi-level untuk transaksi tertentu |
+| **Notifikasi** | Alert invoice overdue, stok rendah, auto-check |
+| **Aset Tetap** | Register, depresiasi otomatis per periode |
+| **Jejak Audit** | Log aktivitas lengkap dengan filter |
+| **Pajak** | Konfigurasi PPN/PPh, laporan pajak bulanan |
+| **Dark Mode** | Toggle light/dark/system |
+| **Global Search** | `Ctrl+K` command palette, cari apapun |
+| **PWA** | Installable di mobile/desktop |
+| **Backup & Restore** | Via UI, upload backup eksternal |
+| **Akun Sistem** | 26 role akun konfigurabel (IFRS/GAAP) |
+
+---
 
 ## Tech Stack
 
-- **Frontend**: React 19, TypeScript, Vite, TailwindCSS 4, TanStack Query 5, Recharts
-- **Backend**: Node.js 20, Express 5, TypeScript, Prisma 7
-- **Database**: PostgreSQL 16
-- **Auth**: JWT + bcrypt, role-based (Admin, Accountant, Viewer)
-- **Deploy**: Docker Compose (2 container: app + db)
+- **Frontend** — React 19, TypeScript, Vite 7, TailwindCSS 4, TanStack Query 5, Recharts, @react-pdf/renderer, Sonner, Lucide
+- **Backend** — Node.js 20, Express 5, TypeScript, Prisma 7, Zod, Pino, JWT, bcrypt, helmet, express-rate-limit
+- **Database** — PostgreSQL 16
+- **Auth** — JWT + bcrypt, role-based (Admin / Accountant / Viewer / StaffProduksi)
+- **Testing** — Vitest (unit), Playwright (E2E)
+- **Deploy** — Docker Compose (2 container: `app` + `db`)
 
 ---
 
@@ -53,7 +176,7 @@ git clone https://github.com/Logia-ysn/aplikasi-keuangan-pmd.git
 cd aplikasi-keuangan-pmd
 ```
 
-### 2. Buat file .env
+### 2. Buat file `.env`
 
 ```bash
 cp .env.docker.example .env
@@ -62,18 +185,14 @@ cp .env.docker.example .env
 Edit `.env` — **WAJIB ganti `JWT_SECRET`**:
 
 ```env
-# Database
 POSTGRES_USER=keuangan
 POSTGRES_PASSWORD=keuangan_secret_2026
 POSTGRES_DB=keuangan_db
-
-# Port aplikasi
 PORT=3001
 
-# JWT Secret — WAJIB diganti! Generate: openssl rand -hex 48
+# WAJIB diganti! Generate: openssl rand -hex 48
 JWT_SECRET=paste-hasil-generate-disini
 
-# CORS (tambahkan domain jika pakai reverse proxy)
 ALLOWED_ORIGINS=http://localhost:3001
 ```
 
@@ -89,7 +208,7 @@ openssl rand -hex 48
 docker compose up -d --build
 ```
 
-Tunggu ~30 detik. Cek log untuk memastikan startup sukses:
+Tunggu ~30 detik, lalu cek log:
 
 ```bash
 docker compose logs -f app
@@ -112,7 +231,7 @@ Server running at http://localhost:3001
 http://localhost:3001
 ```
 
-Login default:
+**Login default:**
 
 | Email | Password | Role |
 |---|---|---|
@@ -120,23 +239,16 @@ Login default:
 | `staff@keuangan.local` | `Admin123!` | Accountant |
 | `viewer@keuangan.local` | `Admin123!` | Viewer (read-only) |
 
-> **Ganti password default segera setelah login pertama!**
-> Bisa via menu user di header → "Ganti Password", atau via Onboarding Wizard.
+> **Ganti password default segera setelah login pertama!** Bisa via menu user di header → "Ganti Password", atau via Onboarding Wizard.
 
 ---
 
-## Perintah Docker
-
-### Operasional harian
+## Perintah Docker Harian
 
 ```bash
-# Start
+# Start / stop / restart
 docker compose up -d
-
-# Stop
 docker compose down
-
-# Restart
 docker compose restart
 
 # Lihat log
@@ -188,32 +300,28 @@ docker compose up -d --build   # fresh start + auto-seed
 ### Opsi 1: Docker Compose (Recommended)
 
 ```bash
-# Di server
 git clone https://github.com/Logia-ysn/aplikasi-keuangan-pmd.git
 cd aplikasi-keuangan-pmd
 
-# Setup environment
 cp .env.docker.example .env
 nano .env   # Set JWT_SECRET dan ALLOWED_ORIGINS
 
-# Build & jalankan
 docker compose up -d --build
 ```
 
-### Opsi 2: Dengan Cloudflare Tunnel
+### Opsi 2: Cloudflare Tunnel
 
 ```bash
 # .env
 ALLOWED_ORIGINS=http://localhost:3001,https://keuangan.yourdomain.com
 
-# Jalankan app
 docker compose up -d --build
 
-# Setup Cloudflare Tunnel (di terminal terpisah)
+# Terminal terpisah
 cloudflared tunnel --url http://localhost:3001
 ```
 
-### Opsi 3: Dengan reverse proxy (Nginx)
+### Opsi 3: Reverse proxy (Nginx)
 
 ```nginx
 server {
@@ -249,10 +357,10 @@ docker compose up -d
               └── Serve: Express API + React SPA
 ```
 
-### Apa yang terjadi saat `docker compose up --build`:
+**Yang terjadi saat `docker compose up --build`:**
 
-1. **db** container start, PostgreSQL siap
-2. **app** container start, menunggu db healthy
+1. Container `db` start, PostgreSQL siap
+2. Container `app` start, menunggu db healthy
 3. `prisma migrate deploy` — jalankan migrasi database
 4. Cek jumlah user — jika 0, jalankan seed (COA, user admin, fiscal year)
 5. Express server start di port 3001
@@ -262,12 +370,12 @@ docker compose up -d
 
 ## Akun Sistem (System Account Roles)
 
-Akun-akun ini digunakan oleh sistem untuk auto GL posting. Semua bisa dikonfigurasi via **Pengaturan > Akun Sistem**.
+Akun-akun ini digunakan oleh sistem untuk auto GL posting. Semua bisa dikonfigurasi via **Pengaturan > Akun Sistem** tanpa mengubah kode — jadi bisa dipakai untuk berbagai jenis industri.
 
 | Grup | Role | Default COA | Fungsi |
 |---|---|---|---|
 | **Kas & Bank** | CASH (multi) | 1.1.1–1.1.5 | Akun kas/bank untuk pembayaran |
-| **Piutang & Hutang** | AR, AP | 1.2.1, 2.1.1 | Auto-posting invoice penjualan/pembelian |
+| **Piutang & Hutang** | AR, AP | 1.2.1, 2.1.1 | Auto-posting invoice |
 | | ALLOWANCE_DOUBTFUL | 1.2.5 | Cadangan kerugian piutang |
 | | BAD_DEBT_EXPENSE | 6.27 | Beban piutang tak tertagih |
 | **Persediaan & HPP** | INVENTORY, COGS | 1.4.0, 5 | Persediaan & HPP |
@@ -278,7 +386,7 @@ Akun-akun ini digunakan oleh sistem untuk auto GL posting. Semua bisa dikonfigur
 | **Deposit** | VENDOR_DEPOSIT, CUSTOMER_DEPOSIT | 1.3, 2.1.2 | Uang muka vendor/pelanggan |
 | **Aset Tetap** | FIXED_ASSET (multi) | 1.6.1–1.6.5 | Aset tetap per kategori |
 | | ACCUM_DEPRECIATION (multi) | 1.7.1–1.7.4 | Akumulasi penyusutan |
-| | DEPRECIATION_EXPENSE (multi) | 6.21–6.24 | Beban penyusutan periodik |
+| | DEPRECIATION_EXPENSE (multi) | 6.21–6.24 | Beban penyusutan |
 | **Bank & Bunga** | BANK_CHARGE, INTEREST_EXPENSE | 8.2, 8.1 | Biaya bank & bunga pinjaman |
 | | INTEREST_INCOME | 7.1 | Pendapatan bunga |
 | **Selisih Kurs** | FX_GAIN_LOSS, FX_UNREALIZED | 8.4, 8.5 | Laba/rugi kurs |
@@ -289,8 +397,6 @@ Akun-akun ini digunakan oleh sistem untuk auto GL posting. Semua bisa dikonfigur
 | | ROUNDING_ACCOUNT | 8.8 | Pembulatan & selisih |
 | **Ekuitas** | OPENING_EQUITY, RETAINED_EARNINGS | 3.1, 3.2 | Saldo awal & laba ditahan |
 | | CURRENT_PROFIT, OWNER_DRAWING | 3.4, 3.5 | Laba berjalan & prive |
-
-> Mapping akun bisa diubah kapan saja via UI tanpa ubah kode. Mendukung berbagai jenis industri.
 
 ---
 
@@ -310,7 +416,6 @@ Penyebab umum:
 ### Lupa password admin
 
 ```bash
-# Reset via Docker
 docker compose exec app node -e "
   const bcrypt = require('bcrypt');
   const { PrismaClient } = require('@prisma/client');
@@ -344,8 +449,6 @@ Migrasi database dijalankan otomatis saat container start. Data aman.
 
 ## Development (tanpa Docker)
 
-Untuk kontributor yang ingin develop tanpa Docker:
-
 ```bash
 # 1. Jalankan PostgreSQL via Docker (database saja)
 docker compose up -d db
@@ -362,6 +465,19 @@ npm run dev             # http://localhost:3001
 cd client
 npm install
 npm run dev             # http://localhost:5173
+```
+
+### Script lain
+
+```bash
+# Server
+npm run build            # Compile TypeScript
+npm run test             # Vitest unit tests
+npm run prisma:generate  # Regenerate Prisma client
+
+# Client
+npm run build            # Vite production build
+npm run lint             # ESLint
 ```
 
 ---

@@ -25,6 +25,21 @@ const formatNumber = (val: number | string, decimals = 0) =>
 const formatRupiah = (value: number) =>
   new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(value);
 
+const formatRupiahCompact = (value: number): string => {
+  const abs = Math.abs(value);
+  const sign = value < 0 ? '-' : '';
+  if (abs >= 1_000_000_000_000) {
+    return `${sign}Rp ${(abs / 1_000_000_000_000).toLocaleString('id-ID', { maximumFractionDigits: 2 })} T`;
+  }
+  if (abs >= 1_000_000_000) {
+    return `${sign}Rp ${(abs / 1_000_000_000).toLocaleString('id-ID', { maximumFractionDigits: 2 })} M`;
+  }
+  if (abs >= 10_000_000) {
+    return `${sign}Rp ${(abs / 1_000_000).toLocaleString('id-ID', { maximumFractionDigits: 1 })} Jt`;
+  }
+  return formatRupiah(value);
+};
+
 // ---------------------------------------------------------------------------
 // Sub-components
 // ---------------------------------------------------------------------------
@@ -40,27 +55,34 @@ interface KpiCardProps {
 }
 
 function KpiCard({ title, value, icon: Icon, bgClass, iconClass, loading, format = 'number' }: KpiCardProps) {
+  const isRupiah = format === 'rupiah';
+  const displayValue = isRupiah ? formatRupiahCompact(value) : formatNumber(value);
+  const titleAttr = isRupiah ? formatRupiah(value) : undefined;
   return (
     <div
-      className="border rounded-xl p-5"
+      className="border rounded-xl p-5 min-w-0"
       style={{ backgroundColor: 'var(--color-bg-primary)', borderColor: 'var(--color-border)' }}
     >
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-4 gap-2">
         <span
-          className="text-xs font-medium uppercase tracking-wide"
+          className="text-xs font-medium uppercase tracking-wide truncate"
           style={{ color: 'var(--color-text-muted)' }}
         >
           {title}
         </span>
-        <div className={cn('w-8 h-8 rounded-lg flex items-center justify-center', bgClass)}>
+        <div className={cn('w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0', bgClass)}>
           <Icon size={16} className={iconClass} />
         </div>
       </div>
       {loading ? (
         <Loader2 className="w-5 h-5 animate-spin" style={{ color: 'var(--color-text-muted)' }} />
       ) : (
-        <p className="text-2xl font-semibold tabular-nums" style={{ color: 'var(--color-text-primary)' }}>
-          {format === 'rupiah' ? formatRupiah(value) : formatNumber(value)}
+        <p
+          className="text-xl xl:text-2xl font-semibold tabular-nums truncate leading-tight"
+          style={{ color: 'var(--color-text-primary)' }}
+          title={titleAttr}
+        >
+          {displayValue}
         </p>
       )}
     </div>

@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo } from 'react';
-import { Settings2 } from 'lucide-react';
+import { Settings2, LayoutDashboard, DollarSign, TrendingUp, Package, Factory } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import api from '../lib/api';
 import { useCompanySettings } from '../contexts/CompanySettingsContext';
@@ -22,14 +22,25 @@ import FinancialRatios from '../components/widgets/FinancialRatios';
 import MonthlyProfitChart from '../components/widgets/MonthlyProfitChart';
 import CashFlowChart from '../components/widgets/CashFlowChart';
 import AgingSummary from '../components/widgets/AgingSummary';
+import CashPositionWidget from '../components/widgets/CashPositionWidget';
+import TopVendors from '../components/widgets/TopVendors';
+import RendemenTrendChart from '../components/widgets/RendemenTrendChart';
+import CogsBackfillWidget from '../components/widgets/CogsBackfillWidget';
 import DashboardSettings, { DEFAULT_WIDGETS, type WidgetConfig } from '../components/DashboardSettings';
+import DashboardSectionNav, { type SectionDef } from '../components/DashboardSectionNav';
 
 // Widget IDs only visible to finance roles (not StaffProduksi)
 const FINANCE_WIDGET_IDS = new Set([
   'revenue-chart', 'recent-activities', 'top-customers',
   'overdue-invoices', 'expense-breakdown',
   'financial-ratios', 'monthly-profit', 'cash-flow-summary', 'aging-summary',
+  'cash-position', 'top-vendors',
 ]);
+
+const KEUANGAN_WIDGETS = ['revenue-chart', 'monthly-profit', 'cash-flow-summary', 'financial-ratios', 'expense-breakdown', 'aging-summary', 'overdue-invoices', 'top-vendors'];
+const SALES_WIDGETS = ['top-customers', 'recent-activities'];
+const STOK_WIDGETS = ['warehouse-kpi', 'stock-alert', 'movement-trend', 'category-distribution', 'top-items', 'recent-movements', 'cogs-backfill'];
+const PRODUKSI_WIDGETS = ['production-stats', 'rendemen-trend'];
 
 const STORAGE_KEY = 'dashboard-widgets';
 
@@ -43,6 +54,34 @@ function loadWidgetPrefs(): Record<string, boolean> {
 
 function saveWidgetPrefs(prefs: Record<string, boolean>) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(prefs));
+}
+
+interface SectionHeaderProps {
+  icon: React.ElementType;
+  title: string;
+  subtitle?: string;
+}
+
+function SectionHeader({ icon: Icon, title, subtitle }: SectionHeaderProps) {
+  return (
+    <div className="flex items-center gap-3 pt-2 pb-1">
+      <div
+        className="w-8 h-8 rounded-lg flex items-center justify-center"
+        style={{ backgroundColor: 'var(--color-bg-primary)', border: '1px solid var(--color-border)' }}
+      >
+        <Icon size={16} style={{ color: 'var(--color-text-secondary)' }} />
+      </div>
+      <div>
+        <h2 className="text-sm font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-primary)' }}>
+          {title}
+        </h2>
+        {subtitle && (
+          <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>{subtitle}</p>
+        )}
+      </div>
+      <div className="h-px flex-1 ml-2" style={{ backgroundColor: 'var(--color-border)' }} />
+    </div>
+  );
 }
 
 export const Dashboard = () => {
@@ -78,6 +117,11 @@ export const Dashboard = () => {
       return w?.enabled ?? true;
     },
     [widgets]
+  );
+
+  const anyEnabled = useCallback(
+    (ids: string[]) => ids.some((id) => isEnabled(id)),
+    [isEnabled]
   );
 
   const handleToggle = useCallback(
@@ -117,6 +161,20 @@ export const Dashboard = () => {
     },
   });
 
+  const showKeuangan = !isStaffProduksi && anyEnabled(KEUANGAN_WIDGETS);
+  const showSales = !isStaffProduksi && anyEnabled(SALES_WIDGETS);
+  const showStok = anyEnabled(STOK_WIDGETS);
+  const showProduksi = anyEnabled(PRODUKSI_WIDGETS);
+
+  const sections: SectionDef[] = useMemo(() => {
+    const list: SectionDef[] = [{ id: 'overview', label: 'Overview', icon: LayoutDashboard }];
+    if (showKeuangan) list.push({ id: 'keuangan', label: 'Keuangan', icon: DollarSign });
+    if (showSales) list.push({ id: 'sales', label: 'Sales', icon: TrendingUp });
+    if (showStok) list.push({ id: 'stok', label: 'Stok', icon: Package });
+    if (showProduksi) list.push({ id: 'produksi', label: 'Produksi', icon: Factory });
+    return list;
+  }, [showKeuangan, showSales, showStok, showProduksi]);
+
   return (
     <div className="space-y-6 pb-8">
       {/* Page Header */}
@@ -146,94 +204,143 @@ export const Dashboard = () => {
         </div>
       </div>
 
-      {/* ── Finance Dashboard (non-StaffProduksi) ── */}
-      {!isStaffProduksi && (
-        <>
-          {/* KPI Cards (always shown) */}
-          <KPICards data={metrics} loading={isMetricsLoading} />
+      {/* Sticky Section Nav */}
+      <DashboardSectionNav sections={sections} />
 
-          {/* Widget Grid: Revenue Chart + Recent Activities / Top Customers */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            {isEnabled('revenue-chart') && (
-              <div className="lg:col-span-2">
+      {/* ─────────── SECTION: OVERVIEW ─────────── */}
+      <section id="overview" className="space-y-4 scroll-mt-20">
+        <SectionHeader
+          icon={LayoutDashboard}
+          title="Overview"
+          subtitle="Ringkasan performa utama"
+        />
+        <KPICards data={metrics} loading={isMetricsLoading} />
+        {!isStaffProduksi && isEnabled('cash-position') && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <CashPositionWidget />
+          </div>
+        )}
+      </section>
+
+      {/* ─────────── SECTION: KEUANGAN ─────────── */}
+      {showKeuangan && (
+        <section id="keuangan" className="space-y-4 scroll-mt-20">
+          <SectionHeader
+            icon={DollarSign}
+            title="Keuangan"
+            subtitle="Pendapatan, laba, arus kas & rasio"
+          />
+
+          {(isEnabled('revenue-chart') || isEnabled('monthly-profit')) && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {isEnabled('revenue-chart') && (
                 <RevenueChart data={chartData} loading={isChartsLoading} />
-              </div>
-            )}
+              )}
+              {isEnabled('monthly-profit') && <MonthlyProfitChart />}
+            </div>
+          )}
+
+          {(isEnabled('cash-flow-summary') || isEnabled('financial-ratios') || isEnabled('expense-breakdown')) && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {isEnabled('cash-flow-summary') && <CashFlowChart />}
+              {isEnabled('financial-ratios') && <FinancialRatios />}
+              {isEnabled('expense-breakdown') && <ExpenseBreakdown />}
+            </div>
+          )}
+
+          {(isEnabled('aging-summary') || isEnabled('overdue-invoices')) && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {isEnabled('aging-summary') && <AgingSummary />}
+              {isEnabled('overdue-invoices') && <OverdueInvoices />}
+            </div>
+          )}
+
+          {isEnabled('top-vendors') && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <TopVendors />
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* ─────────── SECTION: SALES ─────────── */}
+      {showSales && (
+        <section id="sales" className="space-y-4 scroll-mt-20">
+          <SectionHeader
+            icon={TrendingUp}
+            title="Sales"
+            subtitle="Pelanggan & aktivitas pembayaran"
+          />
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {isEnabled('top-customers') && <TopCustomers />}
             {isEnabled('recent-activities') && (
               <RecentActivities data={recentActivities || null} />
             )}
           </div>
-
-          {/* Second row of widgets */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {isEnabled('top-customers') && <TopCustomers />}
-            {isEnabled('overdue-invoices') && <OverdueInvoices />}
-            {isEnabled('expense-breakdown') && <ExpenseBreakdown />}
-          </div>
-
-          {/* Third row: Financial insights */}
-          {(isEnabled('monthly-profit') || isEnabled('cash-flow-summary') || isEnabled('financial-ratios') || isEnabled('aging-summary')) && (
-            <>
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                {isEnabled('monthly-profit') && (
-                  <div className="lg:col-span-2">
-                    <MonthlyProfitChart />
-                  </div>
-                )}
-                {isEnabled('cash-flow-summary') && <CashFlowChart />}
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {isEnabled('financial-ratios') && <FinancialRatios />}
-                {isEnabled('aging-summary') && <AgingSummary />}
-              </div>
-            </>
-          )}
-        </>
+        </section>
       )}
 
-      {/* Stock Alert */}
-      {isEnabled('stock-alert') && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <StockAlert />
-        </div>
-      )}
-
-      {/* ── Warehouse Section ── */}
-      {(isEnabled('warehouse-kpi') || isEnabled('movement-trend') || isEnabled('category-distribution') || isEnabled('top-items') || isEnabled('recent-movements') || isEnabled('production-stats')) && (
-        <>
-          {/* Section Divider (only for non-StaffProduksi since it's the main content for them) */}
-          {!isStaffProduksi && (
-            <div className="flex items-center gap-3 pt-2">
-              <div className="h-px flex-1" style={{ backgroundColor: 'var(--color-border)' }} />
-              <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
-                Gudang & Inventori
-              </span>
-              <div className="h-px flex-1" style={{ backgroundColor: 'var(--color-border)' }} />
-            </div>
-          )}
+      {/* ─────────── SECTION: STOK & GUDANG ─────────── */}
+      {showStok && (
+        <section id="stok" className="space-y-4 scroll-mt-20">
+          <SectionHeader
+            icon={Package}
+            title="Stok & Gudang"
+            subtitle="Inventori, pergerakan & peringatan stok"
+          />
 
           {isEnabled('warehouse-kpi') && <WarehouseKPICards />}
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            {isEnabled('movement-trend') && (
-              <div className="lg:col-span-2">
-                <MovementTrendChart />
-              </div>
-            )}
-            {isEnabled('category-distribution') && <CategoryDistribution />}
-          </div>
+          {(isEnabled('movement-trend') || isEnabled('category-distribution')) && (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              {isEnabled('movement-trend') && (
+                <div className="lg:col-span-2">
+                  <MovementTrendChart />
+                </div>
+              )}
+              {isEnabled('category-distribution') && <CategoryDistribution />}
+            </div>
+          )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {isEnabled('top-items') && <TopItemsByStock />}
-            {isEnabled('recent-movements') && <RecentMovements />}
-          </div>
+          {(isEnabled('top-items') || isEnabled('recent-movements')) && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {isEnabled('top-items') && <TopItemsByStock />}
+              {isEnabled('recent-movements') && <RecentMovements />}
+            </div>
+          )}
+
+          {isEnabled('stock-alert') && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <StockAlert />
+            </div>
+          )}
+
+          {isEnabled('cogs-backfill') && <CogsBackfillWidget />}
+        </section>
+      )}
+
+      {/* ─────────── SECTION: PRODUKSI ─────────── */}
+      {showProduksi && (
+        <section id="produksi" className="space-y-4 scroll-mt-20">
+          <SectionHeader
+            icon={Factory}
+            title="Produksi"
+            subtitle="Statistik produksi & rendemen"
+          />
 
           {isEnabled('production-stats') && (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
               <ProductionStatsWidget />
             </div>
           )}
-        </>
+
+          {isEnabled('rendemen-trend') && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <RendemenTrendChart />
+            </div>
+          )}
+        </section>
       )}
 
       {/* Dashboard Settings Modal */}

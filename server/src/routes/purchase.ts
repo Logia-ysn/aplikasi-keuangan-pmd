@@ -12,6 +12,7 @@ import { BusinessError, handleRouteError } from '../utils/errors';
 import { systemAccounts } from '../services/systemAccounts';
 import { logger } from '../lib/logger';
 import { calcWeightedAverage } from '../utils/weightedAverage';
+import { settleCogsBackfillForItem } from '../services/cogsBackfillService';
 import {
   computePurchaseItem,
   sumPotonganItem,
@@ -353,6 +354,17 @@ router.post('/', roleMiddleware(['Admin', 'Accountant', 'StaffProduksi']), async
         });
 
         logger.info({ invoiceId: invoice.id, itemId: inventoryItem.id, qty: Number(item.quantity) }, 'Auto stock movement from purchase');
+
+        // Auto-settle pending COGS backfill (sales sebelumnya yang minus stok)
+        await settleCogsBackfillForItem(tx, {
+          itemId: inventoryItem.id,
+          qtyAvailable: Number(item.quantity),
+          unitCostNow: unitCost,
+          fiscalYearId: fiscalYear.id,
+          userId: req.user!.userId,
+          settleDate: parsedDate,
+          source: { type: 'PurchaseInvoice', refId: invoice.id, refNo: invoice.invoiceNumber },
+        });
       }
 
       return invoice;

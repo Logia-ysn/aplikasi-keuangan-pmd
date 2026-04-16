@@ -49,7 +49,7 @@ const InvoiceDetailDrawer: React.FC<Props> = ({ type, invoiceId, onClose, onEdit
   const [editTerms, setEditTerms] = useState('');
   const [isMerging, setIsMerging] = useState(false);
   const endpoint = isSales ? '/sales/invoices' : '/purchase/invoices';
-  const canHaveAttachments = type === 'purchase';
+  const canHaveAttachments = type === 'purchase' || type === 'sales';
 
   const { data: invoice, isLoading } = useQuery({
     queryKey: [type === 'sales' ? 'sales-invoice-detail' : 'purchase-invoice-detail', invoiceId],
@@ -98,11 +98,11 @@ const InvoiceDetailDrawer: React.FC<Props> = ({ type, invoiceId, onClose, onEdit
     onError: (err: any) => toast.error(err.response?.data?.error || 'Gagal memperbarui invoice.'),
   });
 
-  // Attachments (purchase invoice only for now)
+  const attachmentRefType = isSales ? 'sales_invoice' : 'purchase_invoice';
   const { data: attachments = [] } = useQuery({
-    queryKey: ['pi-attachments', invoiceId],
+    queryKey: ['invoice-attachments', attachmentRefType, invoiceId],
     queryFn: async () => {
-      const res = await api.get(`/attachments/purchase_invoice/${invoiceId}`);
+      const res = await api.get(`/attachments/${attachmentRefType}/${invoiceId}`);
       return res.data as Array<{ id: string; fileName: string; mimeType: string; fileSize: number }>;
     },
     enabled: !!invoiceId && canHaveAttachments,
@@ -111,13 +111,13 @@ const InvoiceDetailDrawer: React.FC<Props> = ({ type, invoiceId, onClose, onEdit
   const uploadAttachmentMutation = useMutation({
     mutationFn: async (files: File[]) => {
       const fd = new FormData();
-      fd.append('referenceType', 'purchase_invoice');
+      fd.append('referenceType', attachmentRefType);
       fd.append('referenceId', invoiceId!);
       for (const f of files) fd.append('files', f);
       await api.post('/attachments/upload', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['pi-attachments', invoiceId] });
+      queryClient.invalidateQueries({ queryKey: ['invoice-attachments', attachmentRefType, invoiceId] });
       toast.success('Lampiran berhasil diupload.');
     },
     onError: (err: any) => toast.error(err.response?.data?.error || 'Gagal upload lampiran.'),
@@ -126,7 +126,7 @@ const InvoiceDetailDrawer: React.FC<Props> = ({ type, invoiceId, onClose, onEdit
   const deleteAttachmentMutation = useMutation({
     mutationFn: (id: string) => api.delete(`/attachments/${id}`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['pi-attachments', invoiceId] });
+      queryClient.invalidateQueries({ queryKey: ['invoice-attachments', attachmentRefType, invoiceId] });
       toast.success('Lampiran dihapus.');
     },
     onError: (err: any) => toast.error(err.response?.data?.error || 'Gagal hapus lampiran.'),

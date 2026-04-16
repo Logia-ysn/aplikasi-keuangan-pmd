@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { Search, ChevronDown, X } from 'lucide-react';
 
 export interface SelectOption {
@@ -20,6 +21,7 @@ const SearchableSelect = ({ options, value, onChange, placeholder = 'â€” Pilih â
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [highlightIdx, setHighlightIdx] = useState(-1);
+  const [menuRect, setMenuRect] = useState<{ top: number; left: number; width: number; openUp: boolean } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -67,16 +69,43 @@ const SearchableSelect = ({ options, value, onChange, placeholder = 'â€” Pilih â
     close();
   }, [onChange, close]);
 
-  // Close on click outside
+  // Close on click outside (allow clicks inside the portalled menu)
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        close();
-      }
+      const target = e.target as Node;
+      if (containerRef.current?.contains(target)) return;
+      if (listRef.current?.contains(target)) return;
+      close();
     };
     if (isOpen) document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [isOpen, close]);
+
+  // Position menu via fixed coords so it isn't clipped by parent overflow
+  useEffect(() => {
+    if (!isOpen) { setMenuRect(null); return; }
+    const update = () => {
+      const el = containerRef.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      const MENU_MAX = 240;
+      const spaceBelow = window.innerHeight - r.bottom;
+      const openUp = spaceBelow < MENU_MAX && r.top > spaceBelow;
+      setMenuRect({
+        top: openUp ? r.top - 4 : r.bottom + 4,
+        left: r.left,
+        width: r.width,
+        openUp,
+      });
+    };
+    update();
+    window.addEventListener('scroll', update, true);
+    window.addEventListener('resize', update);
+    return () => {
+      window.removeEventListener('scroll', update, true);
+      window.removeEventListener('resize', update);
+    };
+  }, [isOpen]);
 
   // Scroll highlighted into view
   useEffect(() => {
@@ -144,11 +173,19 @@ const SearchableSelect = ({ options, value, onChange, placeholder = 'â€” Pilih â
         </div>
       )}
 
-      {/* Dropdown */}
-      {isOpen && (
+      {/* Dropdown â€” portalled to body so parent overflow can't clip it */}
+      {isOpen && menuRect && createPortal(
         <div
           ref={listRef}
-          className="absolute z-50 mt-1 w-full max-h-60 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg"
+          style={{
+            position: 'fixed',
+            top: menuRect.openUp ? undefined : menuRect.top,
+            bottom: menuRect.openUp ? window.innerHeight - menuRect.top : undefined,
+            left: menuRect.left,
+            width: menuRect.width,
+            maxHeight: 240,
+          }}
+          className="z-[200] overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg"
         >
           {flatFiltered.length === 0 ? (
             <div className="px-3 py-4 text-xs text-gray-400 text-center">Tidak ditemukan</div>
@@ -182,7 +219,8 @@ const SearchableSelect = ({ options, value, onChange, placeholder = 'â€” Pilih â
               </div>
             ))
           )}
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );

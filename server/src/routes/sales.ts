@@ -163,8 +163,14 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
           const needed = qtyByItem.get(inv.id) ?? 0;
           if (!inv.isActive) throw new BusinessError(`Item '${inv.name}' tidak aktif.`);
           if (Number(inv.currentStock) < needed) {
-            throw new BusinessError(
-              `Stok '${inv.name}' tidak cukup. Tersedia: ${Number(inv.currentStock).toLocaleString('id-ID', { maximumFractionDigits: 3 })} ${inv.unit}, dibutuhkan: ${needed.toLocaleString('id-ID', { maximumFractionDigits: 3 })} ${inv.unit}.`
+            if (!body.allowNegativeStock) {
+              throw new BusinessError(
+                `Stok '${inv.name}' tidak cukup. Tersedia: ${Number(inv.currentStock).toLocaleString('id-ID', { maximumFractionDigits: 3 })} ${inv.unit}, dibutuhkan: ${needed.toLocaleString('id-ID', { maximumFractionDigits: 3 })} ${inv.unit}.`
+              );
+            }
+            logger.warn(
+              { itemId: inv.id, itemName: inv.name, available: Number(inv.currentStock), needed, partyId: body.partyId },
+              'Sales invoice posted with insufficient stock (allowNegativeStock=true)'
             );
           }
         }
@@ -323,11 +329,33 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
         if (!inventoryItem || !inventoryItem.isActive) continue;
 
         const qty = Number(item.quantity);
+        const stockBefore = Number(inventoryItem.currentStock);
 
         // Use weighted average cost for COGS (not selling price)
         const avgCost = Number(inventoryItem.averageCost);
         const cogsUnitCost = avgCost > 0 ? avgCost : 0;
         const cogsAmount = new Decimal(qty).times(new Decimal(cogsUnitCost)).toDecimalPlaces(2).toNumber();
+
+        // Track deficit for auto-COGS-backfill when stock-in arrives later
+        if (body.allowNegativeStock && stockBefore < qty) {
+          const deficitQty = qty - Math.max(0, stockBefore);
+          await tx.cogsBackfillQueue.create({
+            data: {
+              salesInvoiceId: invoice.id,
+              salesInvoiceItemId: item.id,
+              inventoryItemId: inventoryItem.id,
+              qtyPending: deficitQty,
+              qtyOriginal: deficitQty,
+              costAtSale: cogsUnitCost,
+              fiscalYearId: fiscalYear.id,
+              status: 'Pending',
+            },
+          });
+          logger.info(
+            { invoiceId: invoice.id, itemId: inventoryItem.id, deficitQty, costAtSale: cogsUnitCost },
+            'COGS backfill queued (negative stock sale)',
+          );
+        }
 
         // Reduce stock (averageCost unchanged on stock out)
         await tx.inventoryItem.update({

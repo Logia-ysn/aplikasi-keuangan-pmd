@@ -10,6 +10,7 @@ import { updateAccountBalance, recalculateAccountBalances } from '../../utils/ac
 import { systemAccounts } from '../../services/systemAccounts';
 import { logger } from '../../lib/logger';
 import { calcWeightedAverage } from '../../utils/weightedAverage';
+import { settleCogsBackfillForItem } from '../../services/cogsBackfillService';
 
 const router = Router();
 
@@ -222,6 +223,19 @@ router.post('/', roleMiddleware(['Admin', 'Accountant', 'StaffProduksi']), async
           item: { select: { id: true, name: true, code: true, unit: true } },
         },
       });
+
+      // 9. Auto-settle pending COGS backfill on stock-in
+      if (isIn) {
+        await settleCogsBackfillForItem(tx, {
+          itemId: item.id,
+          qtyAvailable: qty,
+          unitCostNow: unitCost,
+          fiscalYearId: fiscalYear.id,
+          userId: req.user!.userId,
+          settleDate: movementDate,
+          source: { type: 'StockMovement', refId: movement.id, refNo: movementNumber },
+        });
+      }
 
       return movement;
     }, { timeout: 15000 });

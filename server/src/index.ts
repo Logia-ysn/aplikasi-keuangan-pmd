@@ -40,6 +40,7 @@ import stockOpnameRoutes from './routes/stockOpname';
 import healthCheckRoutes from './routes/healthCheck';
 import fixedAssetRoutes from './routes/fixedAssets';
 import approvalRoutes from './routes/approvals';
+import cogsBackfillRoutes from './routes/cogsBackfill';
 import { systemAccounts } from './services/systemAccounts';
 
 const app = express();
@@ -158,6 +159,7 @@ app.use('/api/stock-opname', stockOpnameRoutes);
 app.use('/api/health-check', healthCheckRoutes);
 app.use('/api/fixed-assets', fixedAssetRoutes);
 app.use('/api/approvals', approvalRoutes);
+app.use('/api/cogs-backfill', cogsBackfillRoutes);
 
 // ─── Serve Frontend (Production) ──────────────────────────────────────────────
 // In production, serve the built React client from ../client/dist

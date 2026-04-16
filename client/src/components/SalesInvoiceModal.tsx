@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../lib/api';
-import { X, Plus, Trash2, Loader2, AlertCircle, ChevronDown } from 'lucide-react';
+import { X, Plus, Trash2, Loader2, AlertCircle, ChevronDown, Paperclip, FileText, Image as ImageIcon } from 'lucide-react';
 import { formatRupiah } from '../lib/formatters';
+import SearchableSelect, { type SelectOption } from './SearchableSelect';
 
 
 interface InvoiceItem {
@@ -20,6 +21,10 @@ interface InvoiceItem {
   taxPct: number;   // PPN % per item
   pphPct: number;   // PPh % per item
 }
+
+const MAX_ATTACHMENTS = 5;
+const MAX_FILE_SIZE = 5 * 1024 * 1024;
+const ALLOWED_MIME = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
 
 const UNITS = ['Kg', 'Ton', 'Sak', 'Liter', 'Pcs', 'Box', 'Unit', 'Set', 'Meter', 'Jasa'];
 
@@ -45,6 +50,8 @@ const SalesInvoiceModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
   const [labelPotongan, setLabelPotongan] = useState('Potongan');
   const [labelBiaya, setLabelBiaya] = useState('Biaya Lain');
   const [items, setItems] = useState<InvoiceItem[]>([defaultItem()]);
+  const [allowNegativeStock, setAllowNegativeStock] = useState(false);
+  const [stagedFiles, setStagedFiles] = useState<File[]>([]);
   const [error, setError] = useState('');
 
   const queryClient = useQueryClient();
@@ -76,8 +83,43 @@ const SalesInvoiceModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
 
   const selectedParty = parties?.find((p: any) => p.id === partyId);
 
+  const inventoryOptions = useMemo<SelectOption[]>(
+    () =>
+      (inventoryItems ?? []).map((inv: any) => ({
+        value: inv.id,
+        label: `${inv.code} — ${inv.name} (${inv.currentStock} ${inv.unit})`,
+      })),
+    [inventoryItems],
+  );
+
+  const serviceOptions = useMemo<SelectOption[]>(
+    () =>
+      (serviceItems ?? []).map((svc: any) => ({
+        value: svc.id,
+        label: `${svc.code} — ${svc.name} (${svc.unit})`,
+      })),
+    [serviceItems],
+  );
+
   const mutation = useMutation({
-    mutationFn: (data: any) => api.post('/sales/invoices', data),
+    mutationFn: async (data: any) => {
+      const res = await api.post('/sales/invoices', data);
+      const invoice = res.data;
+      if (stagedFiles.length > 0 && invoice?.id) {
+        const fd = new FormData();
+        fd.append('referenceType', 'sales_invoice');
+        fd.append('referenceId', invoice.id);
+        for (const f of stagedFiles) fd.append('files', f);
+        try {
+          await api.post('/attachments/upload', fd, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+          });
+        } catch (err) {
+          console.warn('Upload lampiran gagal:', err);
+        }
+      }
+      return invoice;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['sales-invoices'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-metrics'] });
@@ -85,6 +127,7 @@ const SalesInvoiceModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
       queryClient.invalidateQueries({ queryKey: ['inventory-items'] });
       queryClient.invalidateQueries({ queryKey: ['stock-movements'] });
       queryClient.invalidateQueries({ queryKey: ['coa'] });
+      queryClient.invalidateQueries({ queryKey: ['attachments'] });
       setInvoiceDate(new Date().toISOString().split('T')[0]);
       setDueDate(new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0]);
       setPartyId('');
@@ -95,6 +138,8 @@ const SalesInvoiceModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
       setLabelPotongan('Potongan');
       setLabelBiaya('Biaya Lain');
       setItems([defaultItem()]);
+      setAllowNegativeStock(false);
+      setStagedFiles([]);
       setError('');
       onClose();
     },
@@ -150,6 +195,26 @@ const SalesInvoiceModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
     setItems(next);
   };
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    const valid: File[] = [];
+    for (const f of files) {
+      if (!ALLOWED_MIME.includes(f.type)) {
+        setError(`${f.name}: tipe file tidak didukung (JPG/PNG/WebP/PDF).`);
+        continue;
+      }
+      if (f.size > MAX_FILE_SIZE) {
+        setError(`${f.name}: ukuran melebihi 5 MB.`);
+        continue;
+      }
+      valid.push(f);
+    }
+    const merged = [...stagedFiles, ...valid].slice(0, MAX_ATTACHMENTS);
+    setStagedFiles(merged);
+    e.target.value = '';
+  };
+  const removeStagedFile = (idx: number) => setStagedFiles(stagedFiles.filter((_, i) => i !== idx));
+
   const lineTotal = (item: InvoiceItem) => {
     const base = item.quantity * item.rate;
     return base - (base * (item.discount / 100));
@@ -160,7 +225,28 @@ const SalesInvoiceModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
   const taxAmount = items.reduce((s, it) => s + lineTax(it), 0);
   const pphAmount = items.reduce((s, it) => s + linePph(it), 0);
   const grandTotal = subtotal + taxAmount - pphAmount - potongan + biayaLain;
-  const canSubmit = partyId && items.some(i => i.itemName) && grandTotal > 0 && !mutation.isPending;
+
+  const stockShortages = (() => {
+    const qtyByItem = new Map<string, number>();
+    for (const it of items) {
+      if (!it.inventoryItemId) continue;
+      qtyByItem.set(it.inventoryItemId, (qtyByItem.get(it.inventoryItemId) ?? 0) + (Number(it.quantity) || 0));
+    }
+    const out: { id: string; name: string; unit: string; available: number; needed: number }[] = [];
+    qtyByItem.forEach((needed, id) => {
+      const inv = inventoryItems?.find((i: any) => i.id === id);
+      if (!inv) return;
+      const available = Number(inv.currentStock);
+      if (available < needed) {
+        out.push({ id, name: inv.name, unit: inv.unit || '', available, needed });
+      }
+    });
+    return out;
+  })();
+  const hasShortage = stockShortages.length > 0;
+
+  const canSubmit = partyId && items.some(i => i.itemName) && grandTotal > 0 && !mutation.isPending
+    && (!hasShortage || allowNegativeStock);
 
   if (!isOpen) return null;
 
@@ -293,18 +379,13 @@ const SalesInvoiceModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
 
                         {item.itemType === 'product' ? (
                           <>
-                            <select
+                            <SearchableSelect
+                              options={inventoryOptions}
                               value={item.inventoryItemId}
-                              onChange={e => selectInventoryItem(idx, e.target.value)}
-                              className="w-full bg-transparent text-sm text-gray-800 border-none focus:ring-0 focus:outline-none p-0 cursor-pointer mb-0.5"
-                            >
-                              <option value="">— Pilih dari Stok Gudang —</option>
-                              {inventoryItems?.map((inv: any) => (
-                                <option key={inv.id} value={inv.id}>
-                                  {inv.code} — {inv.name} ({inv.currentStock} {inv.unit})
-                                </option>
-                              ))}
-                            </select>
+                              onChange={(v) => selectInventoryItem(idx, v)}
+                              placeholder="— Pilih dari Stok Gudang —"
+                              className="mb-1"
+                            />
                             {!item.inventoryItemId && (
                               <input
                                 type="text"
@@ -317,18 +398,13 @@ const SalesInvoiceModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
                           </>
                         ) : (
                           <>
-                            <select
+                            <SearchableSelect
+                              options={serviceOptions}
                               value={item.serviceItemId}
-                              onChange={e => selectServiceItem(idx, e.target.value)}
-                              className="w-full bg-transparent text-sm text-gray-800 border-none focus:ring-0 focus:outline-none p-0 cursor-pointer mb-0.5"
-                            >
-                              <option value="">— Pilih Layanan —</option>
-                              {serviceItems?.map((svc: any) => (
-                                <option key={svc.id} value={svc.id}>
-                                  {svc.code} — {svc.name} ({svc.unit})
-                                </option>
-                              ))}
-                            </select>
+                              onChange={(v) => selectServiceItem(idx, v)}
+                              placeholder="— Pilih Layanan —"
+                              className="mb-1"
+                            />
                             {!item.serviceItemId && (
                               <input
                                 type="text"
@@ -512,6 +588,66 @@ const SalesInvoiceModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
             </div>
           </div>
 
+          {hasShortage && (
+            <div className="mx-6 mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-sm">
+              <div className="flex items-start gap-2 mb-2">
+                <AlertCircle size={15} className="mt-0.5 shrink-0" />
+                <div>
+                  <p className="font-medium">Stok tidak mencukupi untuk:</p>
+                  <ul className="mt-1 ml-1 list-disc list-inside text-xs space-y-0.5">
+                    {stockShortages.map(s => (
+                      <li key={s.id}>
+                        <span className="font-medium">{s.name}</span>: tersedia {s.available.toLocaleString('id-ID', { maximumFractionDigits: 3 })} {s.unit}, dibutuhkan {s.needed.toLocaleString('id-ID', { maximumFractionDigits: 3 })} {s.unit}
+                        <span className="text-amber-600"> (kurang {(s.needed - s.available).toLocaleString('id-ID', { maximumFractionDigits: 3 })})</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+              <label className="flex items-start gap-2 mt-2 pl-5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={allowNegativeStock}
+                  onChange={e => setAllowNegativeStock(e.target.checked)}
+                  className="mt-0.5 rounded border-amber-300 text-amber-600 focus:ring-amber-500"
+                />
+                <span className="text-xs">
+                  Izinkan stok minus — produksi/pembelian menyusul.
+                  <span className="block text-amber-600 mt-0.5">COGS akan dihitung pakai harga rata-rata saat ini; bila stok 0, COGS = 0 dan perlu JV koreksi setelah barang masuk.</span>
+                </span>
+              </label>
+            </div>
+          )}
+
+          {/* ATTACHMENTS */}
+          <div className="px-6 pb-4">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest flex items-center gap-1">
+                <Paperclip size={12} /> Dokumen Pendukung
+              </p>
+              <label className="flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-700 cursor-pointer">
+                <Plus size={13} /> Tambah File
+                <input type="file" multiple accept=".jpg,.jpeg,.png,.webp,.pdf" onChange={handleFileSelect} className="hidden" />
+              </label>
+            </div>
+            {stagedFiles.length === 0 ? (
+              <p className="text-xs text-gray-400 italic">Belum ada file. Max {MAX_ATTACHMENTS} file, 5 MB/file (JPG/PNG/PDF).</p>
+            ) : (
+              <div className="space-y-1.5">
+                {stagedFiles.map((f, i) => (
+                  <div key={i} className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg text-xs">
+                    {f.type === 'application/pdf' ? <FileText size={14} className="text-red-500" /> : <ImageIcon size={14} className="text-blue-500" />}
+                    <span className="flex-1 truncate">{f.name}</span>
+                    <span className="text-gray-400">{(f.size / 1024).toFixed(0)} KB</span>
+                    <button onClick={() => removeStagedFile(i)} className="text-gray-400 hover:text-red-500">
+                      <X size={12} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           {error && (
             <div className="mx-6 mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-red-700 text-sm">
               <AlertCircle size={15} /> <span>{error}</span>
@@ -529,6 +665,7 @@ const SalesInvoiceModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
             <button
               onClick={() => mutation.mutate({
                 date: invoiceDate, dueDate, partyId, notes, terms, potongan, biayaLain, labelPotongan, labelBiaya,
+                allowNegativeStock,
                 items: items.map(i => ({
                   ...i,
                   itemType: i.itemType,

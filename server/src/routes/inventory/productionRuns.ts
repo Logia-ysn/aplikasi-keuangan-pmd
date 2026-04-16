@@ -11,6 +11,7 @@ import { cancelJournalsByPrefix } from '../../utils/journalCancel';
 import { systemAccounts } from '../../services/systemAccounts';
 import { logger } from '../../lib/logger';
 import { calcWeightedAverage } from '../../utils/weightedAverage';
+import { settleCogsBackfillForItem } from '../../services/cogsBackfillService';
 
 const router = Router();
 
@@ -231,6 +232,17 @@ router.post('/', roleMiddleware(['Admin', 'Accountant', 'StaffProduksi']), async
             fiscalYearId: fiscalYear.id,
             createdById: req.user!.userId,
           },
+        });
+
+        // Auto-settle pending COGS backfill on output stock-in
+        await settleCogsBackfillForItem(tx, {
+          itemId: output.itemId,
+          qtyAvailable: output.quantity,
+          unitCostNow: unitCost,
+          fiscalYearId: fiscalYear.id,
+          userId: req.user!.userId,
+          settleDate: runDate,
+          source: { type: 'ProductionRun', refId: run.id, refNo: runNumber },
         });
       }
 
@@ -567,6 +579,17 @@ router.put('/:id', roleMiddleware(['Admin', 'Accountant', 'StaffProduksi']), asy
             referenceNumber: oldRun.runNumber, notes: body.notes || null,
             fiscalYearId: fiscalYear.id, createdById: req.user!.userId,
           },
+        });
+
+        // Auto-settle pending COGS backfill on edited production output
+        await settleCogsBackfillForItem(tx, {
+          itemId: output.itemId,
+          qtyAvailable: output.quantity,
+          unitCostNow: unitCost,
+          fiscalYearId: fiscalYear.id,
+          userId: req.user!.userId,
+          settleDate: txDate,
+          source: { type: 'ProductionRun', refId: id, refNo: oldRun.runNumber },
         });
       }
 

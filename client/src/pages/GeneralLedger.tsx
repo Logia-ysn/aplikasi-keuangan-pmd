@@ -19,6 +19,7 @@ export const GeneralLedger = () => {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [cancelTarget, setCancelTarget] = useState<{ id: string; entryNumber: string } | null>(null);
+  const [hideCancelled, setHideCancelled] = useState(false);
   const queryClient = useQueryClient();
 
   const fmt = (d: Date) => {
@@ -153,6 +154,15 @@ export const GeneralLedger = () => {
           <button onClick={() => applyPreset('month')} className={cn('btn-secondary text-xs py-1.5 px-3', startDate && 'ring-1 ring-blue-200')}>Bulan Ini</button>
           <button onClick={() => applyPreset('lastMonth')} className="btn-secondary text-xs py-1.5 px-3">Bulan Lalu</button>
           <button onClick={() => applyPreset('year')} className="btn-secondary text-xs py-1.5 px-3">Tahun Ini (YTD)</button>
+          <label className="ml-auto flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={hideCancelled}
+              onChange={(e) => setHideCancelled(e.target.checked)}
+              className="h-3.5 w-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            />
+            Sembunyikan yang dibatalkan
+          </label>
         </div>
       </div>
 
@@ -189,9 +199,10 @@ export const GeneralLedger = () => {
               </tr>
             ) : (
               journals?.filter((j: any) =>
-                !searchTerm ||
-                j.entryNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                j.narration?.toLowerCase().includes(searchTerm.toLowerCase())
+                (!hideCancelled || j.status !== 'Cancelled') &&
+                (!searchTerm ||
+                  j.entryNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                  j.narration?.toLowerCase().includes(searchTerm.toLowerCase()))
               ).map((journal: any) => {
                 const totalDebit = journal.items.reduce((sum: number, item: any) => sum + Number(item.debit), 0);
                 const totalCredit = journal.items.reduce((sum: number, item: any) => sum + Number(item.credit), 0);

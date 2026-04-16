@@ -23,35 +23,35 @@ enum RootType {
 }
 
 model Account {
-  id             String                   @id @default(uuid())
-  name           String
-  accountNumber  String                   @unique
-  accountType    AccountType
-  rootType       RootType
-  isGroup        Boolean                  @default(false)
-  isActive       Boolean                  @default(true)
-  balance        Decimal                  @default(0) @db.Decimal(15, 2)
-  currency       String                   @default("IDR")
-  description    String?
-  parentId       String?
-  parent         Account?                 @relation("AccountHierarchy", fields: [parentId], references: [id])
-  children       Account[]                @relation("AccountHierarchy")
-  ledgerEntries  AccountingLedgerEntry[]
-  journalItems   JournalItem[]
-  salesItems     SalesInvoiceItem[]
-  purchaseItems  PurchaseInvoiceItem[]
-  payments            Payment[]                @relation("PaymentAccount")
-  paymentSplits       PaymentSplit[]           @relation("PaymentSplitAccount")
-  inventoryItems      InventoryItem[]          @relation("ItemAccount")
-  movementsAsOffset   StockMovement[]          @relation("MovementOffset")
-  reconciliations     BankReconciliation[]     @relation("ReconciliationAccount")
-  serviceItems        ServiceItem[]            @relation("ServiceItemAccount")
-  systemAccountMappings SystemAccountMapping[] @relation("MappedAccount")
-  fixedAssetsAsAsset    FixedAsset[]             @relation("AssetAccount")
-  fixedAssetsAsDepr     FixedAsset[]             @relation("DepreciationAccount")
-  fixedAssetsAsAccDep   FixedAsset[]             @relation("AccumulatedDepAccount")
-  createdAt           DateTime                 @default(now())
-  updatedAt           DateTime                 @updatedAt
+  id                    String                  @id @default(uuid())
+  name                  String
+  accountNumber         String                  @unique
+  accountType           AccountType
+  rootType              RootType
+  isGroup               Boolean                 @default(false)
+  isActive              Boolean                 @default(true)
+  balance               Decimal                 @default(0) @db.Decimal(15, 2)
+  currency              String                  @default("IDR")
+  description           String?
+  parentId              String?
+  parent                Account?                @relation("AccountHierarchy", fields: [parentId], references: [id])
+  children              Account[]               @relation("AccountHierarchy")
+  ledgerEntries         AccountingLedgerEntry[]
+  journalItems          JournalItem[]
+  salesItems            SalesInvoiceItem[]
+  purchaseItems         PurchaseInvoiceItem[]
+  payments              Payment[]               @relation("PaymentAccount")
+  paymentSplits         PaymentSplit[]          @relation("PaymentSplitAccount")
+  inventoryItems        InventoryItem[]         @relation("ItemAccount")
+  movementsAsOffset     StockMovement[]         @relation("MovementOffset")
+  reconciliations       BankReconciliation[]    @relation("ReconciliationAccount")
+  serviceItems          ServiceItem[]           @relation("ServiceItemAccount")
+  systemAccountMappings SystemAccountMapping[]  @relation("MappedAccount")
+  fixedAssetsAsAsset    FixedAsset[]            @relation("AssetAccount")
+  fixedAssetsAsDepr     FixedAsset[]            @relation("DepreciationAccount")
+  fixedAssetsAsAccDep   FixedAsset[]            @relation("AccumulatedDepAccount")
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime                @updatedAt
 
   @@index([rootType])
   @@index([accountNumber])
@@ -60,24 +60,24 @@ model Account {
 }
 
 model Party {
-  id                String            @id @default(uuid())
-  name              String
-  partyType         PartyType
-  phone             String?
-  email             String?
-  address           String?
-  taxId             String?           @map("tax_id")
-  outstandingAmount Decimal           @default(0) @db.Decimal(15, 2) @map("outstanding_amount")
-  depositBalance    Decimal           @default(0) @db.Decimal(15, 2) @map("deposit_balance")
-  customerDepositBalance Decimal      @default(0) @db.Decimal(15, 2) @map("customer_deposit_balance")
-  isActive          Boolean           @default(true) @map("is_active")
-  isDummy           Boolean           @default(false) @map("is_dummy")
-  salesInvoices     SalesInvoice[]
-  purchaseInvoices  PurchaseInvoice[]
-  payments          Payment[]
-  ledgerEntries     AccountingLedgerEntry[]
-  createdAt         DateTime          @default(now()) @map("created_at")
-  updatedAt         DateTime          @updatedAt @map("updated_at")
+  id                     String                  @id @default(uuid())
+  name                   String
+  partyType              PartyType
+  phone                  String?
+  email                  String?
+  address                String?
+  taxId                  String?                 @map("tax_id")
+  outstandingAmount      Decimal                 @default(0) @map("outstanding_amount") @db.Decimal(15, 2)
+  depositBalance         Decimal                 @default(0) @map("deposit_balance") @db.Decimal(15, 2)
+  customerDepositBalance Decimal                 @default(0) @map("customer_deposit_balance") @db.Decimal(15, 2)
+  isActive               Boolean                 @default(true) @map("is_active")
+  isDummy                Boolean                 @default(false) @map("is_dummy")
+  salesInvoices          SalesInvoice[]
+  purchaseInvoices       PurchaseInvoice[]
+  payments               Payment[]
+  ledgerEntries          AccountingLedgerEntry[]
+  createdAt              DateTime                @default(now()) @map("created_at")
+  updatedAt              DateTime                @updatedAt @map("updated_at")
 
   @@index([partyType])
   @@map("parties")
@@ -90,21 +90,21 @@ enum PartyType {
 }
 
 model AccountingLedgerEntry {
-  id            String      @id @default(uuid())
+  id            String     @id @default(uuid())
   date          DateTime
-  accountId     String      @map("account_id")
-  account       Account     @relation(fields: [accountId], references: [id])
-  partyId       String?     @map("party_id")
-  party         Party?      @relation(fields: [partyId], references: [id])
-  debit         Decimal     @default(0) @db.Decimal(15, 2)
-  credit        Decimal     @default(0) @db.Decimal(15, 2)
-  referenceType String      @map("reference_type")
-  referenceId   String      @map("reference_id")
+  accountId     String     @map("account_id")
+  account       Account    @relation(fields: [accountId], references: [id])
+  partyId       String?    @map("party_id")
+  party         Party?     @relation(fields: [partyId], references: [id])
+  debit         Decimal    @default(0) @db.Decimal(15, 2)
+  credit        Decimal    @default(0) @db.Decimal(15, 2)
+  referenceType String     @map("reference_type")
+  referenceId   String     @map("reference_id")
   description   String?
-  fiscalYearId  String      @map("fiscal_year_id")
-  fiscalYear    FiscalYear  @relation(fields: [fiscalYearId], references: [id])
-  isCancelled   Boolean     @default(false) @map("is_cancelled")
-  createdAt     DateTime    @default(now()) @map("created_at")
+  fiscalYearId  String     @map("fiscal_year_id")
+  fiscalYear    FiscalYear @relation(fields: [fiscalYearId], references: [id])
+  isCancelled   Boolean    @default(false) @map("is_cancelled")
+  createdAt     DateTime   @default(now()) @map("created_at")
 
   @@index([accountId])
   @@index([date])
@@ -115,25 +115,26 @@ model AccountingLedgerEntry {
 }
 
 model JournalEntry {
-  id           String           @id @default(uuid())
-  entryNumber  String           @unique @map("entry_number")
-  date         DateTime
-  status       DocumentStatus   @default(Draft)
-  narration    String?
-  fiscalYearId String           @map("fiscal_year_id")
-  fiscalYear   FiscalYear       @relation(fields: [fiscalYearId], references: [id])
-  createdBy    String           @map("created_by")
-  user         User             @relation(fields: [createdBy], references: [id])
-  items                JournalItem[]
-  stockMovement        StockMovement?
-  payment              Payment?
-  depositApplication   VendorDepositApplication?
+  id                         String                      @id @default(uuid())
+  entryNumber                String                      @unique @map("entry_number")
+  date                       DateTime
+  status                     DocumentStatus              @default(Draft)
+  narration                  String?
+  fiscalYearId               String                      @map("fiscal_year_id")
+  fiscalYear                 FiscalYear                  @relation(fields: [fiscalYearId], references: [id])
+  createdBy                  String                      @map("created_by")
+  user                       User                        @relation(fields: [createdBy], references: [id])
+  items                      JournalItem[]
+  stockMovement              StockMovement?
+  payment                    Payment?
+  depositApplication         VendorDepositApplication?
   customerDepositApplication CustomerDepositApplication?
   depreciationEntries        DepreciationEntry[]
-  submittedAt   DateTime?        @map("submitted_at")
-  cancelledAt   DateTime?        @map("cancelled_at")
-  createdAt     DateTime         @default(now()) @map("created_at")
-  updatedAt     DateTime         @updatedAt @map("updated_at")
+  cogsBackfillSettlements    CogsBackfillSettlement[]    @relation("CogsBackfillJE")
+  submittedAt                DateTime?                   @map("submitted_at")
+  cancelledAt                DateTime?                   @map("cancelled_at")
+  createdAt                  DateTime                    @default(now()) @map("created_at")
+  updatedAt                  DateTime                    @updatedAt @map("updated_at")
 
   @@index([status])
   @@index([date])
@@ -158,33 +159,34 @@ model JournalItem {
 }
 
 model SalesInvoice {
-  id             String             @id @default(uuid())
-  invoiceNumber  String             @unique @map("invoice_number")
-  date           DateTime
-  partyId        String             @map("party_id")
-  customer       Party              @relation(fields: [partyId], references: [id])
-  status         InvoiceStatus      @default(Draft)
-  grandTotal     Decimal            @db.Decimal(15, 2) @map("grand_total")
-  outstanding    Decimal            @db.Decimal(15, 2)
-  taxPct         Decimal            @default(0) @db.Decimal(5, 2) @map("tax_pct")
-  potongan       Decimal            @default(0) @db.Decimal(15, 2)
-  biayaLain      Decimal            @default(0) @db.Decimal(15, 2) @map("biaya_lain")
-  labelPotongan  String?            @map("label_potongan")
-  labelBiaya     String?            @map("label_biaya")
-  terms          String?
-  dueDate        DateTime?          @map("due_date")
-  notes          String?
-  fiscalYearId   String             @map("fiscal_year_id")
-  fiscalYear     FiscalYear         @relation(fields: [fiscalYearId], references: [id])
-  createdBy      String             @map("created_by")
-  user           User               @relation(fields: [createdBy], references: [id])
-  items          SalesInvoiceItem[]
+  id                  String                       @id @default(uuid())
+  invoiceNumber       String                       @unique @map("invoice_number")
+  date                DateTime
+  partyId             String                       @map("party_id")
+  customer            Party                        @relation(fields: [partyId], references: [id])
+  status              InvoiceStatus                @default(Draft)
+  grandTotal          Decimal                      @map("grand_total") @db.Decimal(15, 2)
+  outstanding         Decimal                      @db.Decimal(15, 2)
+  taxPct              Decimal                      @default(0) @map("tax_pct") @db.Decimal(5, 2)
+  potongan            Decimal                      @default(0) @db.Decimal(15, 2)
+  biayaLain           Decimal                      @default(0) @map("biaya_lain") @db.Decimal(15, 2)
+  labelPotongan       String?                      @map("label_potongan")
+  labelBiaya          String?                      @map("label_biaya")
+  terms               String?
+  dueDate             DateTime?                    @map("due_date")
+  notes               String?
+  fiscalYearId        String                       @map("fiscal_year_id")
+  fiscalYear          FiscalYear                   @relation(fields: [fiscalYearId], references: [id])
+  createdBy           String                       @map("created_by")
+  user                User                         @relation(fields: [createdBy], references: [id])
+  items               SalesInvoiceItem[]
+  cogsBackfills       CogsBackfillQueue[]
   depositApplications CustomerDepositApplication[] @relation("CustomerDepositApplied")
-  submittedAt    DateTime?          @map("submitted_at")
-  cancelledAt    DateTime?          @map("cancelled_at")
-  isDummy        Boolean            @default(false) @map("is_dummy")
-  createdAt      DateTime           @default(now()) @map("created_at")
-  updatedAt      DateTime           @updatedAt @map("updated_at")
+  submittedAt         DateTime?                    @map("submitted_at")
+  cancelledAt         DateTime?                    @map("cancelled_at")
+  isDummy             Boolean                      @default(false) @map("is_dummy")
+  createdAt           DateTime                     @default(now()) @map("created_at")
+  updatedAt           DateTime                     @updatedAt @map("updated_at")
 
   @@index([partyId])
   @@index([status])
@@ -194,25 +196,26 @@ model SalesInvoice {
 }
 
 model SalesInvoiceItem {
-  id               String         @id @default(uuid())
-  salesInvoiceId   String         @map("sales_invoice_id")
-  salesInvoice     SalesInvoice   @relation(fields: [salesInvoiceId], references: [id], onDelete: Cascade)
-  itemType         String         @default("product") @map("item_type")
-  inventoryItemId  String?        @map("inventory_item_id")
-  inventoryItem    InventoryItem? @relation("SalesInvoiceInventory", fields: [inventoryItemId], references: [id])
-  serviceItemId    String?        @map("service_item_id")
-  serviceItem      ServiceItem?   @relation("SalesInvoiceService", fields: [serviceItemId], references: [id])
-  itemName         String         @map("item_name")
-  quantity         Decimal        @db.Decimal(15, 3)
-  unit             String
-  rate             Decimal        @db.Decimal(15, 2)
-  discount         Decimal        @default(0) @db.Decimal(5, 2)
-  amount           Decimal        @db.Decimal(15, 2)
-  taxPct           Decimal        @default(0) @db.Decimal(5, 2) @map("tax_pct")
-  pphPct           Decimal        @default(0) @db.Decimal(5, 2) @map("pph_pct")
-  accountId        String         @map("account_id")
-  account          Account        @relation(fields: [accountId], references: [id])
-  description      String?
+  id              String              @id @default(uuid())
+  salesInvoiceId  String              @map("sales_invoice_id")
+  salesInvoice    SalesInvoice        @relation(fields: [salesInvoiceId], references: [id], onDelete: Cascade)
+  itemType        String              @default("product") @map("item_type")
+  inventoryItemId String?             @map("inventory_item_id")
+  inventoryItem   InventoryItem?      @relation("SalesInvoiceInventory", fields: [inventoryItemId], references: [id])
+  serviceItemId   String?             @map("service_item_id")
+  serviceItem     ServiceItem?        @relation("SalesInvoiceService", fields: [serviceItemId], references: [id])
+  cogsBackfills   CogsBackfillQueue[]
+  itemName        String              @map("item_name")
+  quantity        Decimal             @db.Decimal(15, 3)
+  unit            String
+  rate            Decimal             @db.Decimal(15, 2)
+  discount        Decimal             @default(0) @db.Decimal(5, 2)
+  amount          Decimal             @db.Decimal(15, 2)
+  taxPct          Decimal             @default(0) @map("tax_pct") @db.Decimal(5, 2)
+  pphPct          Decimal             @default(0) @map("pph_pct") @db.Decimal(5, 2)
+  accountId       String              @map("account_id")
+  account         Account             @relation(fields: [accountId], references: [id])
+  description     String?
 
   @@index([salesInvoiceId])
   @@index([inventoryItemId])
@@ -221,30 +224,30 @@ model SalesInvoiceItem {
 }
 
 model PurchaseInvoice {
-  id             String                @id @default(uuid())
-  invoiceNumber  String                @unique @map("invoice_number")
-  date           DateTime
-  partyId        String                @map("party_id")
-  supplier       Party                 @relation(fields: [partyId], references: [id])
-  status         InvoiceStatus         @default(Draft)
-  grandTotal     Decimal               @db.Decimal(15, 2) @map("grand_total")
-  outstanding    Decimal               @db.Decimal(15, 2)
-  taxPct         Decimal               @default(0) @db.Decimal(5, 2) @map("tax_pct")
-  potongan       Decimal               @default(0) @db.Decimal(15, 2)
-  biayaLain      Decimal               @default(0) @db.Decimal(15, 2) @map("biaya_lain")
-  dueDate        DateTime?             @map("due_date")
-  notes          String?
-  fiscalYearId   String                @map("fiscal_year_id")
-  fiscalYear     FiscalYear            @relation(fields: [fiscalYearId], references: [id])
-  createdBy      String                @map("created_by")
-  user           User                  @relation(fields: [createdBy], references: [id])
+  id                  String                     @id @default(uuid())
+  invoiceNumber       String                     @unique @map("invoice_number")
+  date                DateTime
+  partyId             String                     @map("party_id")
+  supplier            Party                      @relation(fields: [partyId], references: [id])
+  status              InvoiceStatus              @default(Draft)
+  grandTotal          Decimal                    @map("grand_total") @db.Decimal(15, 2)
+  outstanding         Decimal                    @db.Decimal(15, 2)
+  taxPct              Decimal                    @default(0) @map("tax_pct") @db.Decimal(5, 2)
+  potongan            Decimal                    @default(0) @db.Decimal(15, 2)
+  biayaLain           Decimal                    @default(0) @map("biaya_lain") @db.Decimal(15, 2)
+  dueDate             DateTime?                  @map("due_date")
+  notes               String?
+  fiscalYearId        String                     @map("fiscal_year_id")
+  fiscalYear          FiscalYear                 @relation(fields: [fiscalYearId], references: [id])
+  createdBy           String                     @map("created_by")
+  user                User                       @relation(fields: [createdBy], references: [id])
   items               PurchaseInvoiceItem[]
   depositApplications VendorDepositApplication[] @relation("DepositApplied")
-  submittedAt    DateTime?             @map("submitted_at")
-  cancelledAt    DateTime?             @map("cancelled_at")
-  isDummy        Boolean               @default(false) @map("is_dummy")
-  createdAt      DateTime              @default(now()) @map("created_at")
-  updatedAt      DateTime              @updatedAt @map("updated_at")
+  submittedAt         DateTime?                  @map("submitted_at")
+  cancelledAt         DateTime?                  @map("cancelled_at")
+  isDummy             Boolean                    @default(false) @map("is_dummy")
+  createdAt           DateTime                   @default(now()) @map("created_at")
+  updatedAt           DateTime                   @updatedAt @map("updated_at")
 
   @@index([partyId])
   @@index([status])
@@ -265,13 +268,13 @@ model PurchaseInvoiceItem {
   rate              Decimal         @db.Decimal(15, 2)
   discount          Decimal         @default(0) @db.Decimal(5, 2)
   amount            Decimal         @db.Decimal(15, 2)
-  taxPct            Decimal         @default(0) @db.Decimal(5, 2) @map("tax_pct")
-  pphPct            Decimal         @default(0) @db.Decimal(5, 2) @map("pph_pct")
-  potonganItem      Decimal         @default(0) @db.Decimal(15, 2) @map("potongan_item")
+  taxPct            Decimal         @default(0) @map("tax_pct") @db.Decimal(5, 2)
+  pphPct            Decimal         @default(0) @map("pph_pct") @db.Decimal(5, 2)
+  potonganItem      Decimal         @default(0) @map("potongan_item") @db.Decimal(15, 2)
   kualitas          String?
   refaksi           Decimal?        @db.Decimal(15, 3)
-  timbanganTruk     Decimal?        @db.Decimal(15, 3) @map("timbangan_truk")
-  timbanganDiterima Decimal?        @db.Decimal(15, 3) @map("timbangan_diterima")
+  timbanganTruk     Decimal?        @map("timbangan_truk") @db.Decimal(15, 3)
+  timbanganDiterima Decimal?        @map("timbangan_diterima") @db.Decimal(15, 3)
   nomorMobil        String?         @map("nomor_mobil")
   accountId         String          @map("account_id")
   account           Account         @relation(fields: [accountId], references: [id])
@@ -283,33 +286,33 @@ model PurchaseInvoiceItem {
 }
 
 model Payment {
-  id            String              @id @default(uuid())
-  paymentNumber String              @unique @map("payment_number")
-  date          DateTime
-  paymentType   PaymentType         @map("payment_type")
-  partyId       String              @map("party_id")
-  party         Party               @relation(fields: [partyId], references: [id])
-  accountId     String              @map("account_id")
-  account       Account             @relation("PaymentAccount", fields: [accountId], references: [id])
-  amount        Decimal             @db.Decimal(15, 2)
-  refundedAmount Decimal            @default(0) @db.Decimal(15, 2) @map("refunded_amount")
-  status        DocumentStatus      @default(Draft)
-  referenceNo   String?             @map("reference_number")
-  notes         String?
-  createdBy     String              @map("created_by")
-  user          User                @relation(fields: [createdBy], references: [id])
-  allocations           PaymentAllocation[]
-  splits                PaymentSplit[]
-  depositApplications   VendorDepositApplication[] @relation("DepositApplications")
+  id                          String                       @id @default(uuid())
+  paymentNumber               String                       @unique @map("payment_number")
+  date                        DateTime
+  paymentType                 PaymentType                  @map("payment_type")
+  partyId                     String                       @map("party_id")
+  party                       Party                        @relation(fields: [partyId], references: [id])
+  accountId                   String                       @map("account_id")
+  account                     Account                      @relation("PaymentAccount", fields: [accountId], references: [id])
+  amount                      Decimal                      @db.Decimal(15, 2)
+  refundedAmount              Decimal                      @default(0) @map("refunded_amount") @db.Decimal(15, 2)
+  status                      DocumentStatus               @default(Draft)
+  referenceNo                 String?                      @map("reference_number")
+  notes                       String?
+  createdBy                   String                       @map("created_by")
+  user                        User                         @relation(fields: [createdBy], references: [id])
+  allocations                 PaymentAllocation[]
+  splits                      PaymentSplit[]
+  depositApplications         VendorDepositApplication[]   @relation("DepositApplications")
   customerDepositApplications CustomerDepositApplication[] @relation("CustomerDepositApplications")
-  journalEntryId        String?             @unique @map("journal_entry_id")
-  journalEntry          JournalEntry?       @relation(fields: [journalEntryId], references: [id])
-  fiscalYearId     String              @map("fiscal_year_id")
-  fiscalYear    FiscalYear          @relation(fields: [fiscalYearId], references: [id])
-  submittedAt   DateTime?           @map("submitted_at")
-  cancelledAt   DateTime?           @map("cancelled_at")
-  createdAt     DateTime            @default(now()) @map("created_at")
-  updatedAt     DateTime            @updatedAt @map("updated_at")
+  journalEntryId              String?                      @unique @map("journal_entry_id")
+  journalEntry                JournalEntry?                @relation(fields: [journalEntryId], references: [id])
+  fiscalYearId                String                       @map("fiscal_year_id")
+  fiscalYear                  FiscalYear                   @relation(fields: [fiscalYearId], references: [id])
+  submittedAt                 DateTime?                    @map("submitted_at")
+  cancelledAt                 DateTime?                    @map("cancelled_at")
+  createdAt                   DateTime                     @default(now()) @map("created_at")
+  updatedAt                   DateTime                     @updatedAt @map("updated_at")
 
   @@index([partyId])
   @@index([accountId])
@@ -334,12 +337,12 @@ model PaymentSplit {
 }
 
 model PaymentAllocation {
-  id              String      @id @default(uuid())
-  paymentId       String      @map("payment_id")
-  payment         Payment     @relation(fields: [paymentId], references: [id], onDelete: Cascade)
-  invoiceType     String      @map("invoice_type")
-  invoiceId       String      @map("invoice_id")
-  allocatedAmount Decimal     @db.Decimal(15, 2) @map("allocated_amount")
+  id              String  @id @default(uuid())
+  paymentId       String  @map("payment_id")
+  payment         Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  invoiceType     String  @map("invoice_type")
+  invoiceId       String  @map("invoice_id")
+  allocatedAmount Decimal @map("allocated_amount") @db.Decimal(15, 2)
 
   @@index([paymentId])
   @@index([invoiceType, invoiceId])
@@ -363,42 +366,43 @@ model FiscalYear {
   stockMovements   StockMovement[]
   productionRuns   ProductionRun[]
   stockOpnames     StockOpname[]
-  fixedAssets       FixedAsset[]
+  fixedAssets      FixedAsset[]
+  cogsBackfills    CogsBackfillQueue[]     @relation("CogsBackfillFY")
   createdAt        DateTime                @default(now()) @map("created_at")
 
   @@map("fiscal_years")
 }
 
 model User {
-  id               String            @id @default(uuid())
-  username         String            @unique
-  fullName         String            @map("full_name")
-  email            String            @unique
-  passwordHash     String            @map("password_hash")
-  role             UserRole          @default(Accountant)
-  isActive         Boolean           @default(true) @map("is_active")
-  lastLoginAt      DateTime?         @map("last_login_at")
-  journalEntries   JournalEntry[]
-  salesInvoices    SalesInvoice[]
-  purchaseInvoices PurchaseInvoice[]
-  payments         Payment[]
-  closedYears      FiscalYear[]      @relation("ClosedBy")
-  audits           AuditLog[]
-  stockMovements       StockMovement[]       @relation("MovementCreatedBy")
-  productionRuns       ProductionRun[]       @relation("ProductionCreatedBy")
-  notifications        Notification[]        @relation("UserNotifications")
-  recurringTemplates           RecurringTemplate[]          @relation("UserRecurring")
-  vendorDepositApplications    VendorDepositApplication[]
-  customerDepositApplications  CustomerDepositApplication[]
-  tokenBlacklist               TokenBlacklist[]
-  attachments                  TransactionAttachment[]
-  stockOpnames                 StockOpname[]                @relation("OpnameCreatedBy")
-  fixedAssets                  FixedAsset[]                 @relation("AssetCreatedBy")
-  approvalRequests             ApprovalRequest[]            @relation("ApprovalRequester")
-  approvalApprovals            ApprovalRequest[]            @relation("ApprovalApprover")
-  approvalRejections           ApprovalRequest[]            @relation("ApprovalRejecter")
-  createdAt            DateTime              @default(now()) @map("created_at")
-  updatedAt            DateTime              @updatedAt @map("updated_at")
+  id                          String                       @id @default(uuid())
+  username                    String                       @unique
+  fullName                    String                       @map("full_name")
+  email                       String                       @unique
+  passwordHash                String                       @map("password_hash")
+  role                        UserRole                     @default(Accountant)
+  isActive                    Boolean                      @default(true) @map("is_active")
+  lastLoginAt                 DateTime?                    @map("last_login_at")
+  journalEntries              JournalEntry[]
+  salesInvoices               SalesInvoice[]
+  purchaseInvoices            PurchaseInvoice[]
+  payments                    Payment[]
+  closedYears                 FiscalYear[]                 @relation("ClosedBy")
+  audits                      AuditLog[]
+  stockMovements              StockMovement[]              @relation("MovementCreatedBy")
+  productionRuns              ProductionRun[]              @relation("ProductionCreatedBy")
+  notifications               Notification[]               @relation("UserNotifications")
+  recurringTemplates          RecurringTemplate[]          @relation("UserRecurring")
+  vendorDepositApplications   VendorDepositApplication[]
+  customerDepositApplications CustomerDepositApplication[]
+  tokenBlacklist              TokenBlacklist[]
+  attachments                 TransactionAttachment[]
+  stockOpnames                StockOpname[]                @relation("OpnameCreatedBy")
+  fixedAssets                 FixedAsset[]                 @relation("AssetCreatedBy")
+  approvalRequests            ApprovalRequest[]            @relation("ApprovalRequester")
+  approvalApprovals           ApprovalRequest[]            @relation("ApprovalApprover")
+  approvalRejections          ApprovalRequest[]            @relation("ApprovalRejecter")
+  createdAt                   DateTime                     @default(now()) @map("created_at")
+  updatedAt                   DateTime                     @updatedAt @map("updated_at")
 
   @@map("users")
 }
@@ -437,7 +441,7 @@ model AuditLog {
 
 model CompanySettings {
   id                   String  @id @default(uuid())
-  slug                 String  @default("default") @unique
+  slug                 String  @unique @default("default")
   companyName          String  @map("company_name")
   address              String?
   phone                String?
@@ -501,26 +505,27 @@ enum StockMovementType {
 }
 
 model InventoryItem {
-  id           String          @id @default(uuid())
-  code         String          @unique
-  name         String
-  unit         String
-  category     String?
-  description  String?
-  currentStock Decimal         @default(0) @db.Decimal(15, 3) @map("current_stock")
-  averageCost  Decimal         @default(0) @db.Decimal(20, 2) @map("average_cost")
-  minimumStock Decimal         @default(0) @db.Decimal(15, 3) @map("minimum_stock")
-  isActive     Boolean         @default(true) @map("is_active")
-  isDummy      Boolean         @default(false) @map("is_dummy")
-  accountId    String?         @map("account_id")
-  account      Account?        @relation("ItemAccount", fields: [accountId], references: [id])
-  movements             StockMovement[]
-  productionLines       ProductionRunItem[]    @relation("ProductionLines")
-  salesInvoiceItems     SalesInvoiceItem[]     @relation("SalesInvoiceInventory")
-  purchaseInvoiceItems  PurchaseInvoiceItem[]  @relation("PurchaseInvoiceInventory")
-  opnameLines           StockOpnameItem[]      @relation("OpnameLines")
-  createdAt    DateTime        @default(now()) @map("created_at")
-  updatedAt    DateTime        @updatedAt @map("updated_at")
+  id                   String                @id @default(uuid())
+  code                 String                @unique
+  name                 String
+  unit                 String
+  category             String?
+  description          String?
+  currentStock         Decimal               @default(0) @map("current_stock") @db.Decimal(15, 3)
+  averageCost          Decimal               @default(0) @map("average_cost") @db.Decimal(20, 2)
+  minimumStock         Decimal               @default(0) @map("minimum_stock") @db.Decimal(15, 3)
+  isActive             Boolean               @default(true) @map("is_active")
+  isDummy              Boolean               @default(false) @map("is_dummy")
+  accountId            String?               @map("account_id")
+  account              Account?              @relation("ItemAccount", fields: [accountId], references: [id])
+  movements            StockMovement[]
+  productionLines      ProductionRunItem[]   @relation("ProductionLines")
+  salesInvoiceItems    SalesInvoiceItem[]    @relation("SalesInvoiceInventory")
+  purchaseInvoiceItems PurchaseInvoiceItem[] @relation("PurchaseInvoiceInventory")
+  opnameLines          StockOpnameItem[]     @relation("OpnameLines")
+  cogsBackfills        CogsBackfillQueue[]   @relation("CogsBackfillItem")
+  createdAt            DateTime              @default(now()) @map("created_at")
+  updatedAt            DateTime              @updatedAt @map("updated_at")
 
   @@map("inventory_items")
 }
@@ -533,8 +538,8 @@ model StockMovement {
   item            InventoryItem     @relation(fields: [itemId], references: [id])
   movementType    StockMovementType @map("movement_type")
   quantity        Decimal           @db.Decimal(20, 3)
-  unitCost        Decimal           @default(0) @db.Decimal(20, 2) @map("unit_cost")
-  totalValue      Decimal           @default(0) @db.Decimal(20, 2) @map("total_value")
+  unitCost        Decimal           @default(0) @map("unit_cost") @db.Decimal(20, 2)
+  totalValue      Decimal           @default(0) @map("total_value") @db.Decimal(20, 2)
   notes           String?
   referenceType   String?           @map("reference_type")
   referenceId     String?           @map("reference_id")
@@ -566,7 +571,7 @@ model ProductionRun {
   referenceType   String?             @map("reference_type")
   referenceId     String?             @map("reference_id")
   referenceNumber String?             @map("reference_number")
-  rendemenPct     Decimal?            @db.Decimal(5, 2) @map("rendemen_pct")
+  rendemenPct     Decimal?            @map("rendemen_pct") @db.Decimal(5, 2)
   items           ProductionRunItem[]
   isCancelled     Boolean             @default(false) @map("is_cancelled")
   fiscalYearId    String              @map("fiscal_year_id")
@@ -589,8 +594,8 @@ model ProductionRunItem {
   item            InventoryItem @relation("ProductionLines", fields: [itemId], references: [id])
   lineType        String        @map("line_type")
   quantity        Decimal       @db.Decimal(15, 3)
-  unitPrice       Decimal?      @db.Decimal(15, 2) @map("unit_price")
-  rendemenPct     Decimal?      @db.Decimal(5, 2) @map("rendemen_pct")
+  unitPrice       Decimal?      @map("unit_price") @db.Decimal(15, 2)
+  rendemenPct     Decimal?      @map("rendemen_pct") @db.Decimal(5, 2)
   isByProduct     Boolean       @default(false) @map("is_by_product")
   createdAt       DateTime      @default(now()) @map("created_at")
 
@@ -605,20 +610,20 @@ enum StockOpnameStatus {
 }
 
 model StockOpname {
-  id           String             @id @default(uuid())
-  opnameNumber String             @unique @map("opname_number")
+  id           String            @id @default(uuid())
+  opnameNumber String            @unique @map("opname_number")
   date         DateTime
-  status       StockOpnameStatus  @default(Draft)
+  status       StockOpnameStatus @default(Draft)
   notes        String?
   items        StockOpnameItem[]
-  fiscalYearId String             @map("fiscal_year_id")
-  fiscalYear   FiscalYear         @relation(fields: [fiscalYearId], references: [id])
-  createdById  String             @map("created_by_id")
-  createdBy    User               @relation("OpnameCreatedBy", fields: [createdById], references: [id])
-  submittedAt  DateTime?          @map("submitted_at")
-  cancelledAt  DateTime?          @map("cancelled_at")
-  createdAt    DateTime           @default(now()) @map("created_at")
-  updatedAt    DateTime           @updatedAt @map("updated_at")
+  fiscalYearId String            @map("fiscal_year_id")
+  fiscalYear   FiscalYear        @relation(fields: [fiscalYearId], references: [id])
+  createdById  String            @map("created_by_id")
+  createdBy    User              @relation("OpnameCreatedBy", fields: [createdById], references: [id])
+  submittedAt  DateTime?         @map("submitted_at")
+  cancelledAt  DateTime?         @map("cancelled_at")
+  createdAt    DateTime          @default(now()) @map("created_at")
+  updatedAt    DateTime          @updatedAt @map("updated_at")
 
   @@index([date])
   @@index([status])
@@ -632,11 +637,11 @@ model StockOpnameItem {
   stockOpname   StockOpname   @relation(fields: [stockOpnameId], references: [id], onDelete: Cascade)
   itemId        String        @map("item_id")
   item          InventoryItem @relation("OpnameLines", fields: [itemId], references: [id])
-  systemStock   Decimal       @db.Decimal(15, 3) @map("system_stock")
-  actualStock   Decimal       @db.Decimal(15, 3) @map("actual_stock")
+  systemStock   Decimal       @map("system_stock") @db.Decimal(15, 3)
+  actualStock   Decimal       @map("actual_stock") @db.Decimal(15, 3)
   difference    Decimal       @db.Decimal(15, 3)
-  unitCost      Decimal       @default(0) @db.Decimal(20, 2) @map("unit_cost")
-  totalValue    Decimal       @default(0) @db.Decimal(20, 2) @map("total_value")
+  unitCost      Decimal       @default(0) @map("unit_cost") @db.Decimal(20, 2)
+  totalValue    Decimal       @default(0) @map("total_value") @db.Decimal(20, 2)
   movementId    String?       @map("movement_id")
   notes         String?
   createdAt     DateTime      @default(now()) @map("created_at")
@@ -650,7 +655,7 @@ model Notification {
   id        String   @id @default(uuid())
   userId    String   @map("user_id")
   user      User     @relation("UserNotifications", fields: [userId], references: [id])
-  type      String   // invoice_overdue, payment_received, low_stock, system
+  type      String // invoice_overdue, payment_received, low_stock, system
   title     String
   message   String
   isRead    Boolean  @default(false) @map("is_read")
@@ -666,7 +671,7 @@ model RecurringTemplate {
   id           String    @id @default(uuid())
   name         String
   templateType String    @map("template_type") // journal, sales_invoice, purchase_invoice
-  frequency    String    // daily, weekly, monthly, quarterly, yearly
+  frequency    String // daily, weekly, monthly, quarterly, yearly
   dayOfMonth   Int?      @map("day_of_month")
   nextRunDate  DateTime  @map("next_run_date")
   lastRunDate  DateTime? @map("last_run_date")
@@ -682,33 +687,33 @@ model RecurringTemplate {
 }
 
 model BankReconciliation {
-  id               String                    @id @default(uuid())
-  accountId        String                    @map("account_id")
-  account          Account                   @relation("ReconciliationAccount", fields: [accountId], references: [id])
-  statementDate    DateTime                  @map("statement_date")
-  statementBalance Decimal                   @db.Decimal(15, 2) @map("statement_balance")
-  bookBalance      Decimal                   @default(0) @db.Decimal(15, 2) @map("book_balance")
-  status           String                    @default("Draft") // Draft, Completed
+  id               String                   @id @default(uuid())
+  accountId        String                   @map("account_id")
+  account          Account                  @relation("ReconciliationAccount", fields: [accountId], references: [id])
+  statementDate    DateTime                 @map("statement_date")
+  statementBalance Decimal                  @map("statement_balance") @db.Decimal(15, 2)
+  bookBalance      Decimal                  @default(0) @map("book_balance") @db.Decimal(15, 2)
+  status           String                   @default("Draft") // Draft, Completed
   notes            String?
   items            BankReconciliationItem[]
-  createdBy        String                    @map("created_by")
-  createdAt        DateTime                  @default(now()) @map("created_at")
-  updatedAt        DateTime                  @updatedAt @map("updated_at")
+  createdBy        String                   @map("created_by")
+  createdAt        DateTime                 @default(now()) @map("created_at")
+  updatedAt        DateTime                 @updatedAt @map("updated_at")
 
   @@index([accountId, statementDate])
   @@map("bank_reconciliations")
 }
 
 model BankReconciliationItem {
-  id               String              @id @default(uuid())
-  reconciliationId String              @map("reconciliation_id")
-  reconciliation   BankReconciliation  @relation(fields: [reconciliationId], references: [id], onDelete: Cascade)
-  ledgerEntryId    String?             @map("ledger_entry_id")
-  isMatched        Boolean             @default(false) @map("is_matched")
-  statementAmount  Decimal?            @db.Decimal(15, 2) @map("statement_amount")
-  statementDesc    String?             @map("statement_desc")
-  statementDate    DateTime?           @map("statement_date")
-  createdAt        DateTime            @default(now()) @map("created_at")
+  id               String             @id @default(uuid())
+  reconciliationId String             @map("reconciliation_id")
+  reconciliation   BankReconciliation @relation(fields: [reconciliationId], references: [id], onDelete: Cascade)
+  ledgerEntryId    String?            @map("ledger_entry_id")
+  isMatched        Boolean            @default(false) @map("is_matched")
+  statementAmount  Decimal?           @map("statement_amount") @db.Decimal(15, 2)
+  statementDesc    String?            @map("statement_desc")
+  statementDate    DateTime?          @map("statement_date")
+  createdAt        DateTime           @default(now()) @map("created_at")
 
   @@index([reconciliationId])
   @@map("bank_reconciliation_items")
@@ -718,7 +723,7 @@ model TaxConfig {
   id        String   @id @default(uuid())
   name      String
   rate      Decimal  @db.Decimal(5, 2)
-  type      String   // sales, purchase, withholding
+  type      String // sales, purchase, withholding
   accountId String?  @map("account_id")
   isActive  Boolean  @default(true) @map("is_active")
   createdAt DateTime @default(now()) @map("created_at")
@@ -733,7 +738,7 @@ model VendorDepositApplication {
   depositPayment    Payment         @relation("DepositApplications", fields: [depositPaymentId], references: [id])
   purchaseInvoiceId String          @map("purchase_invoice_id")
   purchaseInvoice   PurchaseInvoice @relation("DepositApplied", fields: [purchaseInvoiceId], references: [id])
-  appliedAmount     Decimal         @db.Decimal(15, 2) @map("applied_amount")
+  appliedAmount     Decimal         @map("applied_amount") @db.Decimal(15, 2)
   journalEntryId    String?         @unique @map("journal_entry_id")
   journalEntry      JournalEntry?   @relation(fields: [journalEntryId], references: [id])
   isCancelled       Boolean         @default(false) @map("is_cancelled")
@@ -748,19 +753,19 @@ model VendorDepositApplication {
 }
 
 model CustomerDepositApplication {
-  id                String        @id @default(uuid())
-  depositPaymentId  String        @map("deposit_payment_id")
-  depositPayment    Payment       @relation("CustomerDepositApplications", fields: [depositPaymentId], references: [id])
-  salesInvoiceId    String        @map("sales_invoice_id")
-  salesInvoice      SalesInvoice  @relation("CustomerDepositApplied", fields: [salesInvoiceId], references: [id])
-  appliedAmount     Decimal       @db.Decimal(15, 2) @map("applied_amount")
-  journalEntryId    String?       @unique @map("journal_entry_id")
-  journalEntry      JournalEntry? @relation(fields: [journalEntryId], references: [id])
-  isCancelled       Boolean       @default(false) @map("is_cancelled")
-  appliedAt         DateTime      @default(now()) @map("applied_at")
-  cancelledAt       DateTime?     @map("cancelled_at")
-  createdBy         String        @map("created_by")
-  user              User          @relation(fields: [createdBy], references: [id])
+  id               String        @id @default(uuid())
+  depositPaymentId String        @map("deposit_payment_id")
+  depositPayment   Payment       @relation("CustomerDepositApplications", fields: [depositPaymentId], references: [id])
+  salesInvoiceId   String        @map("sales_invoice_id")
+  salesInvoice     SalesInvoice  @relation("CustomerDepositApplied", fields: [salesInvoiceId], references: [id])
+  appliedAmount    Decimal       @map("applied_amount") @db.Decimal(15, 2)
+  journalEntryId   String?       @unique @map("journal_entry_id")
+  journalEntry     JournalEntry? @relation(fields: [journalEntryId], references: [id])
+  isCancelled      Boolean       @default(false) @map("is_cancelled")
+  appliedAt        DateTime      @default(now()) @map("applied_at")
+  cancelledAt      DateTime?     @map("cancelled_at")
+  createdBy        String        @map("created_by")
+  user             User          @relation(fields: [createdBy], references: [id])
 
   @@index([depositPaymentId])
   @@index([salesInvoiceId])
@@ -772,7 +777,7 @@ model ServiceItem {
   code              String             @unique
   name              String
   unit              String             @default("Jasa")
-  defaultRate       Decimal?           @db.Decimal(15, 2) @map("default_rate")
+  defaultRate       Decimal?           @map("default_rate") @db.Decimal(15, 2)
   accountId         String             @map("account_id")
   account           Account            @relation("ServiceItemAccount", fields: [accountId], references: [id])
   description       String?
@@ -805,34 +810,34 @@ model TransactionAttachment {
 }
 
 model FixedAsset {
-  id                     String              @id @default(uuid())
-  assetNumber            String              @unique @map("asset_number")
-  name                   String
-  category               String
-  description            String?
-  acquisitionDate        DateTime            @map("acquisition_date")
-  acquisitionCost        Decimal             @db.Decimal(20, 2) @map("acquisition_cost")
-  usefulLifeMonths       Int                 @map("useful_life_months")
-  salvageValue           Decimal             @default(0) @db.Decimal(20, 2) @map("salvage_value")
-  depreciationMethod     String              @default("straight_line") @map("depreciation_method")
-  accumulatedDepreciation Decimal            @default(0) @db.Decimal(20, 2) @map("accumulated_depreciation")
-  bookValue              Decimal             @db.Decimal(20, 2) @map("book_value")
-  status                 String              @default("Active")
-  disposalDate           DateTime?           @map("disposal_date")
-  disposalAmount         Decimal?            @db.Decimal(20, 2) @map("disposal_amount")
-  assetAccountId         String              @map("asset_account_id")
-  assetAccount           Account             @relation("AssetAccount", fields: [assetAccountId], references: [id])
-  depreciationAccountId  String              @map("depreciation_account_id")
-  depreciationAccount    Account             @relation("DepreciationAccount", fields: [depreciationAccountId], references: [id])
-  accumulatedDepAccountId String             @map("accumulated_dep_account_id")
-  accumulatedDepAccount  Account             @relation("AccumulatedDepAccount", fields: [accumulatedDepAccountId], references: [id])
-  fiscalYearId           String              @map("fiscal_year_id")
-  fiscalYear             FiscalYear          @relation(fields: [fiscalYearId], references: [id])
-  createdBy              String              @map("created_by")
-  user                   User                @relation("AssetCreatedBy", fields: [createdBy], references: [id])
-  depreciationEntries    DepreciationEntry[]
-  createdAt              DateTime            @default(now()) @map("created_at")
-  updatedAt              DateTime            @updatedAt @map("updated_at")
+  id                      String              @id @default(uuid())
+  assetNumber             String              @unique @map("asset_number")
+  name                    String
+  category                String
+  description             String?
+  acquisitionDate         DateTime            @map("acquisition_date")
+  acquisitionCost         Decimal             @map("acquisition_cost") @db.Decimal(20, 2)
+  usefulLifeMonths        Int                 @map("useful_life_months")
+  salvageValue            Decimal             @default(0) @map("salvage_value") @db.Decimal(20, 2)
+  depreciationMethod      String              @default("straight_line") @map("depreciation_method")
+  accumulatedDepreciation Decimal             @default(0) @map("accumulated_depreciation") @db.Decimal(20, 2)
+  bookValue               Decimal             @map("book_value") @db.Decimal(20, 2)
+  status                  String              @default("Active")
+  disposalDate            DateTime?           @map("disposal_date")
+  disposalAmount          Decimal?            @map("disposal_amount") @db.Decimal(20, 2)
+  assetAccountId          String              @map("asset_account_id")
+  assetAccount            Account             @relation("AssetAccount", fields: [assetAccountId], references: [id])
+  depreciationAccountId   String              @map("depreciation_account_id")
+  depreciationAccount     Account             @relation("DepreciationAccount", fields: [depreciationAccountId], references: [id])
+  accumulatedDepAccountId String              @map("accumulated_dep_account_id")
+  accumulatedDepAccount   Account             @relation("AccumulatedDepAccount", fields: [accumulatedDepAccountId], references: [id])
+  fiscalYearId            String              @map("fiscal_year_id")
+  fiscalYear              FiscalYear          @relation(fields: [fiscalYearId], references: [id])
+  createdBy               String              @map("created_by")
+  user                    User                @relation("AssetCreatedBy", fields: [createdBy], references: [id])
+  depreciationEntries     DepreciationEntry[]
+  createdAt               DateTime            @default(now()) @map("created_at")
+  updatedAt               DateTime            @updatedAt @map("updated_at")
 
   @@index([category])
   @@index([status])
@@ -840,15 +845,15 @@ model FixedAsset {
 }
 
 model DepreciationEntry {
-  id            String      @id @default(uuid())
-  fixedAssetId  String      @map("fixed_asset_id")
-  fixedAsset    FixedAsset  @relation(fields: [fixedAssetId], references: [id], onDelete: Cascade)
-  periodDate    DateTime    @map("period_date")
-  amount        Decimal     @db.Decimal(20, 2)
-  journalEntryId String?   @map("journal_entry_id")
-  journalEntry  JournalEntry? @relation(fields: [journalEntryId], references: [id], onDelete: SetNull)
-  isPosted      Boolean     @default(false) @map("is_posted")
-  createdAt     DateTime    @default(now()) @map("created_at")
+  id             String        @id @default(uuid())
+  fixedAssetId   String        @map("fixed_asset_id")
+  fixedAsset     FixedAsset    @relation(fields: [fixedAssetId], references: [id], onDelete: Cascade)
+  periodDate     DateTime      @map("period_date")
+  amount         Decimal       @db.Decimal(20, 2)
+  journalEntryId String?       @map("journal_entry_id")
+  journalEntry   JournalEntry? @relation(fields: [journalEntryId], references: [id], onDelete: SetNull)
+  isPosted       Boolean       @default(false) @map("is_posted")
+  createdAt      DateTime      @default(now()) @map("created_at")
 
   @@index([fixedAssetId])
   @@index([periodDate])
@@ -856,13 +861,13 @@ model DepreciationEntry {
 }
 
 model ApprovalRule {
-  id            String   @id @default(uuid())
-  documentType  String   @map("document_type")
-  minAmount     Decimal  @default(0) @db.Decimal(20, 2) @map("min_amount")
-  requiredRole  String   @map("required_role")
-  isActive      Boolean  @default(true) @map("is_active")
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
+  id           String   @id @default(uuid())
+  documentType String   @map("document_type")
+  minAmount    Decimal  @default(0) @map("min_amount") @db.Decimal(20, 2)
+  requiredRole String   @map("required_role")
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
 
   @@index([documentType])
   @@map("approval_rules")
@@ -889,4 +894,51 @@ model ApprovalRequest {
   @@index([status])
   @@index([requestedBy])
   @@map("approval_requests")
+}
+
+// ─── COGS Backfill Queue ──────────────────────────────────────────────────────
+// Tracks pending COGS adjustments for sales invoices posted with negative stock.
+// Settled FIFO when matching inventory replenishes (purchase / production / adjustment).
+model CogsBackfillQueue {
+  id                 String                   @id @default(uuid())
+  salesInvoiceId     String                   @map("sales_invoice_id")
+  salesInvoice       SalesInvoice             @relation(fields: [salesInvoiceId], references: [id], onDelete: Cascade)
+  salesInvoiceItemId String                   @map("sales_invoice_item_id")
+  salesInvoiceItem   SalesInvoiceItem         @relation(fields: [salesInvoiceItemId], references: [id], onDelete: Cascade)
+  inventoryItemId    String                   @map("inventory_item_id")
+  inventoryItem      InventoryItem            @relation("CogsBackfillItem", fields: [inventoryItemId], references: [id])
+  qtyPending         Decimal                  @map("qty_pending") @db.Decimal(15, 3)
+  qtyOriginal        Decimal                  @map("qty_original") @db.Decimal(15, 3)
+  costAtSale         Decimal                  @map("cost_at_sale") @db.Decimal(20, 2)
+  status             String                   @default("Pending") // Pending / PartiallySettled / Settled
+  fiscalYearId       String                   @map("fiscal_year_id")
+  fiscalYear         FiscalYear               @relation("CogsBackfillFY", fields: [fiscalYearId], references: [id])
+  settlements        CogsBackfillSettlement[]
+  createdAt          DateTime                 @default(now()) @map("created_at")
+  settledAt          DateTime?                @map("settled_at")
+
+  @@index([status])
+  @@index([inventoryItemId, status])
+  @@index([salesInvoiceId])
+  @@index([createdAt])
+  @@map("cogs_backfill_queue")
+}
+
+model CogsBackfillSettlement {
+  id             String            @id @default(uuid())
+  queueId        String            @map("queue_id")
+  queue          CogsBackfillQueue @relation(fields: [queueId], references: [id], onDelete: Cascade)
+  qtySettled     Decimal           @map("qty_settled") @db.Decimal(15, 3)
+  costAtSettle   Decimal           @map("cost_at_settle") @db.Decimal(20, 2)
+  differential   Decimal           @db.Decimal(20, 2)
+  journalEntryId String?           @map("journal_entry_id")
+  journalEntry   JournalEntry?     @relation("CogsBackfillJE", fields: [journalEntryId], references: [id])
+  triggerSource  String            @map("trigger_source") // PurchaseInvoice / ProductionRun / StockMovement
+  triggerRefId   String?           @map("trigger_ref_id")
+  triggerRefNo   String?           @map("trigger_ref_no")
+  createdAt      DateTime          @default(now()) @map("created_at")
+
+  @@index([queueId])
+  @@index([journalEntryId])
+  @@map("cogs_backfill_settlements")
 }

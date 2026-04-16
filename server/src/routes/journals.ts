@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { AuthRequest, roleMiddleware } from '../middleware/auth';
 import { updateBalancesForItems } from '../utils/accountBalance';
+import { applyPartyImpact } from '../utils/partyBalance';
 import { generateDocumentNumber } from '../utils/documentNumber';
 import { getOpenFiscalYear } from '../utils/fiscalYear';
 import { validateBody } from '../utils/validate';
@@ -98,7 +99,11 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
             })),
           },
         },
-        include: { items: true },
+        include: {
+          items: {
+            include: { account: { select: { accountNumber: true, rootType: true } } },
+          },
+        },
       });
 
       // Post to immutable ledger
@@ -126,26 +131,19 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
         }))
       );
 
-      // Update party outstanding amounts (account-aware direction)
-      for (const item of journalEntry.items) {
-        if (item.partyId) {
-          const account = await tx.account.findUnique({
-            where: { id: item.accountId },
-            select: { rootType: true },
-          });
-          // ASSET/EXPENSE (debit-normal): debit increases outstanding
-          // LIABILITY/EQUITY/REVENUE (credit-normal): credit increases outstanding
-          const impact = account?.rootType === 'ASSET' || account?.rootType === 'EXPENSE'
-            ? Number(item.debit) - Number(item.credit)
-            : Number(item.credit) - Number(item.debit);
-          if (impact !== 0) {
-            await tx.party.update({
-              where: { id: item.partyId },
-              data: { outstandingAmount: { increment: impact } },
-            });
-          }
-        }
-      }
+      // Update party denorm balances — account-aware so UM (2.1.2/1.3) lines
+      // hit customerDepositBalance/depositBalance instead of outstandingAmount.
+      await applyPartyImpact(
+        tx,
+        journalEntry.items.map((i) => ({
+          partyId: i.partyId,
+          debit: Number(i.debit),
+          credit: Number(i.credit),
+          accountNumber: i.account.accountNumber,
+          rootType: i.account.rootType,
+        })),
+        'apply',
+      );
 
       return journalEntry;
     }, { timeout: 15000 });
@@ -183,7 +181,9 @@ router.patch('/:id/cancel', roleMiddleware(['Admin', 'Accountant']), async (req:
     const entry = await prisma.journalEntry.findUnique({
       where: { id },
       include: {
-        items: { include: { account: { select: { rootType: true } } } },
+        items: {
+          include: { account: { select: { accountNumber: true, rootType: true } } },
+        },
         payment: { select: { id: true } },
       },
     });
@@ -208,24 +208,60 @@ router.patch('/:id/cancel', roleMiddleware(['Admin', 'Accountant']), async (req:
         tx,
         entry.items.map((i) => ({
           accountId: i.accountId,
-          debit: Number(i.credit),  // swap: old credit becomes debit
-          credit: Number(i.debit),  // swap: old debit becomes credit
-        }))
+          debit: Number(i.credit),
+          credit: Number(i.debit),
+        })),
       );
 
-      // Reverse party outstanding amounts
-      for (const item of entry.items) {
-        if (item.partyId) {
-          const isDebitNormal = item.account.rootType === 'ASSET' || item.account.rootType === 'EXPENSE';
-          const reverseImpact = isDebitNormal
-            ? Number(item.credit) - Number(item.debit)
-            : Number(item.debit) - Number(item.credit);
-          if (reverseImpact !== 0) {
-            await tx.party.update({
-              where: { id: item.partyId },
-              data: { outstandingAmount: { increment: reverseImpact } },
-            });
-          }
+      // Reverse party denorm balances — symmetric with POST classification.
+      await applyPartyImpact(
+        tx,
+        entry.items.map((i) => ({
+          partyId: i.partyId,
+          debit: Number(i.debit),
+          credit: Number(i.credit),
+          accountNumber: i.account.accountNumber,
+          rootType: i.account.rootType,
+        })),
+        'reverse',
+      );
+
+      // Undo refund/offset side-effects created by customerDeposits.ts.
+      // Offset JVs: linked customer_deposit_applications → mark cancelled and
+      // restore the sales invoice outstanding + status.
+      const offsetApps = await tx.customerDepositApplication.findMany({
+        where: { journalEntryId: entry.id, isCancelled: false },
+      });
+      for (const app of offsetApps) {
+        await tx.customerDepositApplication.update({
+          where: { id: app.id },
+          data: { isCancelled: true, cancelledAt: new Date() },
+        });
+        const inv = await tx.salesInvoice.findUnique({ where: { id: app.salesInvoiceId } });
+        if (inv) {
+          const restored = Number(inv.outstanding) + Number(app.appliedAmount);
+          const newStatus =
+            restored >= Number(inv.grandTotal) - 0.01 ? 'Submitted' : 'PartiallyPaid';
+          await tx.salesInvoice.update({
+            where: { id: inv.id },
+            data: { outstanding: restored, status: newStatus },
+          });
+        }
+      }
+
+      // Refund JVs: narration pattern "Refund UM Pelanggan: {paymentNumber} - ...".
+      // Roll back payment.refundedAmount by the DR amount on the 2.1.2 line.
+      const refundMatch = entry.narration?.match(/^Refund UM Pelanggan:\s*(\S+)/);
+      if (refundMatch) {
+        const paymentNumber = refundMatch[1];
+        const depositLine = entry.items.find(
+          (i) => i.account.accountNumber === '2.1.2' && Number(i.debit) > 0,
+        );
+        if (depositLine) {
+          await tx.payment.updateMany({
+            where: { paymentNumber },
+            data: { refundedAmount: { decrement: Number(depositLine.debit) } },
+          });
         }
       }
 
@@ -241,8 +277,8 @@ router.patch('/:id/cancel', roleMiddleware(['Admin', 'Accountant']), async (req:
           date: new Date(),
           accountId: item.accountId,
           partyId: item.partyId,
-          debit: item.credit,   // reversed
-          credit: item.debit,   // reversed
+          debit: item.credit,
+          credit: item.debit,
           referenceType: 'JournalEntry' as const,
           referenceId: entry.id,
           description: `[BATAL] ${item.description || entry.narration}`,
