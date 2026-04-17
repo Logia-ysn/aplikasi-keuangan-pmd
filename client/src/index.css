@@ -410,14 +410,7 @@ body {
     size: A4;
   }
 
-  /* Landscape pages (daily report, etc.) */
-  @page landscape {
-    margin: 1cm;
-    size: A4 landscape;
-  }
-  .print-landscape {
-    page: landscape;
-  }
+  /* Compact print for landscape reports */
   .print-landscape .data-table {
     font-size: 8pt !important;
   }

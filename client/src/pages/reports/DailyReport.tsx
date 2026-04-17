@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import {
@@ -49,6 +49,14 @@ function EmptyRow({ colSpan, message }: { colSpan: number; message?: string }) {
 const DailyReport = () => {
   const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const company = useCompanyPDF();
+
+  useEffect(() => {
+    const style = document.createElement('style');
+    style.id = 'daily-report-print';
+    style.textContent = '@page { size: A4 landscape; margin: 1cm; }';
+    document.head.appendChild(style);
+    return () => { style.remove(); };
+  }, []);
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['daily-report', date],
