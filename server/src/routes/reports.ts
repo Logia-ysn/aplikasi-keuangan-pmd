@@ -818,4 +818,271 @@ router.get('/receivable-schedule', async (req, res) => {
   }
 });
 
+// GET /api/reports/daily — consolidated daily activity report
+router.get('/daily', async (req, res) => {
+  const { date: rawDate } = req.query;
+  const dateStr = typeof rawDate === 'string' && rawDate ? rawDate : new Date().toISOString().slice(0, 10);
+  const dayStart = new Date(dateStr);
+  if (isNaN(dayStart.getTime())) {
+    return res.status(400).json({ error: 'Parameter date tidak valid.' });
+  }
+  const dayEnd = new Date(dateStr);
+  dayEnd.setHours(23, 59, 59, 999);
+
+  try {
+    const activeStatus = { notIn: ['Draft' as const, 'Cancelled' as const] };
+    const dayRange = { gte: dayStart, lte: dayEnd };
+
+    const [
+      salesInvoices,
+      purchaseInvoices,
+      productionRuns,
+      paymentsData,
+      manualJournals,
+      arInvoices,
+      apInvoices,
+      vendorDepositPayments,
+    ] = await Promise.all([
+      // 1. Sales invoices of the day
+      prisma.salesInvoice.findMany({
+        where: { date: dayRange, status: activeStatus },
+        include: {
+          customer: { select: { name: true } },
+        },
+        orderBy: { date: 'asc' },
+      }),
+      // 2. Purchase invoices of the day
+      prisma.purchaseInvoice.findMany({
+        where: { date: dayRange, status: activeStatus },
+        include: {
+          supplier: { select: { name: true } },
+        },
+        orderBy: { date: 'asc' },
+      }),
+      // 3. Production runs of the day
+      prisma.productionRun.findMany({
+        where: { date: dayRange, isCancelled: false },
+        include: {
+          items: { include: { item: { select: { name: true, unit: true } } } },
+        },
+        orderBy: { date: 'asc' },
+      }),
+      // 4. Payments of the day
+      prisma.payment.findMany({
+        where: { date: dayRange, status: 'Submitted' },
+        include: {
+          party: { select: { name: true } },
+          account: { select: { name: true, accountNumber: true } },
+        },
+        orderBy: { date: 'asc' },
+      }),
+      // 5. Manual journal count of the day
+      prisma.journalEntry.count({
+        where: { date: dayRange, status: 'Submitted' },
+      }),
+      // 6. All outstanding AR invoices (as of end of day)
+      prisma.salesInvoice.findMany({
+        where: { outstanding: { gt: 0 }, status: activeStatus },
+        include: { customer: { select: { name: true } } },
+        orderBy: { dueDate: 'asc' },
+      }),
+      // 7. All outstanding AP invoices
+      prisma.purchaseInvoice.findMany({
+        where: { outstanding: { gt: 0 }, status: activeStatus },
+        include: { supplier: { select: { name: true } } },
+        orderBy: { dueDate: 'asc' },
+      }),
+      // 8. Vendor deposits
+      prisma.payment.findMany({
+        where: { paymentType: 'VendorDeposit', status: 'Submitted' },
+        include: {
+          party: { select: { name: true } },
+          depositApplications: { select: { appliedAmount: true } },
+        },
+        orderBy: { date: 'desc' },
+      }),
+    ]);
+
+    // ── Cash/bank balances ──
+    const cashAccountsMapped = await systemAccounts.getAccounts('CASH');
+    const cashAccountIds = cashAccountsMapped.map((a) => a.id);
+    const cashAccountRows = cashAccountIds.length > 0
+      ? await prisma.account.findMany({
+          where: { id: { in: cashAccountIds } },
+          select: { id: true, name: true, accountNumber: true, balance: true },
+        })
+      : [];
+    const cashBalances = cashAccountRows.map((a) => ({
+      accountName: a.name,
+      accountNumber: a.accountNumber,
+      balance: Number(a.balance),
+    }));
+
+    // ── 1. Sales summary ──
+    const sales = {
+      invoices: salesInvoices.map((si) => ({
+        invoiceNumber: si.invoiceNumber,
+        customerName: si.customer?.name || '—',
+        grandTotal: Number(si.grandTotal),
+        outstanding: Number(si.outstanding),
+      })),
+      summary: {
+        count: salesInvoices.length,
+        totalRevenue: salesInvoices.reduce((s, si) => s + Number(si.grandTotal), 0),
+        totalNewReceivables: salesInvoices.reduce((s, si) => s + Number(si.outstanding), 0),
+      },
+    };
+
+    // ── 2. Purchases summary ──
+    const purchases = {
+      invoices: purchaseInvoices.map((pi) => ({
+        invoiceNumber: pi.invoiceNumber,
+        supplierName: pi.supplier?.name || '—',
+        grandTotal: Number(pi.grandTotal),
+        outstanding: Number(pi.outstanding),
+      })),
+      summary: {
+        count: purchaseInvoices.length,
+        totalSpend: purchaseInvoices.reduce((s, pi) => s + Number(pi.grandTotal), 0),
+        totalNewPayables: purchaseInvoices.reduce((s, pi) => s + Number(pi.outstanding), 0),
+      },
+    };
+
+    // ── 3. Production summary ──
+    const production = {
+      runs: productionRuns.map((pr) => {
+        const inputs = pr.items.filter((i) => i.lineType === 'Input');
+        const outputs = pr.items.filter((i) => i.lineType === 'Output');
+        return {
+          runNumber: pr.runNumber,
+          date: pr.date,
+          inputs: inputs.map((i) => ({ itemName: i.item.name, quantity: Number(i.quantity), unit: i.item.unit })),
+          outputs: outputs.map((i) => ({ itemName: i.item.name, quantity: Number(i.quantity), unit: i.item.unit, isByProduct: i.isByProduct })),
+          rendemenPct: pr.rendemenPct ? Number(pr.rendemenPct) : null,
+        };
+      }),
+      summary: {
+        totalRuns: productionRuns.length,
+        totalInputKg: productionRuns.reduce((s, pr) =>
+          s + pr.items.filter((i) => i.lineType === 'Input').reduce((ss, i) => ss + Number(i.quantity), 0), 0),
+        totalOutputKg: productionRuns.reduce((s, pr) =>
+          s + pr.items.filter((i) => i.lineType === 'Output').reduce((ss, i) => ss + Number(i.quantity), 0), 0),
+        avgRendemen: productionRuns.length > 0
+          ? +(productionRuns.reduce((s, pr) => s + Number(pr.rendemenPct || 0), 0) / productionRuns.length).toFixed(1)
+          : 0,
+      },
+    };
+
+    // ── 4. Finance summary ──
+    const paymentsIn = paymentsData.filter((p) => p.paymentType === 'Receive' || p.paymentType === 'CustomerDeposit');
+    const paymentsOut = paymentsData.filter((p) => p.paymentType === 'Pay' || p.paymentType === 'VendorDeposit');
+    const finance = {
+      paymentsIn: paymentsIn.map((p) => ({
+        paymentNumber: p.paymentNumber,
+        partyName: p.party?.name || '—',
+        amount: Number(p.amount),
+        accountName: p.account?.name || '—',
+      })),
+      paymentsOut: paymentsOut.map((p) => ({
+        paymentNumber: p.paymentNumber,
+        partyName: p.party?.name || '—',
+        amount: Number(p.amount),
+        accountName: p.account?.name || '—',
+      })),
+      manualJournals,
+      cashBankBalances: cashBalances,
+      summary: {
+        totalIn: paymentsIn.reduce((s, p) => s + Number(p.amount), 0),
+        totalOut: paymentsOut.reduce((s, p) => s + Number(p.amount), 0),
+        netCashFlow: paymentsIn.reduce((s, p) => s + Number(p.amount), 0) - paymentsOut.reduce((s, p) => s + Number(p.amount), 0),
+      },
+    };
+
+    // ── 5. Receivables (aging) ──
+    const agingBucket = (dueDate: Date | null, refDate: Date) => {
+      if (!dueDate) return 'current';
+      const diff = Math.floor((refDate.getTime() - dueDate.getTime()) / 86400000);
+      if (diff <= 0) return 'current';
+      if (diff <= 30) return 'd1_30';
+      if (diff <= 60) return 'd31_60';
+      if (diff <= 90) return 'd61_90';
+      return 'd91_plus';
+    };
+
+    const arByCustomer = new Map<string, { customerName: string; current: number; d1_30: number; d31_60: number; d61_90: number; d91_plus: number; total: number }>();
+    for (const inv of arInvoices) {
+      const name = inv.customer?.name || '—';
+      const entry = arByCustomer.get(name) || { customerName: name, current: 0, d1_30: 0, d31_60: 0, d61_90: 0, d91_plus: 0, total: 0 };
+      const bucket = agingBucket(inv.dueDate, dayEnd);
+      const amt = Number(inv.outstanding);
+      entry[bucket] += amt;
+      entry.total += amt;
+      arByCustomer.set(name, entry);
+    }
+    const receivables = {
+      byCustomer: [...arByCustomer.values()].sort((a, b) => b.total - a.total),
+      summary: {
+        totalOutstanding: arInvoices.reduce((s, i) => s + Number(i.outstanding), 0),
+        totalOverdue: arInvoices.filter((i) => i.dueDate && i.dueDate < dayEnd).reduce((s, i) => s + Number(i.outstanding), 0),
+        totalCustomers: arByCustomer.size,
+      },
+    };
+
+    // ── 6. Payables (aging) ──
+    const apBySupplier = new Map<string, { supplierName: string; current: number; d1_30: number; d31_60: number; d61_90: number; d91_plus: number; total: number }>();
+    for (const inv of apInvoices) {
+      const name = inv.supplier?.name || '—';
+      const entry = apBySupplier.get(name) || { supplierName: name, current: 0, d1_30: 0, d31_60: 0, d61_90: 0, d91_plus: 0, total: 0 };
+      const bucket = agingBucket(inv.dueDate, dayEnd);
+      const amt = Number(inv.outstanding);
+      entry[bucket] += amt;
+      entry.total += amt;
+      apBySupplier.set(name, entry);
+    }
+    const payables = {
+      bySupplier: [...apBySupplier.values()].sort((a, b) => b.total - a.total),
+      summary: {
+        totalOutstanding: apInvoices.reduce((s, i) => s + Number(i.outstanding), 0),
+        totalOverdue: apInvoices.filter((i) => i.dueDate && i.dueDate < dayEnd).reduce((s, i) => s + Number(i.outstanding), 0),
+        totalSuppliers: apBySupplier.size,
+      },
+    };
+
+    // ── 7. Vendor deposits ──
+    const vendorDeposits = {
+      deposits: vendorDepositPayments.map((p) => {
+        const totalApplied = p.depositApplications.reduce((s, a) => s + Number(a.appliedAmount), 0);
+        return {
+          paymentNumber: p.paymentNumber,
+          supplierName: p.party?.name || '—',
+          amount: Number(p.amount),
+          totalApplied,
+          remaining: Number(p.amount) - totalApplied,
+          date: p.date,
+        };
+      }).filter((d) => d.remaining > 0),
+      summary: {
+        totalDeposits: vendorDepositPayments.reduce((s, p) => s + Number(p.amount), 0),
+        totalApplied: vendorDepositPayments.reduce((s, p) => s + p.depositApplications.reduce((ss, a) => ss + Number(a.appliedAmount), 0), 0),
+        totalRemaining: 0,
+      },
+    };
+    vendorDeposits.summary.totalRemaining = vendorDeposits.deposits.reduce((s, d) => s + d.remaining, 0);
+
+    return res.json({
+      date: dateStr,
+      sales,
+      purchases,
+      production,
+      finance,
+      receivables,
+      payables,
+      vendorDeposits,
+    });
+  } catch (error) {
+    logger.error({ error }, 'GET /reports/daily error');
+    return res.status(500).json({ error: 'Gagal mengambil laporan harian.' });
+  }
+});
+
 export default router;

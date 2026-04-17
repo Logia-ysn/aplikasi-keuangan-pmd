@@ -34,6 +34,7 @@ import PayableSchedule from './pages/reports/PayableSchedule';
 import ReceivableSchedule from './pages/reports/ReceivableSchedule';
 import FixedAssetsPage from './pages/FixedAssetsPage';
 import ApprovalsPage from './pages/ApprovalsPage';
+import DailyReport from './pages/reports/DailyReport';
 
 
 const ProtectedRoute = () => {
@@ -87,6 +88,7 @@ function App() {
 
             {/* Report Routes */}
             <Route path="/reports" element={<FinanceRoute><Reports /></FinanceRoute>} />
+            <Route path="/reports/daily" element={<FinanceRoute><DailyReport /></FinanceRoute>} />
             <Route path="/reports/trial-balance" element={<FinanceRoute><TrialBalance /></FinanceRoute>} />
             <Route path="/reports/profit-loss" element={<FinanceRoute><ProfitLoss /></FinanceRoute>} />
             <Route path="/reports/balance-sheet" element={<FinanceRoute><BalanceSheet /></FinanceRoute>} />

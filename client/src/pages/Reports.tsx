@@ -1,8 +1,14 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { BarChart3, Scale, Clock, ClipboardList, Banknote, ChevronRight, Receipt, BookOpen, Package, CreditCard, FileText } from 'lucide-react';
+import { BarChart3, Scale, Clock, ClipboardList, Banknote, ChevronRight, Receipt, BookOpen, Package, CreditCard, FileText, CalendarDays } from 'lucide-react';
 
 const reports = [
+  {
+    title: 'Laporan Harian',
+    description: 'Ringkasan lengkap aktivitas penjualan, pembelian, produksi, keuangan, piutang, hutang, dan deposit.',
+    icon: CalendarDays,
+    path: '/reports/daily',
+  },
   {
     title: 'Neraca Saldo',
     description: 'Verifikasi keseimbangan saldo debit dan kredit per akun.',
