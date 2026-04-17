@@ -72,7 +72,7 @@ const DailyReport = () => {
       onRetry={() => refetch()}
     >
       {data && (
-        <div className="space-y-6">
+        <div className="space-y-6 print-landscape">
           {/* 1. PENJUALAN */}
           <section className="bg-white border border-gray-200 rounded-xl p-5">
             <SectionHeader icon={ShoppingCart} title="Penjualan" count={data.sales.summary.count} />
