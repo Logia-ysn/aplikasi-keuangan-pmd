@@ -848,6 +848,7 @@ router.get('/daily', async (req, res) => {
         where: { date: dayRange, status: activeStatus },
         include: {
           customer: { select: { name: true } },
+          items: { select: { itemName: true, quantity: true, unit: true, amount: true } },
         },
         orderBy: { date: 'asc' },
       }),
@@ -856,6 +857,7 @@ router.get('/daily', async (req, res) => {
         where: { date: dayRange, status: activeStatus },
         include: {
           supplier: { select: { name: true } },
+          items: { select: { itemName: true, quantity: true, unit: true, amount: true } },
         },
         orderBy: { date: 'asc' },
       }),
@@ -923,6 +925,8 @@ router.get('/daily', async (req, res) => {
       invoices: salesInvoices.map((si) => ({
         invoiceNumber: si.invoiceNumber,
         customerName: si.customer?.name || '—',
+        items: si.items.map((it) => ({ itemName: it.itemName, quantity: Number(it.quantity), unit: it.unit, amount: Number(it.amount) })),
+        totalQty: si.items.reduce((s, it) => s + Number(it.quantity), 0),
         grandTotal: Number(si.grandTotal),
         outstanding: Number(si.outstanding),
       })),
@@ -930,6 +934,7 @@ router.get('/daily', async (req, res) => {
         count: salesInvoices.length,
         totalRevenue: salesInvoices.reduce((s, si) => s + Number(si.grandTotal), 0),
         totalNewReceivables: salesInvoices.reduce((s, si) => s + Number(si.outstanding), 0),
+        totalQty: salesInvoices.reduce((s, si) => s + si.items.reduce((ss, it) => ss + Number(it.quantity), 0), 0),
       },
     };
 
@@ -938,6 +943,8 @@ router.get('/daily', async (req, res) => {
       invoices: purchaseInvoices.map((pi) => ({
         invoiceNumber: pi.invoiceNumber,
         supplierName: pi.supplier?.name || '—',
+        items: pi.items.map((it) => ({ itemName: it.itemName, quantity: Number(it.quantity), unit: it.unit, amount: Number(it.amount) })),
+        totalQty: pi.items.reduce((s, it) => s + Number(it.quantity), 0),
         grandTotal: Number(pi.grandTotal),
         outstanding: Number(pi.outstanding),
       })),
@@ -945,6 +952,7 @@ router.get('/daily', async (req, res) => {
         count: purchaseInvoices.length,
         totalSpend: purchaseInvoices.reduce((s, pi) => s + Number(pi.grandTotal), 0),
         totalNewPayables: purchaseInvoices.reduce((s, pi) => s + Number(pi.outstanding), 0),
+        totalQty: purchaseInvoices.reduce((s, pi) => s + pi.items.reduce((ss, it) => ss + Number(it.quantity), 0), 0),
       },
     };
 

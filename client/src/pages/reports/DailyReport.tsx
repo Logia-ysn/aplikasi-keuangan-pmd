@@ -76,20 +76,23 @@ const DailyReport = () => {
           {/* 1. PENJUALAN */}
           <section className="bg-white border border-gray-200 rounded-xl p-5">
             <SectionHeader icon={ShoppingCart} title="Penjualan" count={data.sales.summary.count} />
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
               <SummaryCard label="Jumlah Faktur" value={String(data.sales.summary.count)} />
+              <SummaryCard label="Total Qty" value={`${data.sales.summary.totalQty.toLocaleString('id-ID')} kg`} />
               <SummaryCard label="Total Omzet" value={formatRupiah(data.sales.summary.totalRevenue)} />
               <SummaryCard label="Piutang Baru" value={formatRupiah(data.sales.summary.totalNewReceivables)} />
             </div>
             <div className="table-responsive">
               <table className="data-table text-xs">
-                <thead><tr><th>No. Faktur</th><th>Pelanggan</th><th className="text-right">Total</th><th className="text-right">Sisa Piutang</th></tr></thead>
+                <thead><tr><th>No. Faktur</th><th>Pelanggan</th><th>Item</th><th className="text-right">Qty</th><th className="text-right">Total</th><th className="text-right">Sisa Piutang</th></tr></thead>
                 <tbody>
-                  {data.sales.invoices.length === 0 ? <EmptyRow colSpan={4} message="Tidak ada penjualan hari ini" /> :
+                  {data.sales.invoices.length === 0 ? <EmptyRow colSpan={6} message="Tidak ada penjualan hari ini" /> :
                     data.sales.invoices.map((inv: any) => (
                       <tr key={inv.invoiceNumber}>
                         <td className="font-mono">{inv.invoiceNumber}</td>
                         <td>{inv.customerName}</td>
+                        <td className="text-gray-500">{inv.items.map((i: any) => i.itemName).join(', ')}</td>
+                        <td className="text-right tabular-nums">{inv.totalQty.toLocaleString('id-ID')}</td>
                         <td className="text-right tabular-nums">{formatRupiah(inv.grandTotal)}</td>
                         <td className="text-right tabular-nums">{formatRupiah(inv.outstanding)}</td>
                       </tr>
@@ -102,20 +105,23 @@ const DailyReport = () => {
           {/* 2. PEMBELIAN */}
           <section className="bg-white border border-gray-200 rounded-xl p-5">
             <SectionHeader icon={Truck} title="Pembelian" count={data.purchases.summary.count} />
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
               <SummaryCard label="Jumlah Faktur" value={String(data.purchases.summary.count)} />
+              <SummaryCard label="Total Qty" value={`${data.purchases.summary.totalQty.toLocaleString('id-ID')} kg`} />
               <SummaryCard label="Total Belanja" value={formatRupiah(data.purchases.summary.totalSpend)} />
               <SummaryCard label="Hutang Baru" value={formatRupiah(data.purchases.summary.totalNewPayables)} />
             </div>
             <div className="table-responsive">
               <table className="data-table text-xs">
-                <thead><tr><th>No. Faktur</th><th>Supplier</th><th className="text-right">Total</th><th className="text-right">Sisa Hutang</th></tr></thead>
+                <thead><tr><th>No. Faktur</th><th>Supplier</th><th>Item</th><th className="text-right">Qty</th><th className="text-right">Total</th><th className="text-right">Sisa Hutang</th></tr></thead>
                 <tbody>
-                  {data.purchases.invoices.length === 0 ? <EmptyRow colSpan={4} message="Tidak ada pembelian hari ini" /> :
+                  {data.purchases.invoices.length === 0 ? <EmptyRow colSpan={6} message="Tidak ada pembelian hari ini" /> :
                     data.purchases.invoices.map((inv: any) => (
                       <tr key={inv.invoiceNumber}>
                         <td className="font-mono">{inv.invoiceNumber}</td>
                         <td>{inv.supplierName}</td>
+                        <td className="text-gray-500">{inv.items.map((i: any) => i.itemName).join(', ')}</td>
+                        <td className="text-right tabular-nums">{inv.totalQty.toLocaleString('id-ID')}</td>
                         <td className="text-right tabular-nums">{formatRupiah(inv.grandTotal)}</td>
                         <td className="text-right tabular-nums">{formatRupiah(inv.outstanding)}</td>
                       </tr>
