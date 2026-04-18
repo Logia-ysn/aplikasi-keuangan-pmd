@@ -253,7 +253,7 @@ const PurchaseInvoiceModal: React.FC<PurchaseInvoiceModalProps> = ({ isOpen, onC
           {/* Meta */}
           <div className="p-4 sm:p-6 grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-8 border-b border-gray-100">
             <div>
-              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-2">Supplier / Pemasok</p>
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2">Supplier / Pemasok</p>
               <select value={partyId} onChange={(e) => setPartyId(e.target.value)} className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2">
                 <option value="">— Pilih Supplier —</option>
                 {parties?.map((p: any) => (
@@ -270,11 +270,11 @@ const PurchaseInvoiceModal: React.FC<PurchaseInvoiceModalProps> = ({ isOpen, onC
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">Tanggal Invoice</label>
+                <label className="block text-xs font-semibold text-gray-400 uppercase tracking-widest mb-1.5">Tanggal Invoice</label>
                 <input type="date" value={invoiceDate} onChange={(e) => setInvoiceDate(e.target.value)} className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
               <div>
-                <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">Jatuh Tempo</label>
+                <label className="block text-xs font-semibold text-gray-400 uppercase tracking-widest mb-1.5">Jatuh Tempo</label>
                 <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
             </div>
@@ -283,7 +283,7 @@ const PurchaseInvoiceModal: React.FC<PurchaseInvoiceModalProps> = ({ isOpen, onC
           {/* ITEMS — Desktop table */}
           <div className="px-4 sm:px-6 pt-5 pb-4">
             <div className="flex items-center justify-between mb-3">
-              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Daftar Barang</p>
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest">Daftar Barang</p>
               <div className="flex items-center gap-3">
                 <button onClick={addItem} className="flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-700">
                   <Plus size={13} /> Tambah Bahan
@@ -298,7 +298,7 @@ const PurchaseInvoiceModal: React.FC<PurchaseInvoiceModalProps> = ({ isOpen, onC
             <div className="hidden md:block border border-gray-200 rounded-xl overflow-x-auto">
               <table className="w-full text-sm min-w-[1400px]">
                 <thead>
-                  <tr className="bg-gray-50 border-b border-gray-200 text-[10px] font-semibold text-gray-400 uppercase tracking-wide">
+                  <tr className="bg-gray-50 border-b border-gray-200 text-xs font-semibold text-gray-400 uppercase tracking-wide">
                     <th className="text-left px-2 py-2 w-14">Tipe</th>
                     <th className="text-left px-2 py-2 min-w-[180px]">Item / Jasa</th>
                     <th className="text-left px-2 py-2 w-24">No. Mobil</th>
@@ -320,14 +320,14 @@ const PurchaseInvoiceModal: React.FC<PurchaseInvoiceModalProps> = ({ isOpen, onC
                     const isService = item.itemType === 'service';
                     return (
                       <tr key={item.id} className={`border-b border-gray-50 last:border-0 hover:bg-gray-50/50 ${isService ? 'bg-emerald-50/30' : ''}`}>
-                        <td className="px-2 py-2 text-center text-[10px]">
+                        <td className="px-2 py-2 text-center text-xs">
                           <span className={`inline-block px-1.5 py-0.5 rounded ${isService ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>
                             {isService ? 'Jasa' : 'Bahan'}
                           </span>
                         </td>
                         <td className="px-2 py-2">
                           {isService ? (
-                            <input type="text" value={item.itemName} onChange={(e) => updateItem(idx, 'itemName', e.target.value)} placeholder="Biaya angkutan, jasa giling..." className="w-full bg-transparent text-xs text-gray-800 border-none focus:ring-0 focus:outline-none p-0 placeholder:text-gray-300" />
+                            <input type="text" value={item.itemName} onChange={(e) => updateItem(idx, 'itemName', e.target.value)} placeholder="Biaya angkutan, jasa giling..." className="w-full bg-transparent text-xs text-gray-800 border-none focus:ring-0 focus:outline-none p-0 placeholder:text-gray-400" />
                           ) : (
                             <>
                               <select value={item.inventoryItemId} onChange={(e) => selectInventoryItem(idx, e.target.value)} className="w-full bg-transparent text-xs text-gray-800 border-none focus:ring-0 focus:outline-none p-0 cursor-pointer">
@@ -337,31 +337,31 @@ const PurchaseInvoiceModal: React.FC<PurchaseInvoiceModalProps> = ({ isOpen, onC
                                 ))}
                               </select>
                               {!item.inventoryItemId && (
-                                <input type="text" value={item.itemName} onChange={(e) => updateItem(idx, 'itemName', e.target.value)} placeholder="atau manual..." className="w-full bg-transparent text-[11px] text-gray-500 border-none focus:ring-0 focus:outline-none p-0 placeholder:text-gray-300" />
+                                <input type="text" value={item.itemName} onChange={(e) => updateItem(idx, 'itemName', e.target.value)} placeholder="atau manual..." className="w-full bg-transparent text-xs text-gray-500 border-none focus:ring-0 focus:outline-none p-0 placeholder:text-gray-400" />
                               )}
                             </>
                           )}
                         </td>
                         <td className="px-2 py-2">
-                          <input type="text" value={item.nomorMobil} onChange={(e) => updateItem(idx, 'nomorMobil', e.target.value)} placeholder={isService ? '—' : 'B 1234 ABC'} className="w-full bg-transparent text-xs text-gray-700 font-mono uppercase border-none focus:ring-0 focus:outline-none p-0 placeholder:text-gray-300 placeholder:normal-case" />
+                          <input type="text" value={item.nomorMobil} onChange={(e) => updateItem(idx, 'nomorMobil', e.target.value)} placeholder={isService ? '—' : 'B 1234 ABC'} className="w-full bg-transparent text-xs text-gray-700 font-mono uppercase border-none focus:ring-0 focus:outline-none p-0 placeholder:text-gray-400 placeholder:normal-case" />
                         </td>
                         <td className="px-2 py-2">
                           {isService ? (
-                            <input type="text" value={item.description} onChange={(e) => updateItem(idx, 'description', e.target.value)} placeholder="catatan..." className="w-full bg-transparent text-xs text-gray-700 border-none focus:ring-0 focus:outline-none p-0 placeholder:text-gray-300" />
+                            <input type="text" value={item.description} onChange={(e) => updateItem(idx, 'description', e.target.value)} placeholder="catatan..." className="w-full bg-transparent text-xs text-gray-700 border-none focus:ring-0 focus:outline-none p-0 placeholder:text-gray-400" />
                           ) : (
-                            <input type="text" value={item.kualitas} onChange={(e) => updateItem(idx, 'kualitas', e.target.value)} placeholder="KA 18%..." className="w-full bg-transparent text-xs text-gray-700 border-none focus:ring-0 focus:outline-none p-0 placeholder:text-gray-300" />
+                            <input type="text" value={item.kualitas} onChange={(e) => updateItem(idx, 'kualitas', e.target.value)} placeholder="KA 18%..." className="w-full bg-transparent text-xs text-gray-700 border-none focus:ring-0 focus:outline-none p-0 placeholder:text-gray-400" />
                           )}
                         </td>
                         <td className="px-2 py-2 text-right">
                           {isService ? (
-                            <span className="text-[11px] text-gray-300">—</span>
+                            <span className="text-xs text-gray-300">—</span>
                           ) : (
                             <input type="number" value={item.refaksi || ''} onChange={(e) => updateItem(idx, 'refaksi', Number(e.target.value))} placeholder="0" className="w-full bg-transparent text-xs text-amber-600 text-right font-mono border-none focus:ring-0 focus:outline-none p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
                           )}
                         </td>
                         <td className="px-2 py-2 text-right">
                           {isService ? (
-                            <span className="text-[11px] text-gray-300">—</span>
+                            <span className="text-xs text-gray-300">—</span>
                           ) : (
                             <input type="number" value={item.timbanganTruk || ''} onChange={(e) => updateItem(idx, 'timbanganTruk', Number(e.target.value))} placeholder="0" className="w-full bg-transparent text-xs text-gray-500 text-right font-mono border-none focus:ring-0 focus:outline-none p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
                           )}
@@ -406,7 +406,7 @@ const PurchaseInvoiceModal: React.FC<PurchaseInvoiceModalProps> = ({ isOpen, onC
                 return (
                   <div key={item.id} className={`border rounded-xl p-3 space-y-2 ${isService ? 'border-emerald-200 bg-emerald-50/30' : 'border-gray-200 bg-white'}`}>
                     <div className="flex items-center justify-between">
-                      <span className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded ${isService ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>
+                      <span className={`text-xs font-semibold uppercase px-1.5 py-0.5 rounded ${isService ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>
                         {isService ? 'Jasa / Biaya' : 'Bahan Baku'} #{idx + 1}
                       </span>
                       {items.length > 1 && (
@@ -416,7 +416,7 @@ const PurchaseInvoiceModal: React.FC<PurchaseInvoiceModalProps> = ({ isOpen, onC
                       )}
                     </div>
                     <div>
-                      <label className="block text-[10px] text-gray-400 mb-1">{isService ? 'Nama Jasa/Biaya' : 'Jenis Barang'}</label>
+                      <label className="block text-xs text-gray-400 mb-1">{isService ? 'Nama Jasa/Biaya' : 'Jenis Barang'}</label>
                       {isService ? (
                         <input type="text" value={item.itemName} onChange={(e) => updateItem(idx, 'itemName', e.target.value)} placeholder="Biaya angkutan, jasa giling..." className="w-full border border-gray-200 rounded-lg py-2 px-2 text-sm" />
                       ) : (
@@ -434,11 +434,11 @@ const PurchaseInvoiceModal: React.FC<PurchaseInvoiceModalProps> = ({ isOpen, onC
                       )}
                     </div>
                     <div>
-                      <label className="block text-[10px] text-gray-400 mb-1">No. Mobil</label>
+                      <label className="block text-xs text-gray-400 mb-1">No. Mobil</label>
                       <input type="text" value={item.nomorMobil} onChange={(e) => updateItem(idx, 'nomorMobil', e.target.value)} placeholder="B 1234 ABC" className="w-full border border-gray-200 rounded-lg py-2 px-2 text-sm font-mono uppercase" />
                     </div>
                     <div>
-                      <label className="block text-[10px] text-gray-400 mb-1">{isService ? 'Catatan' : 'Kualitas'}</label>
+                      <label className="block text-xs text-gray-400 mb-1">{isService ? 'Catatan' : 'Kualitas'}</label>
                       {isService ? (
                         <input type="text" value={item.description} onChange={(e) => updateItem(idx, 'description', e.target.value)} placeholder="catatan..." className="w-full border border-gray-200 rounded-lg py-2 px-2 text-sm" />
                       ) : (
@@ -449,33 +449,33 @@ const PurchaseInvoiceModal: React.FC<PurchaseInvoiceModalProps> = ({ isOpen, onC
                       {!isService && (
                         <>
                           <div>
-                            <label className="block text-[10px] text-gray-400 mb-1">Timb. Truk (kg)</label>
+                            <label className="block text-xs text-gray-400 mb-1">Timb. Truk (kg)</label>
                             <input type="number" value={item.timbanganTruk || ''} onChange={(e) => updateItem(idx, 'timbanganTruk', Number(e.target.value))} className="w-full border border-gray-200 rounded-lg py-2 px-2 text-sm font-mono" />
                           </div>
                           <div>
-                            <label className="block text-[10px] text-gray-400 mb-1">Refaksi (kg)</label>
+                            <label className="block text-xs text-gray-400 mb-1">Refaksi (kg)</label>
                             <input type="number" value={item.refaksi || ''} onChange={(e) => updateItem(idx, 'refaksi', Number(e.target.value))} className="w-full border border-gray-200 rounded-lg py-2 px-2 text-sm font-mono text-amber-600" />
                           </div>
                         </>
                       )}
                       <div className="col-span-2">
-                        <label className="block text-[10px] text-gray-400 mb-1">{isService ? 'Jumlah *' : 'Timbangan Diterima (kg) *'}</label>
+                        <label className="block text-xs text-gray-400 mb-1">{isService ? 'Jumlah *' : 'Timbangan Diterima (kg) *'}</label>
                         <input type="number" value={item.timbanganDiterima || ''} onChange={(e) => updateItem(idx, 'timbanganDiterima', Number(e.target.value))} className="w-full border border-gray-300 rounded-lg py-2 px-2 text-sm font-mono font-semibold" />
                       </div>
                       <div>
-                        <label className="block text-[10px] text-gray-400 mb-1">{isService ? 'Harga *' : 'Harga/kg *'}</label>
+                        <label className="block text-xs text-gray-400 mb-1">{isService ? 'Harga *' : 'Harga/kg *'}</label>
                         <input type="number" value={item.rate || ''} onChange={(e) => updateItem(idx, 'rate', Number(e.target.value))} className="w-full border border-gray-200 rounded-lg py-2 px-2 text-sm font-mono" />
                       </div>
                       <div>
-                        <label className="block text-[10px] text-gray-400 mb-1">Potongan</label>
+                        <label className="block text-xs text-gray-400 mb-1">Potongan</label>
                         <input type="number" value={item.potonganItem || ''} onChange={(e) => updateItem(idx, 'potonganItem', Number(e.target.value))} className="w-full border border-gray-200 rounded-lg py-2 px-2 text-sm font-mono text-red-500" />
                       </div>
                       <div>
-                        <label className="block text-[10px] text-gray-400 mb-1">PPN %</label>
+                        <label className="block text-xs text-gray-400 mb-1">PPN %</label>
                         <input type="number" value={item.taxPct || ''} onChange={(e) => updateItem(idx, 'taxPct', Number(e.target.value))} className="w-full border border-gray-200 rounded-lg py-2 px-2 text-sm font-mono text-blue-600" />
                       </div>
                       <div>
-                        <label className="block text-[10px] text-gray-400 mb-1">PPh %</label>
+                        <label className="block text-xs text-gray-400 mb-1">PPh %</label>
                         <input type="number" value={item.pphPct || ''} onChange={(e) => updateItem(idx, 'pphPct', Number(e.target.value))} className="w-full border border-gray-200 rounded-lg py-2 px-2 text-sm font-mono text-purple-600" />
                       </div>
                     </div>
@@ -492,7 +492,7 @@ const PurchaseInvoiceModal: React.FC<PurchaseInvoiceModalProps> = ({ isOpen, onC
           {/* ATTACHMENTS */}
           <div className="px-4 sm:px-6 pb-4">
             <div className="flex items-center justify-between mb-3">
-              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest flex items-center gap-1">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest flex items-center gap-1">
                 <Paperclip size={12} /> Dokumen Pendukung
               </p>
               <label className="flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-700 cursor-pointer">
@@ -521,8 +521,8 @@ const PurchaseInvoiceModal: React.FC<PurchaseInvoiceModalProps> = ({ isOpen, onC
           {/* SUMMARY + NOTES */}
           <div className="px-4 sm:px-6 pb-6 grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-8 items-start">
             <div>
-              <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">Catatan</label>
-              <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="No. PO, referensi..." rows={4} className="w-full border border-gray-200 rounded-lg py-2.5 px-3 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none placeholder:text-gray-300" />
+              <label className="block text-xs font-semibold text-gray-400 uppercase tracking-widest mb-1.5">Catatan</label>
+              <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="No. PO, referensi..." rows={4} className="w-full border border-gray-200 rounded-lg py-2.5 px-3 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none placeholder:text-gray-400" />
             </div>
             <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
               <div className="space-y-2 text-sm">

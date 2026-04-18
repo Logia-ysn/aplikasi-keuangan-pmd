@@ -170,7 +170,7 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
 
           {Object.entries(grouped).map(([type, items]) => (
             <div key={type}>
-              <div className="px-4 py-1.5 text-[10px] font-semibold uppercase tracking-wider"
+              <div className="px-4 py-1.5 text-xs font-semibold uppercase tracking-wider"
                 style={{ color: 'var(--color-text-muted)', backgroundColor: 'var(--color-bg-secondary)' }}
               >
                 {typeLabels[type] || type}
@@ -207,21 +207,21 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
         </div>
 
         {/* Footer hint */}
-        <div className="px-4 py-2 border-t flex items-center gap-4 text-[10px]"
+        <div className="px-4 py-2 border-t flex items-center gap-4 text-xs"
           style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-muted)' }}
         >
           <span>
-            <kbd className="px-1 py-0.5 rounded border text-[10px] font-mono"
+            <kbd className="px-1 py-0.5 rounded border text-xs font-mono"
               style={{ borderColor: 'var(--color-border)', backgroundColor: 'var(--color-bg-tertiary)' }}
             >&uarr;&darr;</kbd> navigasi
           </span>
           <span>
-            <kbd className="px-1 py-0.5 rounded border text-[10px] font-mono"
+            <kbd className="px-1 py-0.5 rounded border text-xs font-mono"
               style={{ borderColor: 'var(--color-border)', backgroundColor: 'var(--color-bg-tertiary)' }}
             >Enter</kbd> pilih
           </span>
           <span>
-            <kbd className="px-1 py-0.5 rounded border text-[10px] font-mono"
+            <kbd className="px-1 py-0.5 rounded border text-xs font-mono"
               style={{ borderColor: 'var(--color-border)', backgroundColor: 'var(--color-bg-tertiary)' }}
             >Esc</kbd> tutup
           </span>

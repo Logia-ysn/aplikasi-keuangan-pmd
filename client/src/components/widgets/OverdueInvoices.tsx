@@ -50,14 +50,14 @@ const OverdueInvoices: React.FC = () => {
                   </span>
                   <span
                     className={cn(
-                      'badge text-[10px]',
+                      'badge text-xs',
                       inv.type === 'sales' ? 'badge-blue' : 'badge-purple'
                     )}
                   >
                     {inv.type === 'sales' ? 'AR' : 'AP'}
                   </span>
                 </div>
-                <p className="text-[11px] truncate mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+                <p className="text-xs truncate mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
                   {inv.partyName}
                 </p>
               </div>
@@ -65,7 +65,7 @@ const OverdueInvoices: React.FC = () => {
                 <p className="text-xs font-semibold tabular-nums text-red-600">
                   {formatRupiah(inv.amount)}
                 </p>
-                <p className="text-[10px] text-orange-600 font-medium">
+                <p className="text-xs text-orange-600 font-medium">
                   {inv.daysOverdue} hari
                 </p>
               </div>

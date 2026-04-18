@@ -58,15 +58,15 @@ export default function FinancialRatios() {
       </div>
       <div className="mt-4 pt-3 border-t grid grid-cols-3 gap-2 text-center" style={{ borderColor: 'var(--color-border-light)' }}>
         <div>
-          <p className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>Total Aset</p>
+          <p className="text-xs uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>Total Aset</p>
           <p className="text-xs font-semibold mt-0.5" style={{ color: 'var(--color-text-primary)' }}>Rp {fmt(data.totalAssets)}</p>
         </div>
         <div>
-          <p className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>Liabilitas</p>
+          <p className="text-xs uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>Liabilitas</p>
           <p className="text-xs font-semibold mt-0.5" style={{ color: 'var(--color-text-primary)' }}>Rp {fmt(data.totalLiabilities)}</p>
         </div>
         <div>
-          <p className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>Ekuitas</p>
+          <p className="text-xs uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>Ekuitas</p>
           <p className="text-xs font-semibold mt-0.5" style={{ color: 'var(--color-text-primary)' }}>Rp {fmt(data.totalEquity)}</p>
         </div>
       </div>

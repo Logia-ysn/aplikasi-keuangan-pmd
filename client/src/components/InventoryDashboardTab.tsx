@@ -340,20 +340,20 @@ export default function InventoryDashboardTab() {
                   return (
                     <tr key={item.id} className="border-t" style={{ borderColor: 'var(--color-border)' }}>
                       <td className="py-2.5 pl-1">
-                        <span className="font-mono bg-gray-50 dark:bg-gray-800 px-1.5 py-0.5 rounded text-[11px]" style={{ color: 'var(--color-text-primary)' }}>
+                        <span className="font-mono bg-gray-50 dark:bg-gray-800 px-1.5 py-0.5 rounded text-xs" style={{ color: 'var(--color-text-primary)' }}>
                           {item.code}
                         </span>
                       </td>
                       <td className="py-2.5 font-medium" style={{ color: 'var(--color-text-primary)' }}>
                         {item.name}
                         {item.category && (
-                          <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-800" style={{ color: 'var(--color-text-muted)' }}>
+                          <span className="ml-1.5 text-xs px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-800" style={{ color: 'var(--color-text-muted)' }}>
                             {item.category}
                           </span>
                         )}
                       </td>
                       <td className="py-2.5 text-right tabular-nums font-semibold" style={{ color: 'var(--color-text-primary)' }}>
-                        {fmtNum(current, 1)} <span className="font-normal text-[10px]" style={{ color: 'var(--color-text-muted)' }}>{item.unit}</span>
+                        {fmtNum(current, 1)} <span className="font-normal text-xs" style={{ color: 'var(--color-text-muted)' }}>{item.unit}</span>
                       </td>
                       <td className="py-2.5 text-right tabular-nums" style={{ color: 'var(--color-text-muted)' }}>
                         {fmtNum(MIN_STOCK_KG)}
@@ -369,13 +369,13 @@ export default function InventoryDashboardTab() {
                               }}
                             />
                           </div>
-                          <span className="text-[10px] tabular-nums w-8 text-right font-medium" style={{ color: 'var(--color-text-muted)' }}>
+                          <span className="text-xs tabular-nums w-8 text-right font-medium" style={{ color: 'var(--color-text-muted)' }}>
                             {pct}%
                           </span>
                         </div>
                       </td>
                       <td className="py-2.5 text-center">
-                        <span className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold', status.bgColor, status.color)}>
+                        <span className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold', status.bgColor, status.color)}>
                           {React.createElement(trend, { size: 10 })}
                           {status.label}
                         </span>
@@ -527,7 +527,7 @@ export default function InventoryDashboardTab() {
           ) : (
             <div className="space-y-5">
               <div>
-                <span className="text-[10px] font-medium uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>
+                <span className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>
                   Total Produksi
                 </span>
                 <p className="text-2xl font-semibold tabular-nums mt-0.5" style={{ color: 'var(--color-text-primary)' }}>
@@ -535,7 +535,7 @@ export default function InventoryDashboardTab() {
                 </p>
               </div>
               <div>
-                <span className="text-[10px] font-medium uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>
+                <span className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>
                   Produksi Bulan Ini
                 </span>
                 <p className="text-2xl font-semibold tabular-nums mt-0.5" style={{ color: 'var(--color-text-primary)' }}>
@@ -543,7 +543,7 @@ export default function InventoryDashboardTab() {
                 </p>
               </div>
               <div>
-                <span className="text-[10px] font-medium uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>
+                <span className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>
                   Rata-rata Rendemen
                 </span>
                 <p className="text-2xl font-semibold tabular-nums mt-0.5" style={{ color: 'var(--color-text-primary)' }}>
@@ -590,7 +590,7 @@ export default function InventoryDashboardTab() {
                         {format(new Date(mov.date), 'dd MMM yyyy', { locale: idLocale })}
                       </td>
                       <td className="py-2 font-medium" style={{ color: 'var(--color-text-primary)' }}>
-                        <span className="font-mono text-[10px] bg-gray-50 dark:bg-gray-800 px-1 py-0.5 rounded mr-1.5">
+                        <span className="font-mono text-xs bg-gray-50 dark:bg-gray-800 px-1 py-0.5 rounded mr-1.5">
                           {mov.item?.code}
                         </span>
                         {mov.item?.name ?? '-'}
@@ -599,7 +599,7 @@ export default function InventoryDashboardTab() {
                         <span className={badge.cls}>{badge.label}</span>
                       </td>
                       <td className="py-2 text-right tabular-nums font-medium" style={{ color: 'var(--color-text-primary)' }}>
-                        {fmtNum(mov.quantity)} <span className="font-normal text-[10px]" style={{ color: 'var(--color-text-muted)' }}>{mov.item?.unit}</span>
+                        {fmtNum(mov.quantity)} <span className="font-normal text-xs" style={{ color: 'var(--color-text-muted)' }}>{mov.item?.unit}</span>
                       </td>
                       <td className="py-2 text-right tabular-nums" style={{ color: 'var(--color-text-muted)' }}>
                         {mov.totalValue != null ? formatRupiah(Number(mov.totalValue)) : '\u2014'}

@@ -261,7 +261,7 @@ export function ProductionRunModal({ isOpen, onClose, items, editRun }: Props) {
                           placeholder="— Pilih Item —"
                         />
                         {item && (
-                          <p className="text-[10px] text-gray-400 mt-0.5 ml-1">
+                          <p className="text-xs text-gray-400 mt-0.5 ml-1">
                             Stok: {Number(item.currentStock).toLocaleString('id-ID', { maximumFractionDigits: 3 })} {item.unit}
                           </p>
                         )}
@@ -343,7 +343,7 @@ export function ProductionRunModal({ isOpen, onClose, items, editRun }: Props) {
                         )}
                         {row.isByProduct && (
                           <div className="flex items-center px-2 py-2 bg-amber-100 rounded-lg">
-                            <span className="text-[10px] font-semibold text-amber-700">Samping</span>
+                            <span className="text-xs font-semibold text-amber-700">Samping</span>
                           </div>
                         )}
                         {outputs.length > 1 && (
@@ -358,7 +358,7 @@ export function ProductionRunModal({ isOpen, onClose, items, editRun }: Props) {
                       </div>
                       {/* HPP / Unit Price row + By-product toggle */}
                       <div className="flex items-center gap-2 pl-0.5">
-                        <label className="text-[10px] text-gray-400 font-medium whitespace-nowrap">HPP/kg (Rp)</label>
+                        <label className="text-xs text-gray-400 font-medium whitespace-nowrap">HPP/kg (Rp)</label>
                         <input
                           type="number"
                           value={row.unitPrice}
@@ -368,7 +368,7 @@ export function ProductionRunModal({ isOpen, onClose, items, editRun }: Props) {
                           className="w-36 border border-gray-200 rounded-lg py-1.5 px-2.5 text-sm font-mono bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                         />
                         {price > 0 && qty > 0 && (
-                          <span className="text-[10px] text-gray-400 font-mono">
+                          <span className="text-xs text-gray-400 font-mono">
                             = Rp {(price * qty).toLocaleString('id-ID')}
                           </span>
                         )}
@@ -379,7 +379,7 @@ export function ProductionRunModal({ isOpen, onClose, items, editRun }: Props) {
                             onChange={e => updateOutput(idx, 'isByProduct', e.target.checked)}
                             className="rounded border-gray-300 text-amber-500 focus:ring-amber-500 w-3.5 h-3.5"
                           />
-                          <span className="text-[10px] text-gray-500 font-medium whitespace-nowrap">Produk Samping</span>
+                          <span className="text-xs text-gray-500 font-medium whitespace-nowrap">Produk Samping</span>
                         </label>
                       </div>
                     </div>

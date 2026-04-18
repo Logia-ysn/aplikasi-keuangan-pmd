@@ -339,7 +339,7 @@ const SetBalanceModal: React.FC<{ isOpen: boolean; onClose: () => void; account:
               {account.balance !== 0 && (() => {
                 const isDebitNature = account.rootType === 'ASSET' || account.rootType === 'EXPENSE';
                 const isDebitBalance = account.balance > 0 ? isDebitNature : !isDebitNature;
-                return <span className={cn('text-[10px] font-bold px-1 py-0.5 rounded', isDebitBalance ? 'text-blue-600 bg-blue-50' : 'text-emerald-600 bg-emerald-50')}>{isDebitBalance ? 'D' : 'K'}</span>;
+                return <span className={cn('text-xs font-bold px-1 py-0.5 rounded', isDebitBalance ? 'text-blue-600 bg-blue-50' : 'text-emerald-600 bg-emerald-50')}>{isDebitBalance ? 'D' : 'K'}</span>;
               })()}
             </div>
           </div>
@@ -354,7 +354,7 @@ const SetBalanceModal: React.FC<{ isOpen: boolean; onClose: () => void; account:
               placeholder="0"
               autoFocus
             />
-            <p className="text-[11px] text-gray-400 mt-1">Jurnal saldo awal akan otomatis dibuat terhadap akun Saldo Laba Ditahan.</p>
+            <p className="text-xs text-gray-400 mt-1">Jurnal saldo awal akan otomatis dibuat terhadap akun Saldo Laba Ditahan.</p>
           </div>
 
           <div className="flex gap-3 pt-1">
@@ -413,12 +413,12 @@ const AccountNode: React.FC<{
 
         <div className="flex-1 flex items-center justify-between min-w-0">
           <div className="flex items-center gap-2 min-w-0">
-            <span className="font-mono text-[11px] text-gray-400 shrink-0">{account.accountNumber}</span>
+            <span className="font-mono text-xs text-gray-400 shrink-0">{account.accountNumber}</span>
             <span className={cn('text-sm truncate', account.isGroup ? 'font-semibold text-gray-800' : 'text-gray-600')}>
               {account.name}
             </span>
             {!account.isActive && (
-              <span className="text-[10px] font-semibold text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-full">Nonaktif</span>
+              <span className="text-xs font-semibold text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-full">Nonaktif</span>
             )}
           </div>
 
@@ -429,7 +429,7 @@ const AccountNode: React.FC<{
               return (
                 <span className="text-xs font-mono tabular-nums flex items-center gap-1">
                   <span style={{ color: 'var(--color-text-muted)' }}>{formatRupiah(Math.abs(account.balance))}</span>
-                  <span className={cn('text-[10px] font-bold px-1 py-0.5 rounded', isDebitBalance ? 'text-blue-600 bg-blue-50' : 'text-emerald-600 bg-emerald-50')}>
+                  <span className={cn('text-xs font-bold px-1 py-0.5 rounded', isDebitBalance ? 'text-blue-600 bg-blue-50' : 'text-emerald-600 bg-emerald-50')}>
                     {isDebitBalance ? 'D' : 'K'}
                   </span>
                 </span>
@@ -583,7 +583,7 @@ export const COAPage: React.FC = () => {
               className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
-          <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Struktur Hierarki</span>
+          <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Struktur Hierarki</span>
         </div>
 
         <div className="min-h-[400px]">

@@ -124,7 +124,7 @@ const ApplyDepositModal: React.FC<ApplyDepositModalProps> = ({
             <>
               {/* Deposit selection */}
               <div>
-                <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-2">Pilih Deposit</label>
+                <label className="block text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2">Pilih Deposit</label>
                 <div className="space-y-2">
                   {availableDeposits.map((dep: any) => (
                     <button
@@ -139,11 +139,11 @@ const ApplyDepositModal: React.FC<ApplyDepositModalProps> = ({
                       <div className="flex items-center justify-between">
                         <div>
                           <p className="text-sm font-medium text-gray-800">{dep.paymentNumber}</p>
-                          <p className="text-[10px] text-gray-400">{formatDate(dep.date)} · {dep.account?.name}</p>
+                          <p className="text-xs text-gray-400">{formatDate(dep.date)} · {dep.account?.name}</p>
                         </div>
                         <div className="text-right">
                           <p className="text-sm font-bold font-mono text-amber-600">{formatRupiah(dep.remaining)}</p>
-                          <p className="text-[10px] text-gray-400">dari {formatRupiah(dep.amount)}</p>
+                          <p className="text-xs text-gray-400">dari {formatRupiah(dep.amount)}</p>
                         </div>
                       </div>
                     </button>
@@ -154,7 +154,7 @@ const ApplyDepositModal: React.FC<ApplyDepositModalProps> = ({
               {/* Amount */}
               {selectedDepositId && (
                 <div>
-                  <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">Jumlah yang diaplikasikan (Rp)</label>
+                  <label className="block text-xs font-semibold text-gray-400 uppercase tracking-widest mb-1.5">Jumlah yang diaplikasikan (Rp)</label>
                   <input
                     type="number"
                     value={amount}

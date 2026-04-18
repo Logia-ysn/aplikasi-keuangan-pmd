@@ -104,7 +104,7 @@ export const CompanySettingsTab: React.FC = () => {
               ) : (
                 <div className="flex flex-col items-center gap-1 text-gray-400">
                   <ImageIcon size={20} />
-                  <span className="text-[10px]">Belum ada</span>
+                  <span className="text-xs">Belum ada</span>
                 </div>
               )}
             </div>
@@ -130,7 +130,7 @@ export const CompanySettingsTab: React.FC = () => {
                 </button>
               )}
 
-              <p className="text-[11px] text-gray-400 mt-1">
+              <p className="text-xs text-gray-400 mt-1">
                 PNG, JPG, SVG · Maks. 2MB<br />
                 Disarankan: background transparan
               </p>

@@ -61,7 +61,7 @@ export default function CashPositionWidget() {
                       className="text-xs font-medium truncate pr-2"
                       style={{ color: 'var(--color-text-secondary)' }}
                     >
-                      <span className="text-[10px] font-mono mr-1.5" style={{ color: 'var(--color-text-muted)' }}>
+                      <span className="text-xs font-mono mr-1.5" style={{ color: 'var(--color-text-muted)' }}>
                         {acc.accountNumber}
                       </span>
                       {acc.name}

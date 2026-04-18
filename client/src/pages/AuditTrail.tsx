@@ -220,7 +220,7 @@ export const AuditTrail = () => {
               <div key={action} className="card p-3 flex items-center gap-3">
                 <BarChart3 size={16} className={colors[action]} />
                 <div>
-                  <p className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>{action}</p>
+                  <p className="text-xs uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>{action}</p>
                   <p className={cn('text-lg font-bold', colors[action])}>{count}</p>
                 </div>
               </div>
@@ -278,15 +278,15 @@ export const AuditTrail = () => {
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap" style={{ color: 'var(--color-text-secondary)' }}>
                         <div className="text-xs">{formatDate(log.createdAt)}</div>
-                        <div className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>{formatTime(log.createdAt)}</div>
+                        <div className="text-xs" style={{ color: 'var(--color-text-muted)' }}>{formatTime(log.createdAt)}</div>
                       </td>
                       <td className="px-4 py-3">
                         <div className="text-xs font-medium" style={{ color: 'var(--color-text-primary)' }}>{log.user?.fullName ?? '-'}</div>
-                        <div className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>{log.user?.email ?? ''}</div>
+                        <div className="text-xs" style={{ color: 'var(--color-text-muted)' }}>{log.user?.email ?? ''}</div>
                       </td>
                       <td className="px-4 py-3">{actionBadge(log.action)}</td>
                       <td className="px-4 py-3 font-mono text-xs" style={{ color: 'var(--color-text-secondary)' }}>{log.entityType}</td>
-                      <td className="px-4 py-3 font-mono text-[10px]" style={{ color: 'var(--color-text-muted)' }}>
+                      <td className="px-4 py-3 font-mono text-xs" style={{ color: 'var(--color-text-muted)' }}>
                         {log.entityId.length > 12 ? `${log.entityId.slice(0, 8)}...` : log.entityId}
                       </td>
                     </tr>

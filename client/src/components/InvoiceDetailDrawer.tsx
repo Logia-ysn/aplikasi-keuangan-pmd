@@ -300,7 +300,7 @@ const InvoiceDetailDrawer: React.FC<Props> = ({ type, invoiceId, onClose, onEdit
             {!isSales && canEdit && onEditFull && Number(invoice?.outstanding ?? 0) === Number(invoice?.grandTotal ?? 0) && (
               <button
                 onClick={() => onEditFull(invoice)}
-                className="px-2 py-1 rounded-lg hover:bg-amber-50 text-[11px] font-medium text-amber-600 hover:text-amber-700 border border-amber-200 transition-colors"
+                className="px-2 py-1 rounded-lg hover:bg-amber-50 text-xs font-medium text-amber-600 hover:text-amber-700 border border-amber-200 transition-colors"
                 title="Batalkan dan buat ulang invoice ini"
               >
                 Edit Lengkap
@@ -403,7 +403,7 @@ const InvoiceDetailDrawer: React.FC<Props> = ({ type, invoiceId, onClose, onEdit
                     {sc.icon} {sc.label}
                   </span>
                   {isOverdue && (
-                    <span className="badge badge-red inline-flex items-center gap-1 text-[10px]">
+                    <span className="badge badge-red inline-flex items-center gap-1 text-xs">
                       <AlertTriangle size={11} /> Lewat jatuh tempo
                     </span>
                   )}
@@ -423,13 +423,13 @@ const InvoiceDetailDrawer: React.FC<Props> = ({ type, invoiceId, onClose, onEdit
                       style={{ width: `${Math.min(paidPct, 100)}%` }}
                     />
                   </div>
-                  <div className="flex justify-between text-[10px] text-gray-400">
+                  <div className="flex justify-between text-xs text-gray-400">
                     <span>{paidPct}% terbayar</span>
                     {outstanding > 0 && <span className="text-red-400 font-medium">Sisa: {formatRupiah(outstanding)}</span>}
                   </div>
                   {/* Payment breakdown */}
                   {(paidFromCash > 0 || paidFromDeposit > 0) && (
-                    <div className="flex items-center gap-3 text-[10px] text-gray-500 pt-1">
+                    <div className="flex items-center gap-3 text-xs text-gray-500 pt-1">
                       {paidFromCash > 0 && (
                         <span>💵 Tunai/Bank: <span className="font-mono text-gray-700">{formatRupiah(paidFromCash)}</span></span>
                       )}
@@ -445,7 +445,7 @@ const InvoiceDetailDrawer: React.FC<Props> = ({ type, invoiceId, onClose, onEdit
               <div className="px-6 py-4 grid grid-cols-2 gap-6 border-b border-gray-100">
                 {/* Party info */}
                 <div>
-                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-1">
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-1">
                     <User size={10} /> {partyLabel}
                   </p>
                   <p className="text-sm font-semibold text-gray-900">{party?.name ?? '—'}</p>
@@ -457,13 +457,13 @@ const InvoiceDetailDrawer: React.FC<Props> = ({ type, invoiceId, onClose, onEdit
 
                 {/* Invoice meta */}
                 <div>
-                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-1">
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-1">
                     <Calendar size={10} /> Informasi Invoice
                   </p>
                   {isEditing ? (
                     <div className="space-y-3">
                       <div>
-                        <label className="text-[10px] text-gray-400">Jatuh Tempo</label>
+                        <label className="text-xs text-gray-400">Jatuh Tempo</label>
                         <input
                           type="date"
                           value={editDueDate}
@@ -472,7 +472,7 @@ const InvoiceDetailDrawer: React.FC<Props> = ({ type, invoiceId, onClose, onEdit
                         />
                       </div>
                       <div>
-                        <label className="text-[10px] text-gray-400">Termin</label>
+                        <label className="text-xs text-gray-400">Termin</label>
                         <input
                           type="text"
                           value={editTerms}
@@ -485,23 +485,23 @@ const InvoiceDetailDrawer: React.FC<Props> = ({ type, invoiceId, onClose, onEdit
                   ) : (
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <p className="text-[10px] text-gray-400">Tanggal</p>
+                        <p className="text-xs text-gray-400">Tanggal</p>
                         <p className="text-xs font-medium text-gray-800">{formatDate(invoice.date)}</p>
                       </div>
                       <div>
-                        <p className="text-[10px] text-gray-400">Jatuh Tempo</p>
+                        <p className="text-xs text-gray-400">Jatuh Tempo</p>
                         <p className={cn('text-xs font-medium', isOverdue ? 'text-red-500' : 'text-gray-800')}>
                           {invoice.dueDate ? formatDate(invoice.dueDate) : '—'}
                         </p>
                       </div>
                       {invoice.terms && (
                         <div>
-                          <p className="text-[10px] text-gray-400">Termin</p>
+                          <p className="text-xs text-gray-400">Termin</p>
                           <p className="text-xs font-medium text-gray-800">{invoice.terms}</p>
                         </div>
                       )}
                       <div>
-                        <p className="text-[10px] text-gray-400">Dibuat oleh</p>
+                        <p className="text-xs text-gray-400">Dibuat oleh</p>
                         <p className="text-xs font-medium text-gray-800">{invoice.user?.fullName ?? '—'}</p>
                       </div>
                     </div>
@@ -511,13 +511,13 @@ const InvoiceDetailDrawer: React.FC<Props> = ({ type, invoiceId, onClose, onEdit
 
               {/* Items Table */}
               <div className="px-6 py-4 border-b border-gray-100">
-                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-1">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-1">
                   <Package size={10} /> Daftar Barang / Jasa ({items.length} item)
                 </p>
                 <div className="border border-gray-200 rounded-xl overflow-hidden">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="bg-gray-50 border-b border-gray-200 text-[10px] font-semibold text-gray-400 uppercase tracking-wide">
+                      <tr className="bg-gray-50 border-b border-gray-200 text-xs font-semibold text-gray-400 uppercase tracking-wide">
                         <th className="text-left px-4 py-2.5 w-8">#</th>
                         <th className="text-left px-4 py-2.5">Nama</th>
                         <th className="text-center px-3 py-2.5 w-16">Qty</th>
@@ -540,9 +540,9 @@ const InvoiceDetailDrawer: React.FC<Props> = ({ type, invoiceId, onClose, onEdit
                                 <span className="inline-flex items-center px-1.5 py-0.5 text-[9px] font-semibold rounded bg-purple-100 text-purple-700">Jasa</span>
                               )}
                             </div>
-                            {item.description && <p className="text-[10px] text-gray-400">{item.description}</p>}
+                            {item.description && <p className="text-xs text-gray-400">{item.description}</p>}
                             {!isSales && (item.kualitas || item.timbanganTruk || item.refaksi || item.nomorMobil) && (
-                              <div className="text-[10px] text-gray-400 space-x-2 mt-0.5">
+                              <div className="text-xs text-gray-400 space-x-2 mt-0.5">
                                 {item.nomorMobil && <span>Mobil: <span className="font-mono text-gray-600 uppercase">{item.nomorMobil}</span></span>}
                                 {item.kualitas && <span>Kualitas: <span className="text-gray-600">{item.kualitas}</span></span>}
                                 {Number(item.timbanganTruk) > 0 && <span>Truk: {Number(item.timbanganTruk).toLocaleString('id-ID')} kg</span>}
@@ -586,7 +586,7 @@ const InvoiceDetailDrawer: React.FC<Props> = ({ type, invoiceId, onClose, onEdit
               {canHaveAttachments && (
                 <div className="px-6 py-4 border-b border-gray-100">
                   <div className="flex items-center justify-between mb-3">
-                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest flex items-center gap-1">
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest flex items-center gap-1">
                       <Paperclip size={10} /> Dokumen Pendukung ({attachments.length})
                     </p>
                     {invoice.status !== 'Cancelled' && (
@@ -684,7 +684,7 @@ const InvoiceDetailDrawer: React.FC<Props> = ({ type, invoiceId, onClose, onEdit
               {/* Payment History */}
               {allocations.length > 0 && (
                 <div className="px-6 py-4 border-b border-gray-100">
-                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-1">
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-1">
                     <CreditCard size={10} /> Riwayat Pembayaran ({allocations.length})
                   </p>
                   <div className="space-y-2">
@@ -696,7 +696,7 @@ const InvoiceDetailDrawer: React.FC<Props> = ({ type, invoiceId, onClose, onEdit
                           </div>
                           <div>
                             <p className="text-xs font-medium text-gray-800">{alloc.payment?.paymentNumber}</p>
-                            <p className="text-[10px] text-gray-400">{formatDate(alloc.payment?.date)}</p>
+                            <p className="text-xs text-gray-400">{formatDate(alloc.payment?.date)}</p>
                           </div>
                         </div>
                         <span className="font-mono text-sm font-semibold text-green-600">
@@ -711,7 +711,7 @@ const InvoiceDetailDrawer: React.FC<Props> = ({ type, invoiceId, onClose, onEdit
               {/* Deposit Applications */}
               {depositApplications.length > 0 && (
                 <div className="px-6 py-4 border-b border-gray-100">
-                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-1">
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-1">
                     <Wallet size={10} /> Riwayat Uang Muka ({depositApplications.length})
                   </p>
                   <div className="space-y-2">
@@ -729,9 +729,9 @@ const InvoiceDetailDrawer: React.FC<Props> = ({ type, invoiceId, onClose, onEdit
                           <div>
                             <p className="text-xs font-medium text-gray-800">
                               {app.depositPayment?.paymentNumber}
-                              {app.isCancelled && <span className="ml-1.5 text-[10px] text-red-400">(Dibatalkan)</span>}
+                              {app.isCancelled && <span className="ml-1.5 text-xs text-red-400">(Dibatalkan)</span>}
                             </p>
-                            <p className="text-[10px] text-gray-400">{formatDate(app.appliedAt ?? app.depositPayment?.date)}</p>
+                            <p className="text-xs text-gray-400">{formatDate(app.appliedAt ?? app.depositPayment?.date)}</p>
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
@@ -775,14 +775,14 @@ const InvoiceDetailDrawer: React.FC<Props> = ({ type, invoiceId, onClose, onEdit
                     title={partyDepositBalance <= 0 ? `${partyLabel} belum punya saldo uang muka` : undefined}
                   >
                     <Wallet size={14} /> Gunakan Uang Muka
-                    {partyDepositBalance <= 0 && <span className="text-[10px] opacity-70">(saldo 0)</span>}
+                    {partyDepositBalance <= 0 && <span className="text-xs opacity-70">(saldo 0)</span>}
                   </button>
                 </div>
               )}
 
               {/* Notes */}
               <div className="px-6 py-4">
-                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-2">Catatan</p>
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2">Catatan</p>
                 {isEditing ? (
                   <div className="space-y-3">
                     <textarea

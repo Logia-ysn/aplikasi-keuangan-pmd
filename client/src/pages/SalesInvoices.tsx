@@ -93,7 +93,7 @@ export const SalesInvoices = () => {
               <Receipt size={16} className="text-blue-600" />
             </div>
             <div className="min-w-0">
-              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Total Invoice</p>
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Total Invoice</p>
               <p className="text-lg font-bold text-gray-900">{summary.total}</p>
             </div>
           </div>
@@ -104,7 +104,7 @@ export const SalesInvoices = () => {
               <DollarSign size={16} className="text-red-500" />
             </div>
             <div className="min-w-0">
-              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Total Piutang</p>
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Total Piutang</p>
               <p className="text-lg font-bold text-red-600 font-mono tabular-nums">{formatRupiah(summary.outstanding)}</p>
             </div>
           </div>
@@ -115,7 +115,7 @@ export const SalesInvoices = () => {
               <CheckCircle2 size={16} className="text-green-600" />
             </div>
             <div>
-              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Sudah Lunas</p>
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Sudah Lunas</p>
               <p className="text-lg font-bold text-green-600">{summary.paid} invoice</p>
             </div>
           </div>
@@ -126,7 +126,7 @@ export const SalesInvoices = () => {
               <AlertTriangle size={16} className="text-orange-500" />
             </div>
             <div>
-              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Jatuh Tempo</p>
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Jatuh Tempo</p>
               <p className="text-lg font-bold text-orange-500">{summary.overdue} invoice</p>
             </div>
           </div>
@@ -234,7 +234,7 @@ export const SalesInvoices = () => {
                   </td>
                   <td>
                     <p className="font-medium text-gray-800">{invoice.customer?.name ?? '—'}</p>
-                    <p className="text-[10px] text-gray-400">{invoice.customer?.phone || ''}</p>
+                    <p className="text-xs text-gray-400">{invoice.customer?.phone || ''}</p>
                   </td>
                   <td className="whitespace-nowrap">
                     {invoice.dueDate ? (
@@ -247,7 +247,7 @@ export const SalesInvoices = () => {
                     )}
                   </td>
                   <td className="text-center">
-                    <span className="badge badge-gray text-[10px]">{invoice.items?.length ?? 0} item</span>
+                    <span className="badge badge-gray text-xs">{invoice.items?.length ?? 0} item</span>
                   </td>
                   <td className="text-right font-mono font-medium text-gray-900 tabular-nums">{formatRupiah(Number(invoice.grandTotal))}</td>
                   <td className="text-right">

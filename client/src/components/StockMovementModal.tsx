@@ -268,7 +268,7 @@ export function StockMovementModal({ isOpen, onClose, editMovement }: StockMovem
                 className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none disabled:bg-gray-50 disabled:text-gray-400"
               />
               {(selectedItem || editMovement?.item) && (
-                <p className="text-[11px] text-gray-400 mt-1">
+                <p className="text-xs text-gray-400 mt-1">
                   Stok saat ini: {Number((selectedItem || editMovement?.item)?.currentStock ?? 0).toLocaleString('id-ID', { maximumFractionDigits: 3 })} {(selectedItem || editMovement?.item)?.unit}
                 </p>
               )}
@@ -310,7 +310,7 @@ export function StockMovementModal({ isOpen, onClose, editMovement }: StockMovem
             <div>
               <label htmlFor="mov-offset-account" className="block text-xs font-semibold text-gray-500 mb-1.5">
                 Akun Lawan {totalValue > 0 && <span className="text-red-500">*</span>}
-                <span className="ml-1.5 text-[10px] font-normal text-blue-500">Untuk posting ke COA</span>
+                <span className="ml-1.5 text-xs font-normal text-blue-500">Untuk posting ke COA</span>
               </label>
               <SearchableSelect
                 options={accountOptions}
@@ -320,7 +320,7 @@ export function StockMovementModal({ isOpen, onClose, editMovement }: StockMovem
                 disabled={isProductionLinked}
               />
               {totalValue > 0 && !form.offsetAccountId && (
-                <p className="text-[11px] text-amber-600 mt-1">
+                <p className="text-xs text-amber-600 mt-1">
                   Pilih akun lawan agar nilai stok tercatat di COA.
                 </p>
               )}
@@ -374,7 +374,7 @@ export function StockMovementModal({ isOpen, onClose, editMovement }: StockMovem
                 onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
                 disabled={isProductionLinked}
                 placeholder="Catatan opsional tentang gerakan stok ini"
-                className="w-full border border-gray-200 rounded-lg py-2.5 px-3 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none placeholder:text-gray-300 disabled:bg-gray-50 disabled:text-gray-400"
+                className="w-full border border-gray-200 rounded-lg py-2.5 px-3 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none placeholder:text-gray-400 disabled:bg-gray-50 disabled:text-gray-400"
               />
             </div>
 

@@ -83,7 +83,7 @@ const DashboardSettings: React.FC<DashboardSettingsProps> = ({ isOpen, onClose, 
                 <p className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
                   {w.name}
                 </p>
-                <p className="text-[11px] mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+                <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
                   {w.description}
                 </p>
               </div>

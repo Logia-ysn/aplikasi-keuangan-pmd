@@ -86,7 +86,7 @@ const PartyFormModal: React.FC<PartyFormModalProps> = ({ isOpen, onClose, editPa
 
   if (!isOpen) return null;
 
-  const inputCls = 'w-full border border-gray-200 rounded-lg py-2 pl-9 pr-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-gray-300';
+  const inputCls = 'w-full border border-gray-200 rounded-lg py-2 pl-9 pr-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-gray-400';
   const iconCls = 'absolute left-3 top-1/2 -translate-y-1/2 text-gray-300';
 
   return (
@@ -113,7 +113,7 @@ const PartyFormModal: React.FC<PartyFormModalProps> = ({ isOpen, onClose, editPa
 
           {/* Tipe Mitra */}
           <div>
-            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-2">Tipe Mitra</p>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2">Tipe Mitra</p>
             <div className="flex border border-gray-200 rounded-lg overflow-hidden">
               {(['Customer', 'Supplier', 'Both'] as PartyType[]).map(type => (
                 <button
@@ -134,7 +134,7 @@ const PartyFormModal: React.FC<PartyFormModalProps> = ({ isOpen, onClose, editPa
 
           {/* Identitas */}
           <div>
-            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-3">Identitas</p>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Identitas</p>
             <div className="space-y-3">
               {/* Nama */}
               <div>
@@ -172,7 +172,7 @@ const PartyFormModal: React.FC<PartyFormModalProps> = ({ isOpen, onClose, editPa
 
           {/* Kontak */}
           <div>
-            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-3">Kontak</p>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Kontak</p>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Telepon / WhatsApp</label>
@@ -205,7 +205,7 @@ const PartyFormModal: React.FC<PartyFormModalProps> = ({ isOpen, onClose, editPa
 
           {/* Alamat */}
           <div>
-            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-3">Alamat</p>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Alamat</p>
             <div className="relative">
               <MapPin size={14} className="absolute left-3 top-3 text-gray-300" />
               <textarea
@@ -213,7 +213,7 @@ const PartyFormModal: React.FC<PartyFormModalProps> = ({ isOpen, onClose, editPa
                 onChange={e => set('address', e.target.value)}
                 placeholder="Jl. Sudirman No. 1, Kelurahan ..., Kota ..., Provinsi ..."
                 rows={3}
-                className="w-full border border-gray-200 rounded-lg py-2 pl-9 pr-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none placeholder:text-gray-300"
+                className="w-full border border-gray-200 rounded-lg py-2 pl-9 pr-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none placeholder:text-gray-400"
               />
             </div>
           </div>

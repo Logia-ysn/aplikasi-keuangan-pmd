@@ -133,7 +133,7 @@ export const NotificationBell = () => {
               {unreadCount > 0 && (
                 <button
                   onClick={() => markAllReadMutation.mutate()}
-                  className="flex items-center gap-1 text-[11px] text-blue-600 hover:text-blue-700 font-medium px-1.5 py-0.5 rounded hover:bg-blue-50 transition-colors"
+                  className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 font-medium px-1.5 py-0.5 rounded hover:bg-blue-50 transition-colors"
                   disabled={markAllReadMutation.isPending}
                 >
                   <CheckCheck size={12} />
@@ -187,10 +187,10 @@ export const NotificationBell = () => {
                         <span className="w-1.5 h-1.5 rounded-full bg-blue-500 flex-shrink-0" />
                       )}
                     </div>
-                    <p className="text-[11px] mt-0.5 line-clamp-2" style={{ color: 'var(--color-text-secondary)' }}>
+                    <p className="text-xs mt-0.5 line-clamp-2" style={{ color: 'var(--color-text-secondary)' }}>
                       {notif.message}
                     </p>
-                    <p className="text-[10px] mt-1" style={{ color: 'var(--color-text-muted)' }}>
+                    <p className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>
                       {relativeTime(notif.createdAt)}
                     </p>
                   </div>

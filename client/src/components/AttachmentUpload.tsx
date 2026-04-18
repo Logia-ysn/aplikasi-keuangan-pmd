@@ -105,7 +105,7 @@ const AttachmentUpload: React.FC<AttachmentUploadProps> = ({ referenceType, refe
             </span>
           </div>
         )}
-        <p className="text-[10px] mt-1" style={{ color: 'var(--color-text-muted)' }}>
+        <p className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>
           JPG, PNG, PDF — maks 5MB, maks 5 file
         </p>
         <input

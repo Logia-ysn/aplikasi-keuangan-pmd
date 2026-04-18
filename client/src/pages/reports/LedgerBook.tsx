@@ -251,13 +251,13 @@ const LedgerBook: React.FC = () => {
                   <span className="text-sm font-semibold text-gray-800">
                     {account.accountName}
                   </span>
-                  <span className="text-[10px] text-gray-400 uppercase">
+                  <span className="text-xs text-gray-400 uppercase">
                     {account.entries.length} mutasi
                   </span>
                 </div>
                 <div className="flex items-center gap-6 text-sm font-mono tabular-nums">
                   <div className="text-right">
-                    <span className="text-[10px] text-gray-400 block">Saldo Akhir</span>
+                    <span className="text-xs text-gray-400 block">Saldo Akhir</span>
                     <span className={cn(
                       'font-medium',
                       account.closingBalance >= 0 ? 'text-gray-900' : 'text-red-600',
@@ -274,7 +274,7 @@ const LedgerBook: React.FC = () => {
                 <div className="border-t border-gray-100">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="bg-gray-50 text-[10px] font-semibold text-gray-400 uppercase tracking-wide">
+                      <tr className="bg-gray-50 text-xs font-semibold text-gray-400 uppercase tracking-wide">
                         <th className="text-left px-5 py-2 w-28">Tanggal</th>
                         <th className="text-left px-3 py-2">Keterangan</th>
                         <th className="text-right px-3 py-2 w-32">Debit</th>

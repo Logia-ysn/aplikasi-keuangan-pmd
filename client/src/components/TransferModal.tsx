@@ -138,7 +138,7 @@ const TransferModal: React.FC<TransferModalProps> = ({ isOpen, onClose }) => {
 
           {/* Date */}
           <div>
-            <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">Tanggal</label>
+            <label className="block text-xs font-semibold text-gray-400 uppercase tracking-widest mb-1.5">Tanggal</label>
             <input
               type="date"
               value={date}
@@ -150,7 +150,7 @@ const TransferModal: React.FC<TransferModalProps> = ({ isOpen, onClose }) => {
           {/* Source & Destination */}
           <div className="grid grid-cols-1 gap-4">
             <div>
-              <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">Akun Asal (Transfer Dari)</label>
+              <label className="block text-xs font-semibold text-gray-400 uppercase tracking-widest mb-1.5">Akun Asal (Transfer Dari)</label>
               <select
                 value={sourceAccountId}
                 onChange={e => setSourceAccountId(e.target.value)}
@@ -176,7 +176,7 @@ const TransferModal: React.FC<TransferModalProps> = ({ isOpen, onClose }) => {
             )}
 
             <div>
-              <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">Akun Tujuan (Transfer Ke)</label>
+              <label className="block text-xs font-semibold text-gray-400 uppercase tracking-widest mb-1.5">Akun Tujuan (Transfer Ke)</label>
               <select
                 value={destAccountId}
                 onChange={e => setDestAccountId(e.target.value)}
@@ -194,7 +194,7 @@ const TransferModal: React.FC<TransferModalProps> = ({ isOpen, onClose }) => {
 
           {/* Amount */}
           <div>
-            <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">Jumlah (Rp)</label>
+            <label className="block text-xs font-semibold text-gray-400 uppercase tracking-widest mb-1.5">Jumlah (Rp)</label>
             <input
               type="number"
               value={amount}
@@ -208,7 +208,7 @@ const TransferModal: React.FC<TransferModalProps> = ({ isOpen, onClose }) => {
           {/* Reference & Notes */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">No. Referensi</label>
+              <label className="block text-xs font-semibold text-gray-400 uppercase tracking-widest mb-1.5">No. Referensi</label>
               <input
                 type="text"
                 value={referenceNo}
@@ -218,7 +218,7 @@ const TransferModal: React.FC<TransferModalProps> = ({ isOpen, onClose }) => {
               />
             </div>
             <div>
-              <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">Catatan</label>
+              <label className="block text-xs font-semibold text-gray-400 uppercase tracking-widest mb-1.5">Catatan</label>
               <input
                 type="text"
                 value={notes}
@@ -261,7 +261,7 @@ const TransferModal: React.FC<TransferModalProps> = ({ isOpen, onClose }) => {
               <div className="flex items-center gap-2">
                 <CheckCircle2 size={14} className="text-green-500" />
                 <span className="text-xs font-semibold text-green-600">Tersimpan</span>
-                <span className="text-[10px] ml-auto flex items-center gap-1" style={{ color: 'var(--color-text-muted)' }}>
+                <span className="text-xs ml-auto flex items-center gap-1" style={{ color: 'var(--color-text-muted)' }}>
                   <Paperclip size={10} /> Lampiran Bukti Transfer
                 </span>
               </div>

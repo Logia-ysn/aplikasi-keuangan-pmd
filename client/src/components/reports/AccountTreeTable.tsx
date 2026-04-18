@@ -70,7 +70,7 @@ const AccountTreeRow: React.FC<{
             <span className="w-3.5 inline-block" />
           )}
           {showAccountNumber && (
-            <span className="text-[11px] font-mono text-gray-400 w-16 shrink-0">
+            <span className="text-xs font-mono text-gray-400 w-16 shrink-0">
               {account.accountNumber}
             </span>
           )}

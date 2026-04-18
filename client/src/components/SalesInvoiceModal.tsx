@@ -273,7 +273,7 @@ const SalesInvoiceModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
 
             {/* LEFT — Bill To */}
             <div>
-              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-2">Tagihkan Kepada</p>
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2">Tagihkan Kepada</p>
               <select
                 value={partyId}
                 onChange={(e) => setPartyId(e.target.value)}
@@ -296,17 +296,17 @@ const SalesInvoiceModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
             {/* RIGHT — Invoice details */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">Tanggal Invoice</label>
+                <label className="block text-xs font-semibold text-gray-400 uppercase tracking-widest mb-1.5">Tanggal Invoice</label>
                 <input type="date" value={invoiceDate} onChange={e => { setInvoiceDate(e.target.value); setDueDate(calcDueDate(e.target.value, terms)); }}
                   className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
               <div>
-                <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">Jatuh Tempo</label>
+                <label className="block text-xs font-semibold text-gray-400 uppercase tracking-widest mb-1.5">Jatuh Tempo</label>
                 <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)}
                   className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
               <div>
-                <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">Termin Pembayaran</label>
+                <label className="block text-xs font-semibold text-gray-400 uppercase tracking-widest mb-1.5">Termin Pembayaran</label>
                 <select value={terms} onChange={e => { setTerms(e.target.value); setDueDate(calcDueDate(invoiceDate, e.target.value)); }}
                   className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500">
                   {['Cash', 'Net 7', 'Net 14', 'Net 30', 'Net 60'].map(t => (
@@ -315,7 +315,7 @@ const SalesInvoiceModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
                 </select>
               </div>
               <div>
-                <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">Info</label>
+                <label className="block text-xs font-semibold text-gray-400 uppercase tracking-widest mb-1.5">Info</label>
                 <p className="text-xs text-gray-400 mt-1">PPN & PPh diatur per baris item</p>
               </div>
             </div>
@@ -324,7 +324,7 @@ const SalesInvoiceModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
           {/* ── ITEMS TABLE ── */}
           <div className="px-6 pt-5 pb-4">
             <div className="flex items-center justify-between mb-3">
-              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Daftar Barang / Jasa</p>
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest">Daftar Barang / Jasa</p>
               <button onClick={addItem} className="flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-700">
                 <Plus size={13} /> Tambah Baris
               </button>
@@ -333,7 +333,7 @@ const SalesInvoiceModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
             <div className="border border-gray-200 rounded-xl overflow-hidden">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="bg-gray-50 border-b border-gray-200 text-[10px] font-semibold text-gray-400 uppercase tracking-wide">
+                  <tr className="bg-gray-50 border-b border-gray-200 text-xs font-semibold text-gray-400 uppercase tracking-wide">
                     <th className="text-left px-4 py-3 w-8">#</th>
                     <th className="text-left px-4 py-3 min-w-[200px]">Nama Barang / Jasa</th>
                     <th className="text-center px-3 py-3 w-20">Qty</th>
@@ -356,7 +356,7 @@ const SalesInvoiceModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
                           <button
                             type="button"
                             onClick={() => item.itemType !== 'product' && toggleItemType(idx, 'product')}
-                            className={`px-2 py-0.5 text-[10px] font-medium rounded-md transition-colors ${
+                            className={`px-2 py-0.5 text-xs font-medium rounded-md transition-colors ${
                               item.itemType === 'product'
                                 ? 'bg-emerald-100 text-emerald-700'
                                 : 'bg-gray-100 text-gray-400 hover:text-gray-600'
@@ -367,7 +367,7 @@ const SalesInvoiceModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
                           <button
                             type="button"
                             onClick={() => item.itemType !== 'service' && toggleItemType(idx, 'service')}
-                            className={`px-2 py-0.5 text-[10px] font-medium rounded-md transition-colors ${
+                            className={`px-2 py-0.5 text-xs font-medium rounded-md transition-colors ${
                               item.itemType === 'service'
                                 ? 'bg-purple-100 text-purple-700'
                                 : 'bg-gray-100 text-gray-400 hover:text-gray-600'
@@ -392,7 +392,7 @@ const SalesInvoiceModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
                                 value={item.itemName}
                                 onChange={e => updateItem(idx, 'itemName', e.target.value)}
                                 placeholder="Atau ketik nama barang manual..."
-                                className="w-full bg-transparent text-xs text-gray-500 border-none focus:ring-0 focus:outline-none p-0 placeholder:text-gray-300"
+                                className="w-full bg-transparent text-xs text-gray-500 border-none focus:ring-0 focus:outline-none p-0 placeholder:text-gray-400"
                               />
                             )}
                           </>
@@ -411,7 +411,7 @@ const SalesInvoiceModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
                                 value={item.itemName}
                                 onChange={e => updateItem(idx, 'itemName', e.target.value)}
                                 placeholder="Atau ketik nama jasa manual..."
-                                className="w-full bg-transparent text-xs text-gray-500 border-none focus:ring-0 focus:outline-none p-0 placeholder:text-gray-300"
+                                className="w-full bg-transparent text-xs text-gray-500 border-none focus:ring-0 focus:outline-none p-0 placeholder:text-gray-400"
                               />
                             )}
                           </>
@@ -502,13 +502,13 @@ const SalesInvoiceModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
 
             {/* Notes / Terms */}
             <div>
-              <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">Catatan untuk Pelanggan</label>
+              <label className="block text-xs font-semibold text-gray-400 uppercase tracking-widest mb-1.5">Catatan untuk Pelanggan</label>
               <textarea
                 value={notes}
                 onChange={e => setNotes(e.target.value)}
                 placeholder="Misal: Terima kasih atas kepercayaan Anda. Pembayaran via transfer ke rekening BCA..."
                 rows={4}
-                className="w-full border border-gray-200 rounded-lg py-2.5 px-3 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none placeholder:text-gray-300"
+                className="w-full border border-gray-200 rounded-lg py-2.5 px-3 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none placeholder:text-gray-400"
               />
             </div>
 
@@ -622,7 +622,7 @@ const SalesInvoiceModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
           {/* ATTACHMENTS */}
           <div className="px-6 pb-4">
             <div className="flex items-center justify-between mb-3">
-              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest flex items-center gap-1">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest flex items-center gap-1">
                 <Paperclip size={12} /> Dokumen Pendukung
               </p>
               <label className="flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-700 cursor-pointer">

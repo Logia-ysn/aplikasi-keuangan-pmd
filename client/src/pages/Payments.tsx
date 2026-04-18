@@ -272,14 +272,14 @@ export const Payments = () => {
                         return count > 0 ? (
                           <span className="inline-flex items-center gap-0.5 ml-1.5 text-blue-500" title={`${count} lampiran`}>
                             <Paperclip size={11} />
-                            <span className="text-[10px] font-medium">{count}</span>
+                            <span className="text-xs font-medium">{count}</span>
                           </span>
                         ) : null;
                       })()}
                     </td>
                     <td>
                       <span className="font-medium text-gray-800">{txn.partyName ?? '—'}</span>
-                      {txn.partyType && <span className="text-[10px] text-gray-400 uppercase ml-1.5">{txn.partyType}</span>}
+                      {txn.partyType && <span className="text-xs text-gray-400 uppercase ml-1.5">{txn.partyType}</span>}
                     </td>
                     <td className="text-center">
                       <span className={cn('badge', badgeClass)}>

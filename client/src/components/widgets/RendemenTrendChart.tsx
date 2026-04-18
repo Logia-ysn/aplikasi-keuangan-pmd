@@ -65,7 +65,7 @@ export default function RendemenTrendChart() {
         <>
           <div className="grid grid-cols-3 gap-3 mb-4">
             <div>
-              <p className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>
+              <p className="text-xs uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>
                 Bulan Ini
               </p>
               <p className="text-xl font-bold tabular-nums" style={{ color: 'var(--color-text-primary)' }}>
@@ -74,7 +74,7 @@ export default function RendemenTrendChart() {
               </p>
             </div>
             <div>
-              <p className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>
+              <p className="text-xs uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>
                 Rata-rata
               </p>
               <p className="text-xl font-bold tabular-nums" style={{ color: 'var(--color-text-primary)' }}>
@@ -83,7 +83,7 @@ export default function RendemenTrendChart() {
               </p>
             </div>
             <div>
-              <p className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>
+              <p className="text-xs uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>
                 vs Bulan Lalu
               </p>
               <p className={`text-xl font-bold tabular-nums flex items-center gap-1 ${deltaColor}`}>

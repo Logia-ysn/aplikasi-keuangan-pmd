@@ -81,7 +81,7 @@ export const CustomerDeposits = () => {
               <Wallet size={16} className="text-teal-600" />
             </div>
             <div>
-              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Total Deposit</p>
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Total Deposit</p>
               <p className="text-lg font-bold text-gray-900 font-mono tabular-nums">{formatRupiah(summary.totalDeposit)}</p>
             </div>
           </div>
@@ -92,7 +92,7 @@ export const CustomerDeposits = () => {
               <CheckCircle2 size={16} className="text-green-600" />
             </div>
             <div>
-              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Sudah Digunakan</p>
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Sudah Digunakan</p>
               <p className="text-lg font-bold text-green-600 font-mono tabular-nums">{formatRupiah(summary.totalApplied)}</p>
             </div>
           </div>
@@ -103,7 +103,7 @@ export const CustomerDeposits = () => {
               <DollarSign size={16} className="text-blue-600" />
             </div>
             <div>
-              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Sisa Deposit</p>
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Sisa Deposit</p>
               <p className="text-lg font-bold text-blue-600 font-mono tabular-nums">{formatRupiah(summary.totalRemaining)}</p>
             </div>
           </div>
@@ -114,7 +114,7 @@ export const CustomerDeposits = () => {
               <AlertTriangle size={16} className="text-orange-500" />
             </div>
             <div>
-              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Deposit Aktif</p>
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Deposit Aktif</p>
               <p className="text-lg font-bold text-orange-500">{summary.activeCount}</p>
             </div>
           </div>

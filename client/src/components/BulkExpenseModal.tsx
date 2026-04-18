@@ -304,7 +304,7 @@ const BulkExpenseModal = ({ isOpen, onClose }: Props) => {
         {/* Header Form */}
         <div className="px-6 py-4 border-b border-gray-100 bg-gray-50 grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div>
-            <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-widest mb-1">Tanggal</label>
+            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-widest mb-1">Tanggal</label>
             <input
               type="date"
               value={date}
@@ -314,7 +314,7 @@ const BulkExpenseModal = ({ isOpen, onClose }: Props) => {
             />
           </div>
           <div>
-            <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-widest mb-1">Sumber Kas</label>
+            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-widest mb-1">Sumber Kas</label>
             <SearchableSelect
               options={cashOptions}
               value={cashAccountId}
@@ -324,7 +324,7 @@ const BulkExpenseModal = ({ isOpen, onClose }: Props) => {
             />
           </div>
           <div>
-            <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-widest mb-1">Batch Note</label>
+            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-widest mb-1">Batch Note</label>
             <input
               type="text"
               value={batchNote}
@@ -338,7 +338,7 @@ const BulkExpenseModal = ({ isOpen, onClose }: Props) => {
         {/* Rows */}
         <div className="flex-1 overflow-y-auto p-4">
           <div className="space-y-2">
-            <div className="hidden md:grid grid-cols-12 gap-2 px-2 text-[10px] font-semibold text-gray-400 uppercase tracking-widest">
+            <div className="hidden md:grid grid-cols-12 gap-2 px-2 text-xs font-semibold text-gray-400 uppercase tracking-widest">
               <div className="col-span-3">Akun Debit</div>
               <div className="col-span-3">Keterangan</div>
               <div className="col-span-2">Pihak (opsional)</div>
@@ -453,7 +453,7 @@ const BulkExpenseModal = ({ isOpen, onClose }: Props) => {
                     )}
                   </div>
                   {row.error && (
-                    <div className="md:col-span-12 flex items-start gap-1 text-[11px] text-red-600 px-1">
+                    <div className="md:col-span-12 flex items-start gap-1 text-xs text-red-600 px-1">
                       <AlertCircle size={11} className="flex-shrink-0 mt-0.5" />
                       <span>{row.error}</span>
                     </div>

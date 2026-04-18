@@ -121,11 +121,11 @@ const RefundCustomerDepositModal: React.FC<Props> = ({ isOpen, onClose, deposit 
         <div className="p-5 space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div className="bg-teal-50 border border-teal-100 rounded-lg px-3 py-2">
-              <p className="text-[10px] font-semibold text-teal-700 uppercase">Sisa Uang Muka</p>
+              <p className="text-xs font-semibold text-teal-700 uppercase">Sisa Uang Muka</p>
               <p className="text-lg font-bold text-teal-700 font-mono tabular-nums">{formatRupiah(remaining)}</p>
             </div>
             <div className="bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
-              <p className="text-[10px] font-semibold text-blue-700 uppercase">Piutang Pelanggan</p>
+              <p className="text-xs font-semibold text-blue-700 uppercase">Piutang Pelanggan</p>
               <p className="text-lg font-bold text-blue-700 font-mono tabular-nums">{formatRupiah(Number(partyOutstanding ?? 0))}</p>
             </div>
           </div>
@@ -139,7 +139,7 @@ const RefundCustomerDepositModal: React.FC<Props> = ({ isOpen, onClose, deposit 
           <div>
             <div className="flex items-center justify-between">
               <label className="text-xs font-medium text-gray-600">Offset ke Piutang (FIFO invoice terlama)</label>
-              <button type="button" onClick={setOffsetMax} className="text-[11px] text-teal-600 hover:underline">Maks: {formatRupiah(maxOffset)}</button>
+              <button type="button" onClick={setOffsetMax} className="text-xs text-teal-600 hover:underline">Maks: {formatRupiah(maxOffset)}</button>
             </div>
             <input type="number" min={0} value={offsetAmount || ''} onChange={(e) => setOffsetAmount(Number(e.target.value) || 0)}
               className="w-full mt-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
@@ -149,7 +149,7 @@ const RefundCustomerDepositModal: React.FC<Props> = ({ isOpen, onClose, deposit 
           <div>
             <div className="flex items-center justify-between">
               <label className="text-xs font-medium text-gray-600">Refund Kas ke Bank</label>
-              <button type="button" onClick={setCashRest} className="text-[11px] text-teal-600 hover:underline">Sisa: {formatRupiah(Math.max(0, remaining - Number(offsetAmount || 0)))}</button>
+              <button type="button" onClick={setCashRest} className="text-xs text-teal-600 hover:underline">Sisa: {formatRupiah(Math.max(0, remaining - Number(offsetAmount || 0)))}</button>
             </div>
             <input type="number" min={0} value={cashAmount || ''} onChange={(e) => setCashAmount(Number(e.target.value) || 0)}
               className="w-full mt-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"

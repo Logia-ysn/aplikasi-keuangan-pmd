@@ -114,28 +114,28 @@ export const AboutTab: React.FC = () => {
             <div className="bg-gray-50 rounded-lg p-3">
               <div className="flex items-center gap-1.5 mb-1">
                 <Tag size={12} className="text-gray-400" />
-                <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Versi</span>
+                <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Versi</span>
               </div>
               <p className="text-sm font-bold text-gray-900 font-mono">{APP_VERSION}</p>
             </div>
             <div className="bg-gray-50 rounded-lg p-3">
               <div className="flex items-center gap-1.5 mb-1">
                 <Clock size={12} className="text-gray-400" />
-                <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Build Date</span>
+                <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Build Date</span>
               </div>
               <p className="text-sm font-bold text-gray-900">{APP_BUILD_DATE}</p>
             </div>
             <div className="bg-gray-50 rounded-lg p-3">
               <div className="flex items-center gap-1.5 mb-1">
                 <Info size={12} className="text-gray-400" />
-                <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Platform</span>
+                <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Platform</span>
               </div>
               <p className="text-sm font-bold text-gray-900">{runtime?.platform || '...'}</p>
             </div>
             <div className="bg-gray-50 rounded-lg p-3">
               <div className="flex items-center gap-1.5 mb-1">
                 <ExternalLink size={12} className="text-gray-400" />
-                <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Domain</span>
+                <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Domain</span>
               </div>
               <p className="text-sm font-bold text-gray-900 truncate">{runtime?.domain || window.location.origin}</p>
             </div>
@@ -177,7 +177,7 @@ export const AboutTab: React.FC = () => {
                       Pembaruan tersedia: v{updateInfo.remoteVersion}
                     </span>
                   </div>
-                  <span className="text-[10px] font-mono text-blue-500 bg-blue-100 px-2 py-0.5 rounded">
+                  <span className="text-xs font-mono text-blue-500 bg-blue-100 px-2 py-0.5 rounded">
                     v{APP_VERSION} → v{updateInfo.remoteVersion}
                   </span>
                 </div>
@@ -189,15 +189,15 @@ export const AboutTab: React.FC = () => {
                     {updateInfo.remoteChangelog.map((entry) => (
                       <div key={entry.version} className="bg-white/60 rounded-lg p-3">
                         <div className="flex items-center gap-2 mb-1.5">
-                          <span className="font-mono text-[10px] font-bold text-blue-600 bg-blue-100 px-1.5 py-0.5 rounded">
+                          <span className="font-mono text-xs font-bold text-blue-600 bg-blue-100 px-1.5 py-0.5 rounded">
                             v{entry.version}
                           </span>
                           <span className="text-xs font-medium text-gray-800">{entry.title}</span>
-                          <span className="text-[10px] text-gray-400 font-mono ml-auto">{entry.date}</span>
+                          <span className="text-xs text-gray-400 font-mono ml-auto">{entry.date}</span>
                         </div>
                         <ul className="space-y-0.5">
                           {entry.changes.map((c, i) => (
-                            <li key={i} className="text-[11px] text-gray-600 flex items-start gap-1.5">
+                            <li key={i} className="text-xs text-gray-600 flex items-start gap-1.5">
                               <span className="text-blue-400 mt-0.5">•</span> {c}
                             </li>
                           ))}
@@ -209,7 +209,7 @@ export const AboutTab: React.FC = () => {
 
                 <div className="bg-white/60 rounded-lg p-3 text-xs text-gray-600 space-y-1">
                   <p className="font-semibold text-gray-700">Cara update di server:</p>
-                  <pre className="bg-gray-900 text-green-300 rounded-lg p-2.5 text-[11px] font-mono overflow-x-auto">
+                  <pre className="bg-gray-900 text-green-300 rounded-lg p-2.5 text-xs font-mono overflow-x-auto">
 {`cd ~/aplikasi-keuangan-pmd
 git pull origin main
 docker compose up -d --build`}</pre>
@@ -224,7 +224,7 @@ docker compose up -d --build`}</pre>
       <div>
         <div className="flex items-center gap-2 mb-4">
           <h2 className="text-base font-semibold text-gray-900">Changelog</h2>
-          <span className="badge badge-blue text-[10px]">{CHANGELOG.length} rilis</span>
+          <span className="badge badge-blue text-xs">{CHANGELOG.length} rilis</span>
         </div>
 
         <div className="relative">
@@ -257,7 +257,7 @@ docker compose up -d --build`}</pre>
                       </span>
                       <h4 className="text-sm font-semibold text-gray-900">{entry.title}</h4>
                     </div>
-                    <span className="text-[10px] text-gray-400 font-mono">{entry.date}</span>
+                    <span className="text-xs text-gray-400 font-mono">{entry.date}</span>
                   </div>
                   <ul className="space-y-1">
                     {entry.changes.map((change, ci) => (

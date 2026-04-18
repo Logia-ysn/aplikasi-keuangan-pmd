@@ -203,7 +203,7 @@ const ExpenseModal: React.FC<ExpenseModalProps> = ({ isOpen, onClose }) => {
 
           {/* Date */}
           <div>
-            <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">Tanggal</label>
+            <label className="block text-xs font-semibold text-gray-400 uppercase tracking-widest mb-1.5">Tanggal</label>
             <input
               type="date"
               value={date}
@@ -214,7 +214,7 @@ const ExpenseModal: React.FC<ExpenseModalProps> = ({ isOpen, onClose }) => {
 
           {/* Debit Account — what the money is for */}
           <div>
-            <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">
+            <label className="block text-xs font-semibold text-gray-400 uppercase tracking-widest mb-1.5">
               Akun Pengeluaran (Debit)
             </label>
             <SearchableSelect
@@ -223,12 +223,12 @@ const ExpenseModal: React.FC<ExpenseModalProps> = ({ isOpen, onClose }) => {
               onChange={setDebitAccountId}
               placeholder="— Pilih Akun Pengeluaran —"
             />
-            <p className="text-[10px] text-gray-400 mt-1">Contoh: Beban Listrik, Beban Gaji, Hutang Usaha, dll.</p>
+            <p className="text-xs text-gray-400 mt-1">Contoh: Beban Listrik, Beban Gaji, Hutang Usaha, dll.</p>
           </div>
 
           {/* Credit Account — where the money comes from */}
           <div>
-            <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">
+            <label className="block text-xs font-semibold text-gray-400 uppercase tracking-widest mb-1.5">
               Dibayar Dari (Kredit)
             </label>
             <SearchableSelect
@@ -241,7 +241,7 @@ const ExpenseModal: React.FC<ExpenseModalProps> = ({ isOpen, onClose }) => {
 
           {/* Party (optional) */}
           <div>
-            <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">
+            <label className="block text-xs font-semibold text-gray-400 uppercase tracking-widest mb-1.5">
               Pihak Terkait <span className="font-normal normal-case">(opsional)</span>
             </label>
             <SearchableSelect
@@ -254,7 +254,7 @@ const ExpenseModal: React.FC<ExpenseModalProps> = ({ isOpen, onClose }) => {
 
           {/* Amount */}
           <div>
-            <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">Jumlah (Rp)</label>
+            <label className="block text-xs font-semibold text-gray-400 uppercase tracking-widest mb-1.5">Jumlah (Rp)</label>
             <input
               type="number"
               value={amount}
@@ -267,7 +267,7 @@ const ExpenseModal: React.FC<ExpenseModalProps> = ({ isOpen, onClose }) => {
 
           {/* Description */}
           <div>
-            <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">Keterangan</label>
+            <label className="block text-xs font-semibold text-gray-400 uppercase tracking-widest mb-1.5">Keterangan</label>
             <input
               type="text"
               value={description}
@@ -280,7 +280,7 @@ const ExpenseModal: React.FC<ExpenseModalProps> = ({ isOpen, onClose }) => {
           {/* Reference & Notes */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">No. Referensi</label>
+              <label className="block text-xs font-semibold text-gray-400 uppercase tracking-widest mb-1.5">No. Referensi</label>
               <input
                 type="text"
                 value={referenceNo}
@@ -290,7 +290,7 @@ const ExpenseModal: React.FC<ExpenseModalProps> = ({ isOpen, onClose }) => {
               />
             </div>
             <div>
-              <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">Catatan</label>
+              <label className="block text-xs font-semibold text-gray-400 uppercase tracking-widest mb-1.5">Catatan</label>
               <input
                 type="text"
                 value={notes}
@@ -341,7 +341,7 @@ const ExpenseModal: React.FC<ExpenseModalProps> = ({ isOpen, onClose }) => {
               <div className="flex items-center gap-2">
                 <CheckCircle2 size={14} className="text-green-500" />
                 <span className="text-xs font-semibold text-green-600">Tersimpan</span>
-                <span className="text-[10px] ml-auto flex items-center gap-1" style={{ color: 'var(--color-text-muted)' }}>
+                <span className="text-xs ml-auto flex items-center gap-1" style={{ color: 'var(--color-text-muted)' }}>
                   <Paperclip size={10} /> Lampiran Bukti
                 </span>
               </div>

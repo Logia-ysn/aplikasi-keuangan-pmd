@@ -91,7 +91,7 @@ export function ShortcutHelp({ isOpen, onClose }: ShortcutHelpProps) {
         <div className="px-5 py-3 border-t text-xs"
           style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-muted)' }}
         >
-          Tekan <kbd className="px-1.5 py-0.5 rounded border text-[10px] font-mono" style={{ borderColor: 'var(--color-border)', backgroundColor: 'var(--color-bg-tertiary)' }}>Esc</kbd> untuk menutup
+          Tekan <kbd className="px-1.5 py-0.5 rounded border text-xs font-mono" style={{ borderColor: 'var(--color-border)', backgroundColor: 'var(--color-bg-tertiary)' }}>Esc</kbd> untuk menutup
         </div>
       </div>
     </div>

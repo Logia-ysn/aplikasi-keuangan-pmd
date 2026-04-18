@@ -212,7 +212,7 @@ const PaymentDetailDrawer: React.FC<Props> = ({ paymentId, onClose }) => {
                         <p className="text-xs font-medium" style={{ color: 'var(--color-text-primary)' }}>
                           {a.invoiceType === 'SalesInvoice' ? 'Faktur Penjualan' : 'Faktur Pembelian'}
                         </p>
-                        <p className="text-[10px] font-mono" style={{ color: 'var(--color-text-muted)' }}>
+                        <p className="text-xs font-mono" style={{ color: 'var(--color-text-muted)' }}>
                           {a.invoiceId.slice(0, 8)}...
                         </p>
                       </div>
@@ -264,7 +264,7 @@ const PaymentDetailDrawer: React.FC<Props> = ({ paymentId, onClose }) => {
             {/* Notes */}
             {payment.notes && (
               <div className="rounded-lg border p-3" style={{ borderColor: 'var(--color-border)', backgroundColor: 'var(--color-bg-secondary)' }}>
-                <p className="text-[10px] font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--color-text-muted)' }}>Catatan</p>
+                <p className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--color-text-muted)' }}>Catatan</p>
                 <p className="text-xs leading-relaxed" style={{ color: 'var(--color-text-secondary)' }}>{payment.notes}</p>
               </div>
             )}
@@ -315,7 +315,7 @@ const PaymentDetailDrawer: React.FC<Props> = ({ paymentId, onClose }) => {
                         <Icon size={16} className={isImage ? 'text-purple-500' : 'text-blue-500'} />
                         <div className="flex-1 min-w-0">
                           <p className="text-xs font-medium truncate" style={{ color: 'var(--color-text-primary)' }}>{a.originalName}</p>
-                          <p className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>
+                          <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
                             {(a.fileSize / 1024).toFixed(0)} KB
                           </p>
                         </div>
@@ -355,7 +355,7 @@ function InfoItem({ icon, label, value }: { icon: React.ReactNode; label: string
     <div className="rounded-lg border p-3" style={{ borderColor: 'var(--color-border)' }}>
       <div className="flex items-center gap-1.5 mb-1" style={{ color: 'var(--color-text-muted)' }}>
         {icon}
-        <span className="text-[10px] uppercase tracking-wide font-medium">{label}</span>
+        <span className="text-xs uppercase tracking-wide font-medium">{label}</span>
       </div>
       <p className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>{value}</p>
     </div>

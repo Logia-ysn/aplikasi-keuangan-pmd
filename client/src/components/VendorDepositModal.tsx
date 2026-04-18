@@ -132,7 +132,7 @@ const VendorDepositModal: React.FC<VendorDepositModalProps> = ({ isOpen, onClose
           {/* Date & Supplier */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">Tanggal</label>
+              <label className="block text-xs font-semibold text-gray-400 uppercase tracking-widest mb-1.5">Tanggal</label>
               <input
                 type="date"
                 value={date}
@@ -141,7 +141,7 @@ const VendorDepositModal: React.FC<VendorDepositModalProps> = ({ isOpen, onClose
               />
             </div>
             <div>
-              <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">Supplier</label>
+              <label className="block text-xs font-semibold text-gray-400 uppercase tracking-widest mb-1.5">Supplier</label>
               <select
                 value={partyId}
                 onChange={e => setPartyId(e.target.value)}
@@ -161,7 +161,7 @@ const VendorDepositModal: React.FC<VendorDepositModalProps> = ({ isOpen, onClose
               <p className="text-xs font-medium text-amber-700">
                 Saldo uang muka saat ini: <span className="font-bold font-mono">{formatRupiah(depositBalance.totalBalance)}</span>
               </p>
-              <p className="text-[10px] text-amber-500 mt-0.5">
+              <p className="text-xs text-amber-500 mt-0.5">
                 {depositBalance.data.length} deposit aktif
               </p>
             </div>
@@ -181,7 +181,7 @@ const VendorDepositModal: React.FC<VendorDepositModalProps> = ({ isOpen, onClose
             </div>
             <div>
               <span className="text-sm font-medium text-gray-700 group-hover:text-gray-900">Saldo Awal / Koreksi</span>
-              <p className="text-[10px] text-gray-400">Catat deposit tanpa mempengaruhi kas (offset ke Ekuitas Saldo Awal)</p>
+              <p className="text-xs text-gray-400">Catat deposit tanpa mempengaruhi kas (offset ke Ekuitas Saldo Awal)</p>
             </div>
           </label>
 
@@ -190,14 +190,14 @@ const VendorDepositModal: React.FC<VendorDepositModalProps> = ({ isOpen, onClose
               <p className="text-xs text-blue-700">
                 Jurnal: <span className="font-mono font-medium">DR Uang Muka Pembelian / CR Ekuitas Saldo Awal</span>
               </p>
-              <p className="text-[10px] text-blue-500 mt-0.5">Kas/Bank tidak terpengaruh. Gunakan untuk deposit yang uangnya sudah keluar sebelum sistem digunakan.</p>
+              <p className="text-xs text-blue-500 mt-0.5">Kas/Bank tidak terpengaruh. Gunakan untuk deposit yang uangnya sudah keluar sebelum sistem digunakan.</p>
             </div>
           )}
 
           {/* Amount & Account */}
           <div className={isOpeningBalance ? '' : 'grid grid-cols-2 gap-4'}>
             <div>
-              <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">Jumlah (Rp)</label>
+              <label className="block text-xs font-semibold text-gray-400 uppercase tracking-widest mb-1.5">Jumlah (Rp)</label>
               <input
                 type="number"
                 value={amount}
@@ -209,7 +209,7 @@ const VendorDepositModal: React.FC<VendorDepositModalProps> = ({ isOpen, onClose
             </div>
             {!isOpeningBalance && (
               <div>
-                <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">Akun Kas/Bank</label>
+                <label className="block text-xs font-semibold text-gray-400 uppercase tracking-widest mb-1.5">Akun Kas/Bank</label>
                 <select
                   value={accountId}
                   onChange={e => setAccountId(e.target.value)}
@@ -227,7 +227,7 @@ const VendorDepositModal: React.FC<VendorDepositModalProps> = ({ isOpen, onClose
           {/* Reference & Notes */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">No. Referensi</label>
+              <label className="block text-xs font-semibold text-gray-400 uppercase tracking-widest mb-1.5">No. Referensi</label>
               <input
                 type="text"
                 value={referenceNo}
@@ -237,7 +237,7 @@ const VendorDepositModal: React.FC<VendorDepositModalProps> = ({ isOpen, onClose
               />
             </div>
             <div>
-              <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">Catatan</label>
+              <label className="block text-xs font-semibold text-gray-400 uppercase tracking-widest mb-1.5">Catatan</label>
               <input
                 type="text"
                 value={notes}
@@ -269,7 +269,7 @@ const VendorDepositModal: React.FC<VendorDepositModalProps> = ({ isOpen, onClose
               <div className="flex items-center gap-2">
                 <CheckCircle2 size={14} className="text-green-500" />
                 <span className="text-xs font-semibold text-green-600">Tersimpan</span>
-                <span className="text-[10px] ml-auto flex items-center gap-1" style={{ color: 'var(--color-text-muted)' }}>
+                <span className="text-xs ml-auto flex items-center gap-1" style={{ color: 'var(--color-text-muted)' }}>
                   <Paperclip size={10} /> Lampiran Bukti Transfer
                 </span>
               </div>

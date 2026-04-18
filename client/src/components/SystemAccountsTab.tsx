@@ -274,15 +274,15 @@ export const SystemAccountsTab: React.FC = () => {
       {/* Summary cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="bg-white border border-gray-200 rounded-lg p-3">
-          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Total Role</p>
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Total Role</p>
           <p className="text-xl font-bold text-gray-900 mt-0.5">{stats.total}</p>
         </div>
         <div className="bg-white border border-gray-200 rounded-lg p-3">
-          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Terkonfigurasi</p>
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Terkonfigurasi</p>
           <p className="text-xl font-bold text-green-600 mt-0.5">{stats.configured}</p>
         </div>
         <div className="bg-white border border-gray-200 rounded-lg p-3">
-          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Wajib</p>
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Wajib</p>
           <p className="text-xl font-bold text-blue-600 mt-0.5">{stats.requiredConfigured}/{stats.required}</p>
         </div>
         <div className={cn(
@@ -291,7 +291,7 @@ export const SystemAccountsTab: React.FC = () => {
             ? 'bg-green-50 border-green-200'
             : 'bg-amber-50 border-amber-200'
         )}>
-          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Status</p>
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Status</p>
           <div className="flex items-center gap-1.5 mt-0.5">
             {stats.requiredConfigured === stats.required ? (
               <>
@@ -340,12 +340,12 @@ export const SystemAccountsTab: React.FC = () => {
                 )}
                 <div className="text-left">
                   <h3 className="text-sm font-semibold text-gray-700">{group.title}</h3>
-                  <p className="text-[10px] text-gray-400">{group.description}</p>
+                  <p className="text-xs text-gray-400">{group.description}</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
                 <span className={cn(
-                  'text-[10px] font-medium px-2 py-0.5 rounded-full',
+                  'text-xs font-medium px-2 py-0.5 rounded-full',
                   groupStatus.configured === groupStatus.total
                     ? 'bg-green-100 text-green-700'
                     : groupStatus.configured > 0
@@ -382,12 +382,12 @@ export const SystemAccountsTab: React.FC = () => {
                             )}
                             <span className="text-sm font-medium text-gray-900">{meta.label}</span>
                             {meta.required && (
-                              <span className="text-[10px] font-medium text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">
+                              <span className="text-xs font-medium text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">
                                 Wajib
                               </span>
                             )}
                             {meta.multiAccount && (
-                              <span className="text-[10px] font-medium text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded">
+                              <span className="text-xs font-medium text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded">
                                 Multi
                               </span>
                             )}

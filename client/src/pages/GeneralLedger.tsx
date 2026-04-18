@@ -221,12 +221,12 @@ export const GeneralLedger = () => {
                       <div className="flex flex-col gap-1">
                         {journal.items.slice(0, 2).map((item: any) => (
                           <div key={item.id} className="flex items-center gap-1.5">
-                            <span className="text-[10px] font-mono text-gray-400 bg-gray-50 px-1 py-0.5 rounded">{item.account.accountNumber}</span>
+                            <span className="text-xs font-mono text-gray-400 bg-gray-50 px-1 py-0.5 rounded">{item.account.accountNumber}</span>
                             <span className="text-xs text-gray-600 truncate max-w-[100px]">{item.account.name}</span>
                           </div>
                         ))}
                         {journal.items.length > 2 && (
-                          <span className="text-[10px] text-blue-600 font-medium">+{journal.items.length - 2} lainnya</span>
+                          <span className="text-xs text-blue-600 font-medium">+{journal.items.length - 2} lainnya</span>
                         )}
                       </div>
                     </td>

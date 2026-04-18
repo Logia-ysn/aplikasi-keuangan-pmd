@@ -19,9 +19,9 @@ interface SummaryCardProps {
 function SummaryCard({ label, value, sub }: SummaryCardProps) {
   return (
     <div className="bg-gray-50 border border-gray-100 rounded-lg px-4 py-3">
-      <p className="text-[11px] text-gray-500 font-medium">{label}</p>
+      <p className="text-xs text-gray-500 font-medium">{label}</p>
       <p className="text-lg font-semibold text-gray-900 mt-0.5">{value}</p>
-      {sub && <p className="text-[11px] text-gray-400 mt-0.5">{sub}</p>}
+      {sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
     </div>
   );
 }
@@ -34,7 +34,7 @@ function SectionHeader({ icon: Icon, title, count }: { icon: React.ElementType; 
       </div>
       <h2 className="text-sm font-semibold text-gray-900">{title}</h2>
       {count !== undefined && (
-        <span className="text-[11px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">{count}</span>
+        <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">{count}</span>
       )}
     </div>
   );
@@ -181,7 +181,7 @@ const DailyReport = () => {
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 mb-4">
               {data.finance.cashBankBalances.map((cb: any) => (
                 <div key={cb.accountNumber} className="bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
-                  <p className="text-[10px] text-blue-600 font-medium">{cb.accountNumber} — {cb.accountName}</p>
+                  <p className="text-xs text-blue-600 font-medium">{cb.accountNumber} — {cb.accountName}</p>
                   <p className="text-sm font-semibold text-gray-900 mt-0.5">{formatRupiah(cb.balance)}</p>
                 </div>
               ))}

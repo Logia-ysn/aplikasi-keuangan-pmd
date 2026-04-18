@@ -66,7 +66,7 @@ export default function MonthlyProfitChart() {
       </div>
 
       {/* Legend */}
-      <div className="flex items-center justify-center gap-4 mt-3 text-[10px]" style={{ color: 'var(--color-text-muted)' }}>
+      <div className="flex items-center justify-center gap-4 mt-3 text-xs" style={{ color: 'var(--color-text-muted)' }}>
         <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-blue-500" /> Pendapatan</span>
         <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-red-400" /> Beban</span>
       </div>
@@ -76,7 +76,7 @@ export default function MonthlyProfitChart() {
         const last = data[data.length - 1];
         return (
           <div className="mt-3 pt-3 border-t text-center" style={{ borderColor: 'var(--color-border-light)' }}>
-            <p className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>
+            <p className="text-xs uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>
               Laba Bulan Terakhir
             </p>
             <p className={`text-sm font-bold mt-0.5 ${last.profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>

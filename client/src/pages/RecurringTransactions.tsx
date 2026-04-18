@@ -164,7 +164,7 @@ export const RecurringTransactions = () => {
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        <span className={cn('badge rounded-full text-[10px]', typeInfo!.color)}>
+                        <span className={cn('badge rounded-full text-xs', typeInfo!.color)}>
                           {typeInfo!.label}
                         </span>
                       </td>
@@ -194,7 +194,7 @@ export const RecurringTransactions = () => {
                       </td>
                       <td className="px-4 py-3">
                         <span className={cn(
-                          'badge rounded-full text-[10px]',
+                          'badge rounded-full text-xs',
                           t.isActive ? 'badge-green' : 'badge-gray'
                         )}>
                           {t.isActive ? 'Aktif' : 'Nonaktif'}

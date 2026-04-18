@@ -46,7 +46,7 @@ const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({ isOpen, onClo
 
   if (!isOpen) return null;
 
-  const inputCls = 'w-full border rounded-lg py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-gray-300';
+  const inputCls = 'w-full border rounded-lg py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-gray-400';
   const iconCls = 'absolute left-3 top-1/2 -translate-y-1/2';
 
   return (

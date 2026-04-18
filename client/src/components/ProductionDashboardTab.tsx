@@ -65,7 +65,7 @@ export default function ProductionDashboardTab({ items = [] }: Props) {
             <Filter size={13} /> Filter
           </div>
           <div>
-            <label className="block text-[10px] font-semibold text-gray-400 uppercase mb-1">Dari</label>
+            <label className="block text-xs font-semibold text-gray-400 uppercase mb-1">Dari</label>
             <input
               type="date"
               value={startDate}
@@ -74,7 +74,7 @@ export default function ProductionDashboardTab({ items = [] }: Props) {
             />
           </div>
           <div>
-            <label className="block text-[10px] font-semibold text-gray-400 uppercase mb-1">Sampai</label>
+            <label className="block text-xs font-semibold text-gray-400 uppercase mb-1">Sampai</label>
             <input
               type="date"
               value={endDate}
@@ -83,7 +83,7 @@ export default function ProductionDashboardTab({ items = [] }: Props) {
             />
           </div>
           <div className="flex-1 min-w-[180px]">
-            <label className="block text-[10px] font-semibold text-gray-400 uppercase mb-1">Produk</label>
+            <label className="block text-xs font-semibold text-gray-400 uppercase mb-1">Produk</label>
             <select
               value={itemId}
               onChange={e => setItemId(e.target.value)}
@@ -140,7 +140,7 @@ function DashboardContent({ data }: { data: DashboardData }) {
           label="Periode Ini"
           value={fmtNum(summary.periodRuns)}
           sub={periodDelta !== 0 ? (
-            <span className={cn('text-[10px] font-medium flex items-center gap-0.5',
+            <span className={cn('text-xs font-medium flex items-center gap-0.5',
               periodDelta > 0 ? 'text-green-600' : 'text-red-500')}>
               {periodDelta > 0 ? <ArrowUp size={10} /> : <ArrowDown size={10} />}
               {Math.abs(periodDelta)} vs periode sebelumnya
@@ -165,13 +165,13 @@ function DashboardContent({ data }: { data: DashboardData }) {
       {/* Volume summary */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
-          <p className="text-[10px] font-semibold text-blue-500 uppercase tracking-wide">Total Input</p>
+          <p className="text-xs font-semibold text-blue-500 uppercase tracking-wide">Total Input</p>
           <p className="text-xl font-bold text-blue-700 mt-1 tabular-nums">
             {fmtNum(summary.totalInputQtyPeriod, 1)} <span className="text-sm font-normal">Kg</span>
           </p>
         </div>
         <div className="bg-green-50 border border-green-100 rounded-xl p-4">
-          <p className="text-[10px] font-semibold text-green-500 uppercase tracking-wide">Total Output</p>
+          <p className="text-xs font-semibold text-green-500 uppercase tracking-wide">Total Output</p>
           <p className="text-xl font-bold text-green-700 mt-1 tabular-nums">
             {fmtNum(summary.totalOutputQtyPeriod, 1)} <span className="text-sm font-normal">Kg</span>
           </p>
@@ -180,7 +180,7 @@ function DashboardContent({ data }: { data: DashboardData }) {
           )}
         </div>
         <div className="bg-amber-50 border border-amber-100 rounded-xl p-4">
-          <p className="text-[10px] font-semibold text-amber-500 uppercase tracking-wide">Produk Samping</p>
+          <p className="text-xs font-semibold text-amber-500 uppercase tracking-wide">Produk Samping</p>
           <p className="text-xl font-bold text-amber-700 mt-1 tabular-nums">
             {fmtNum(summary.totalByProductQtyPeriod, 1)} <span className="text-sm font-normal">Kg</span>
           </p>
@@ -294,7 +294,7 @@ function KPICard({ icon, label, value, sub, color }: {
   return (
     <div className={cn('rounded-xl p-4 border border-transparent', c.bg)}>
       <div className={cn('mb-2', c.icon)}>{icon}</div>
-      <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">{label}</p>
+      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{label}</p>
       <p className={cn('text-xl font-bold tabular-nums mt-0.5', c.text)}>{value}</p>
       {sub && <div className="mt-1">{sub}</div>}
     </div>

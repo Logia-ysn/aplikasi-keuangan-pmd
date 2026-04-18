@@ -54,7 +54,7 @@ export default function ProductionStatsWidget() {
       ) : (
         <div className="space-y-4">
           <div>
-            <span className="text-[10px] font-medium uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>
+            <span className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>
               Total Produksi
             </span>
             <p className="text-lg font-semibold tabular-nums mt-0.5" style={{ color: 'var(--color-text-primary)' }}>
@@ -62,7 +62,7 @@ export default function ProductionStatsWidget() {
             </p>
           </div>
           <div>
-            <span className="text-[10px] font-medium uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>
+            <span className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>
               Produksi Bulan Ini
             </span>
             <p className="text-lg font-semibold tabular-nums mt-0.5" style={{ color: 'var(--color-text-primary)' }}>
@@ -70,7 +70,7 @@ export default function ProductionStatsWidget() {
             </p>
           </div>
           <div>
-            <span className="text-[10px] font-medium uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>
+            <span className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>
               Rata-rata Rendemen
             </span>
             <p className="text-lg font-semibold tabular-nums mt-0.5" style={{ color: 'var(--color-text-primary)' }}>

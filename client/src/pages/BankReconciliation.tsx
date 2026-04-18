@@ -260,7 +260,7 @@ const ReconciliationDetail: React.FC<{ id: string; onBack: () => void }> = ({ id
                       <p className="text-xs font-medium truncate" style={{ color: 'var(--color-text-primary)' }}>
                         {entry.description || entry.referenceType}
                       </p>
-                      <p className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>
+                      <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
                         {formatDate(entry.date)}
                       </p>
                     </div>
@@ -418,7 +418,7 @@ const ReconciliationDetail: React.FC<{ id: string; onBack: () => void }> = ({ id
                         {item.statementDesc || 'Tanpa keterangan'}
                       </p>
                       {item.statementDate && (
-                        <p className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>
+                        <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
                           {formatDate(item.statementDate)}
                         </p>
                       )}
@@ -432,7 +432,7 @@ const ReconciliationDetail: React.FC<{ id: string; onBack: () => void }> = ({ id
                       <button
                         onClick={() => unmatchMutation.mutate(item.id)}
                         disabled={unmatchMutation.isPending}
-                        className="text-[10px] text-red-500 hover:text-red-700 hover:bg-red-50 px-1.5 py-0.5 rounded transition-colors flex items-center gap-1"
+                        className="text-xs text-red-500 hover:text-red-700 hover:bg-red-50 px-1.5 py-0.5 rounded transition-colors flex items-center gap-1"
                       >
                         <Unlink size={10} /> Batalkan
                       </button>
@@ -552,7 +552,7 @@ export const BankReconciliation: React.FC = () => {
                         <div className="font-medium" style={{ color: 'var(--color-text-primary)' }}>
                           {recon.account.name}
                         </div>
-                        <div className="text-[10px] font-mono" style={{ color: 'var(--color-text-muted)' }}>
+                        <div className="text-xs font-mono" style={{ color: 'var(--color-text-muted)' }}>
                           {recon.account.accountNumber}
                         </div>
                       </td>

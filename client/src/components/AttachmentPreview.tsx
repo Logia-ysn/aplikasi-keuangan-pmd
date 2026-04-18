@@ -82,7 +82,7 @@ const AttachmentPreview: React.FC<AttachmentPreviewProps> = ({
                   onClick={() => window.open(fileUrl, '_blank')}
                 >
                   <FileText size={24} className="text-red-500" />
-                  <span className="text-[10px] font-medium" style={{ color: 'var(--color-text-muted)' }}>PDF</span>
+                  <span className="text-xs font-medium" style={{ color: 'var(--color-text-muted)' }}>PDF</span>
                 </div>
               )}
 
@@ -119,7 +119,7 @@ const AttachmentPreview: React.FC<AttachmentPreviewProps> = ({
 
               {/* File info */}
               <div className="px-2 py-1.5">
-                <p className="text-[10px] truncate font-medium" style={{ color: 'var(--color-text-primary)' }}>
+                <p className="text-xs truncate font-medium" style={{ color: 'var(--color-text-primary)' }}>
                   {att.fileName}
                 </p>
                 <p className="text-[9px]" style={{ color: 'var(--color-text-muted)' }}>

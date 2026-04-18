@@ -214,7 +214,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, defaultTyp
 
           {/* Payment Type Toggle */}
           <div>
-            <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-2">Tipe Transaksi</label>
+            <label className="block text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2">Tipe Transaksi</label>
             <div className="flex border border-gray-200 rounded-lg overflow-hidden">
               {(['Receive', 'Pay'] as PaymentType[]).map((t) => (
                 <button
@@ -237,7 +237,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, defaultTyp
           {/* Date & Party */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">Tanggal</label>
+              <label className="block text-xs font-semibold text-gray-400 uppercase tracking-widest mb-1.5">Tanggal</label>
               <input
                 type="date"
                 value={date}
@@ -246,7 +246,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, defaultTyp
               />
             </div>
             <div>
-              <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">
+              <label className="block text-xs font-semibold text-gray-400 uppercase tracking-widest mb-1.5">
                 {isReceive ? 'Pelanggan' : 'Supplier'}
               </label>
               <select
@@ -295,7 +295,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, defaultTyp
               {partyOutstanding > 0 && (
                 <button
                   onClick={() => setAmount(partyOutstanding)}
-                  className="text-[11px] text-blue-600 hover:text-blue-700 font-medium underline underline-offset-2"
+                  className="text-xs text-blue-600 hover:text-blue-700 font-medium underline underline-offset-2"
                 >
                   Isi jumlah lunaskan semua ({formatRupiah(partyOutstanding)})
                 </button>
@@ -312,7 +312,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, defaultTyp
 
           {/* Amount */}
           <div>
-            <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">Jumlah Tagihan (Rp)</label>
+            <label className="block text-xs font-semibold text-gray-400 uppercase tracking-widest mb-1.5">Jumlah Tagihan (Rp)</label>
             <input
               type="number"
               value={amount}
@@ -325,7 +325,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, defaultTyp
 
           {/* Split toggle */}
           <div className="flex items-center justify-between">
-            <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Distribusi Akun</label>
+            <label className="block text-xs font-semibold text-gray-400 uppercase tracking-widest">Distribusi Akun</label>
             <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
               <input
                 type="checkbox"
@@ -339,7 +339,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, defaultTyp
 
           {!splitMode ? (
             <div>
-              <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">Akun Kas/Bank</label>
+              <label className="block text-xs font-semibold text-gray-400 uppercase tracking-widest mb-1.5">Akun Kas/Bank</label>
               <select
                 value={accountId}
                 onChange={e => setAccountId(e.target.value)}
@@ -353,7 +353,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, defaultTyp
             </div>
           ) : (
             <div className="space-y-2 border border-gray-200 rounded-lg p-3">
-              <p className="text-[11px] text-gray-500">
+              <p className="text-xs text-gray-500">
                 Total {numAmount > 0 ? formatRupiah(numAmount) : '0'} dibagi ke beberapa akun. Selisih harus 0.
               </p>
               {splits.map((sp, idx) => (
@@ -419,7 +419,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, defaultTyp
           {/* Reference & Notes */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">No. Referensi</label>
+              <label className="block text-xs font-semibold text-gray-400 uppercase tracking-widest mb-1.5">No. Referensi</label>
               <input
                 type="text"
                 value={referenceNo}
@@ -429,7 +429,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, defaultTyp
               />
             </div>
             <div>
-              <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">Catatan</label>
+              <label className="block text-xs font-semibold text-gray-400 uppercase tracking-widest mb-1.5">Catatan</label>
               <input
                 type="text"
                 value={notes}
@@ -463,7 +463,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, defaultTyp
               <div className="flex items-center gap-2">
                 <CheckCircle2 size={14} className="text-green-500" />
                 <span className="text-xs font-semibold text-green-600">Tersimpan</span>
-                <span className="text-[10px] ml-auto flex items-center gap-1" style={{ color: 'var(--color-text-muted)' }}>
+                <span className="text-xs ml-auto flex items-center gap-1" style={{ color: 'var(--color-text-muted)' }}>
                   <Paperclip size={10} /> Lampiran Bukti Transfer
                 </span>
               </div>

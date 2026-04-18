@@ -193,7 +193,7 @@ const SearchableSelect = ({ options, value, onChange, placeholder = 'â€” Pilih â
             grouped.map((g) => (
               <div key={g.group}>
                 {g.group && (
-                  <div className="px-3 py-1.5 text-[10px] font-semibold text-gray-400 uppercase tracking-widest bg-gray-50 sticky top-0">
+                  <div className="px-3 py-1.5 text-xs font-semibold text-gray-400 uppercase tracking-widest bg-gray-50 sticky top-0">
                     {g.group}
                   </div>
                 )}

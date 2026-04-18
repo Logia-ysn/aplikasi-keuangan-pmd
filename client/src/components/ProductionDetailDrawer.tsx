@@ -108,15 +108,15 @@ export default function ProductionDetailDrawer({ runId, onClose, onCancel, canCa
               {/* Summary cards */}
               <div className="grid grid-cols-3 gap-3">
                 <div className="bg-blue-50 rounded-lg p-3 text-center">
-                  <p className="text-[10px] font-semibold text-blue-500 uppercase">Total Input</p>
+                  <p className="text-xs font-semibold text-blue-500 uppercase">Total Input</p>
                   <p className="text-lg font-bold text-blue-700">{fmtNum(totalInputQty)} <span className="text-xs font-normal">Kg</span></p>
                 </div>
                 <div className="bg-green-50 rounded-lg p-3 text-center">
-                  <p className="text-[10px] font-semibold text-green-500 uppercase">Total Output</p>
+                  <p className="text-xs font-semibold text-green-500 uppercase">Total Output</p>
                   <p className="text-lg font-bold text-green-700">{fmtNum(totalOutputQty)} <span className="text-xs font-normal">Kg</span></p>
                 </div>
                 <div className="bg-purple-50 rounded-lg p-3 text-center">
-                  <p className="text-[10px] font-semibold text-purple-500 uppercase">Rendemen</p>
+                  <p className="text-xs font-semibold text-purple-500 uppercase">Rendemen</p>
                   <p className="text-lg font-bold text-purple-700">
                     {run.rendemenPct != null ? `${Number(run.rendemenPct).toFixed(1)}%` : '—'}
                   </p>
@@ -189,7 +189,7 @@ export default function ProductionDetailDrawer({ runId, onClose, onCancel, canCa
                           </div>
                           <div className="flex items-center gap-2">
                             {rPct && (
-                              <span className="text-[10px] font-semibold text-green-600 bg-green-100 px-1.5 py-0.5 rounded">
+                              <span className="text-xs font-semibold text-green-600 bg-green-100 px-1.5 py-0.5 rounded">
                                 {rPct}%
                               </span>
                             )}

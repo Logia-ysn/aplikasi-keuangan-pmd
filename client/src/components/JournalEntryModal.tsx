@@ -161,7 +161,7 @@ const JournalEntryModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
                           value={item.description}
                           onChange={(e) => updateItem(index, 'description', e.target.value)}
                           placeholder={narration || 'Keterangan...'}
-                          className="w-full border-none bg-transparent text-sm text-gray-800 focus:ring-0 focus:outline-none p-0 placeholder:text-gray-300"
+                          className="w-full border-none bg-transparent text-sm text-gray-800 focus:ring-0 focus:outline-none p-0 placeholder:text-gray-400"
                         />
                       </td>
                       <td className="px-3 py-2">
@@ -212,11 +212,11 @@ const JournalEntryModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
               </div>
               <div className="flex gap-6">
                 <div className="text-right">
-                  <p className="text-[10px] text-gray-400 uppercase tracking-wider font-medium">Total Debit</p>
+                  <p className="text-xs text-gray-400 uppercase tracking-wider font-medium">Total Debit</p>
                   <p className="text-sm font-semibold text-gray-900 font-mono tabular-nums">{formatRupiah(totalDebit)}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-[10px] text-gray-400 uppercase tracking-wider font-medium">Total Kredit</p>
+                  <p className="text-xs text-gray-400 uppercase tracking-wider font-medium">Total Kredit</p>
                   <p className="text-sm font-semibold text-gray-900 font-mono tabular-nums">{formatRupiah(totalCredit)}</p>
                 </div>
               </div>

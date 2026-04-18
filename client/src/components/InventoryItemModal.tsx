@@ -198,7 +198,7 @@ export function InventoryItemModal({ isOpen, onClose, editItem }: InventoryItemM
                 value={form.description}
                 onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
                 placeholder="Deskripsi opsional tentang item ini"
-                className="w-full border border-gray-200 rounded-lg py-2.5 px-3 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none placeholder:text-gray-300"
+                className="w-full border border-gray-200 rounded-lg py-2.5 px-3 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none placeholder:text-gray-400"
               />
             </div>
 
@@ -215,7 +215,7 @@ export function InventoryItemModal({ isOpen, onClose, editItem }: InventoryItemM
                 onChange={e => setForm(f => ({ ...f, minimumStock: Number(e.target.value) }))}
                 className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
               />
-              <p className="text-[11px] text-gray-400 mt-1">Peringatan stok menipis akan muncul jika stok di bawah nilai ini.</p>
+              <p className="text-xs text-gray-400 mt-1">Peringatan stok menipis akan muncul jika stok di bawah nilai ini.</p>
             </div>
 
             {/* Akun Persediaan */}
@@ -236,7 +236,7 @@ export function InventoryItemModal({ isOpen, onClose, editItem }: InventoryItemM
                   </option>
                 ))}
               </select>
-              <p className="text-[11px] text-gray-400 mt-1">Pilih akun aset untuk pencatatan GL otomatis saat gerakan stok.</p>
+              <p className="text-xs text-gray-400 mt-1">Pilih akun aset untuk pencatatan GL otomatis saat gerakan stok.</p>
             </div>
 
             {error && (

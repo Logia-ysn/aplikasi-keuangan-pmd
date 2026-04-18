@@ -569,7 +569,7 @@ const LoginPage: React.FC = () => {
             </p>
             <div className="flex items-center justify-center gap-2">
               <span
-                className="text-[10px] font-mono rounded-md px-2 py-0.5 backdrop-blur-sm"
+                className="text-xs font-mono rounded-md px-2 py-0.5 backdrop-blur-sm"
                 style={{
                   color: 'var(--color-text-muted)',
                   backgroundColor: 'color-mix(in srgb, var(--color-bg-tertiary) 80%, transparent)',
@@ -578,7 +578,7 @@ const LoginPage: React.FC = () => {
               >
                 v{APP_VERSION}
               </span>
-              <span className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>
+              <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
                 build {APP_BUILD_DATE}
               </span>
             </div>

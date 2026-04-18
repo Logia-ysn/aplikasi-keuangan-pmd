@@ -417,7 +417,7 @@ export function InventoryPage() {
                           {formatNumber(currentStock)} {item.unit}
                         </span>
                         {isLow && (
-                          <span className="ml-1.5 inline-flex items-center gap-0.5 text-[10px] font-semibold text-red-600 bg-red-50 px-1.5 py-0.5 rounded-full">
+                          <span className="ml-1.5 inline-flex items-center gap-0.5 text-xs font-semibold text-red-600 bg-red-50 px-1.5 py-0.5 rounded-full">
                             ⚠ Stok Menipis
                           </span>
                         )}
@@ -574,7 +574,7 @@ export function InventoryPage() {
                             {mov.item?.name ?? '—'}
                           </span>
                           {mov.item?.code && (
-                            <span className="text-[10px] text-gray-400 uppercase ml-1.5">{mov.item.code}</span>
+                            <span className="text-xs text-gray-400 uppercase ml-1.5">{mov.item.code}</span>
                           )}
                         </td>
                         <td className="text-center">

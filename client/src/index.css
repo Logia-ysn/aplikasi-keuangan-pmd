@@ -11,7 +11,7 @@
   --color-bg-tertiary: #f3f4f6;
   --color-text-primary: #111827;
   --color-text-secondary: #6b7280;
-  --color-text-muted: #9ca3af;
+  --color-text-muted: #6b7280;
   --color-border: #e5e7eb;
   --color-border-light: #f3f4f6;
   --color-card-bg: #ffffff;
@@ -280,7 +280,7 @@ body {
     background: white !important;
     margin: 0 !important;
     padding: 0 !important;
-    font-size: 11pt !important;
+    font-size: 12pt !important;
     color: #111 !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
@@ -308,12 +308,12 @@ body {
 
   /* Table print styles */
   .data-table {
-    font-size: 10pt !important;
+    font-size: 11pt !important;
   }
   .data-table thead th {
     background: #f3f4f6 !important;
     border-bottom: 2px solid #374151 !important;
-    font-size: 9pt !important;
+    font-size: 10pt !important;
     padding: 6px 12px !important;
   }
   .data-table tbody td {
@@ -412,10 +412,10 @@ body {
 
   /* Compact print for landscape reports */
   .print-landscape .data-table {
-    font-size: 8pt !important;
+    font-size: 9pt !important;
   }
   .print-landscape .data-table thead th {
-    font-size: 7.5pt !important;
+    font-size: 8.5pt !important;
     padding: 4px 6px !important;
   }
   .print-landscape .data-table tbody td {

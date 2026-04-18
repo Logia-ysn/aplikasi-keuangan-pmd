@@ -69,13 +69,13 @@ export default function CogsBackfillWidget() {
         <>
           <div className="grid grid-cols-2 gap-3 mb-3">
             <div>
-              <p className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>Item Pending</p>
+              <p className="text-xs uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>Item Pending</p>
               <p className="text-xl font-bold tabular-nums" style={{ color: 'var(--color-text-primary)' }}>
                 {data!.pendingCount}
               </p>
             </div>
             <div>
-              <p className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>Estimasi Nilai</p>
+              <p className="text-xs uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>Estimasi Nilai</p>
               <p className="text-xl font-bold tabular-nums text-amber-600">
                 {formatRupiahCompact(data!.totalPendingValue)}
               </p>

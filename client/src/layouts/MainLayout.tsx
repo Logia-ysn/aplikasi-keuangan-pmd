@@ -144,7 +144,7 @@ export const MainLayout = () => {
               </div>
               <div className="hidden md:block">
                 <p className="text-xs font-semibold leading-none" style={{ color: 'var(--color-text-primary)' }}>{user?.fullName || 'User'}</p>
-                <p className="text-[10px] mt-0.5 uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>{user?.role || 'Role'}</p>
+                <p className="text-xs mt-0.5 uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>{user?.role || 'Role'}</p>
               </div>
             </div>
             <button

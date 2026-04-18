@@ -197,7 +197,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen = false, onMobileCl
       {/* Version */}
       {(mobileOpen || !isCollapsed) && (
         <div className="px-4 pb-1">
-          <span className="text-[10px] font-mono tracking-wide" style={{ color: 'var(--color-text-muted)' }}>
+          <span className="text-xs font-mono tracking-wide" style={{ color: 'var(--color-text-muted)' }}>
             v{APP_VERSION}
           </span>
         </div>
@@ -212,7 +212,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen = false, onMobileCl
           {(mobileOpen || !isCollapsed) && (
             <div className="overflow-hidden">
               <p className="text-xs font-semibold truncate" style={{ color: 'var(--color-text-primary)' }}>{user?.fullName || 'User'}</p>
-              <p className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>{user?.role || 'Admin'}</p>
+              <p className="text-xs uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>{user?.role || 'Admin'}</p>
             </div>
           )}
         </div>

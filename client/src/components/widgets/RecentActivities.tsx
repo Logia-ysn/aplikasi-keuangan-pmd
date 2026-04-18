@@ -15,7 +15,7 @@ const RecentActivities: React.FC<RecentActivitiesProps> = ({ data }) => (
       <h2 className="text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>
         Aktivitas Terakhir
       </h2>
-      <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
+      <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
         Live
       </span>
     </div>
@@ -36,7 +36,7 @@ const RecentActivities: React.FC<RecentActivitiesProps> = ({ data }) => (
               <p className="text-xs font-semibold truncate" style={{ color: 'var(--color-text-primary)' }}>
                 {a.paymentNumber}
               </p>
-              <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
+              <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
                 {new Date(a.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}
               </p>
             </div>

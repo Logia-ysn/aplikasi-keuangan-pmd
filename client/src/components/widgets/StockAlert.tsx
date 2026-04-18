@@ -46,13 +46,13 @@ const StockAlert: React.FC = () => {
                 <p className="text-xs font-medium truncate" style={{ color: 'var(--color-text-primary)' }}>
                   {item.name}
                 </p>
-                <p className="text-[10px] mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+                <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
                   Stok: {item.currentStock} / Min: {item.minimumStock} {item.unit}
                 </p>
               </div>
               <span
                 className={cn(
-                  'badge rounded-full text-[10px] font-semibold',
+                  'badge rounded-full text-xs font-semibold',
                   item.status === 'Habis' ? 'badge-red' : 'badge-yellow'
                 )}
               >

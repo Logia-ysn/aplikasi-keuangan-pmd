@@ -275,12 +275,12 @@ const ImportModal = ({ isOpen, onClose, importType }: Props) => {
                     Error ({preview.errors.length}):
                   </p>
                   {preview.errors.slice(0, 10).map((err, i) => (
-                    <p key={i} className="text-[11px] text-red-600 dark:text-red-400">
+                    <p key={i} className="text-xs text-red-600 dark:text-red-400">
                       Baris {err.row}: {err.message}
                     </p>
                   ))}
                   {preview.errors.length > 10 && (
-                    <p className="text-[11px] text-red-500 mt-1">...dan {preview.errors.length - 10} error lainnya</p>
+                    <p className="text-xs text-red-500 mt-1">...dan {preview.errors.length - 10} error lainnya</p>
                   )}
                 </div>
               )}
@@ -368,7 +368,7 @@ const ImportModal = ({ isOpen, onClose, importType }: Props) => {
                     Error Detail:
                   </p>
                   {result.errors.map((err, i) => (
-                    <p key={i} className="text-[11px] text-red-600 dark:text-red-400">
+                    <p key={i} className="text-xs text-red-600 dark:text-red-400">
                       {err.row > 0 ? `Baris ${err.row}: ` : ''}{err.message}
                     </p>
                   ))}

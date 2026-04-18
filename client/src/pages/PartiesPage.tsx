@@ -215,10 +215,10 @@ export const PartiesPage = () => {
                   <div>
                     <h3 className="text-sm font-semibold text-gray-900">
                       {party.name}
-                      {!party.isActive && <span className="ml-1.5 text-[10px] text-red-400 font-normal">(Nonaktif)</span>}
+                      {!party.isActive && <span className="ml-1.5 text-xs text-red-400 font-normal">(Nonaktif)</span>}
                     </h3>
                     <span className={cn(
-                      'text-[10px] font-medium uppercase tracking-wider',
+                      'text-xs font-medium uppercase tracking-wider',
                       party.partyType === 'Customer' ? 'text-blue-500' :
                       party.partyType === 'Supplier' ? 'text-orange-500' : 'text-purple-500'
                     )}>
@@ -276,7 +276,7 @@ export const PartiesPage = () => {
 
               <div className="pt-3 border-t border-gray-100 space-y-1.5">
                 <div>
-                  <p className="text-[10px] text-gray-400 uppercase tracking-wider font-medium mb-0.5">Saldo Terutang</p>
+                  <p className="text-xs text-gray-400 uppercase tracking-wider font-medium mb-0.5">Saldo Terutang</p>
                   <p className={cn(
                     'text-base font-semibold font-mono tabular-nums',
                     Number(party.outstandingAmount) > 0 ? 'text-red-500' :
@@ -284,7 +284,7 @@ export const PartiesPage = () => {
                   )}>
                     {formatRupiah(Math.abs(Number(party.outstandingAmount)))}
                     {Number(party.outstandingAmount) !== 0 && (
-                      <span className="text-[10px] font-normal ml-1 text-gray-400">
+                      <span className="text-xs font-normal ml-1 text-gray-400">
                         {Number(party.outstandingAmount) > 0 ? '(Tagihan)' : '(Deposit)'}
                       </span>
                     )}
@@ -292,7 +292,7 @@ export const PartiesPage = () => {
                 </div>
                 {Number(party.depositBalance) > 0 && (
                   <div>
-                    <p className="text-[10px] text-gray-400 uppercase tracking-wider font-medium mb-0.5">UM Vendor</p>
+                    <p className="text-xs text-gray-400 uppercase tracking-wider font-medium mb-0.5">UM Vendor</p>
                     <p className="text-sm font-semibold font-mono tabular-nums text-amber-600">
                       {formatRupiah(Number(party.depositBalance))}
                     </p>
@@ -300,7 +300,7 @@ export const PartiesPage = () => {
                 )}
                 {Number(party.customerDepositBalance) > 0 && (
                   <div>
-                    <p className="text-[10px] text-gray-400 uppercase tracking-wider font-medium mb-0.5">UM Pelanggan</p>
+                    <p className="text-xs text-gray-400 uppercase tracking-wider font-medium mb-0.5">UM Pelanggan</p>
                     <p className="text-sm font-semibold font-mono tabular-nums text-teal-600">
                       {formatRupiah(Number(party.customerDepositBalance))}
                     </p>

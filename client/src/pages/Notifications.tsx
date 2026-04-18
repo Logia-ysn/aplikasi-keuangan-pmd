@@ -63,7 +63,7 @@ function typeBadge(type: string) {
   };
   const info = labels[type] || labels.system;
   return (
-    <span className={cn('badge rounded-full text-[10px]', info!.color)}>
+    <span className={cn('badge rounded-full text-xs', info!.color)}>
       {info!.label}
     </span>
   );
@@ -201,7 +201,7 @@ export const Notifications = () => {
                 <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-secondary)' }}>
                   {notif.message}
                 </p>
-                <p className="text-[11px] mt-1.5" style={{ color: 'var(--color-text-muted)' }}>
+                <p className="text-xs mt-1.5" style={{ color: 'var(--color-text-muted)' }}>
                   {relativeTime(notif.createdAt)}
                 </p>
               </div>
