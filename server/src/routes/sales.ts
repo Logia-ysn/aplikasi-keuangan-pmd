@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 import Decimal from 'decimal.js';
 import { prisma } from '../lib/prisma';
 import { AuthRequest, roleMiddleware } from '../middleware/auth';
-import { updateAccountBalance } from '../utils/accountBalance';
+import { updateAccountBalance, recalcPartyOutstanding } from '../utils/accountBalance';
 import { generateDocumentNumber } from '../utils/documentNumber';
 import { getOpenFiscalYear } from '../utils/fiscalYear';
 import { validateBody } from '../utils/validate';
@@ -316,7 +316,7 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
       for (const ci of creditJournalItems) {
         await updateAccountBalance(tx, ci.accountId, 0, ci.credit);
       }
-      await tx.party.update({ where: { id: body.partyId }, data: { outstandingAmount: { increment: grandTotalNum } } });
+      await recalcPartyOutstanding(tx, body.partyId);
 
       // Auto-deduct inventory for items linked to InventoryItem
       let totalCogs = new Decimal(0);
@@ -570,11 +570,8 @@ router.post('/:id/cancel', roleMiddleware(['Admin']), async (req: AuthRequest, r
         });
       }
 
-      // Reverse party outstanding
-      await tx.party.update({
-        where: { id: invoice.partyId },
-        data: { outstandingAmount: { decrement: Number(invoice.grandTotal) } },
-      });
+      // Recalc party outstanding from invoice data
+      await recalcPartyOutstanding(tx, invoice.partyId);
 
       return { id: invoice.id, status: 'Cancelled' };
     }, { timeout: 15000 });

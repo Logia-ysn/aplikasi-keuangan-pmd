@@ -10,6 +10,7 @@ import { logger } from '../lib/logger';
 import { systemAccounts } from '../services/systemAccounts';
 import { generateDocumentNumber } from '../utils/documentNumber';
 import { getOpenFiscalYear } from '../utils/fiscalYear';
+import { recalcPartyOutstanding } from '../utils/accountBalance';
 
 const router = Router();
 
@@ -378,8 +379,7 @@ router.post('/generate-dummy', roleMiddleware(['Admin']), async (req, res) => {
               { accountId: kasId!, date: payDate, debit: grandTotal, credit: 0, referenceId: payment.id, referenceType: 'Payment', fiscalYearId: payFy.id },
               { accountId: arId!, date: payDate, debit: 0, credit: grandTotal, referenceId: payment.id, referenceType: 'Payment', fiscalYearId: payFy.id },
             ]});
-            // Update party outstanding
-            await tx.party.update({ where: { id: customer.id }, data: { outstandingAmount: { decrement: grandTotal } } });
+            await recalcPartyOutstanding(tx, customer.id);
             results.payments++;
           }
 
@@ -421,7 +421,7 @@ router.post('/generate-dummy', roleMiddleware(['Admin']), async (req, res) => {
             { accountId: apId!, date: payDate, debit: piAmount, credit: 0, referenceType: 'Payment', referenceId: 'dummy-pay-pi', fiscalYearId: payFy.id },
             { accountId: kasId!, date: payDate, debit: 0, credit: piAmount, referenceType: 'Payment', referenceId: 'dummy-pay-pi', fiscalYearId: payFy.id },
           ]});
-          await tx.party.update({ where: { id: pi.partyId }, data: { outstandingAmount: { decrement: piAmount } } });
+          await recalcPartyOutstanding(tx, pi.partyId);
           results.payments++;
         }
 

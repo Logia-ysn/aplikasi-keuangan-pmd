@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 import Decimal from 'decimal.js';
 import { prisma } from '../lib/prisma';
 import { AuthRequest, roleMiddleware } from '../middleware/auth';
-import { updateAccountBalance } from '../utils/accountBalance';
+import { updateAccountBalance, recalcPartyOutstanding } from '../utils/accountBalance';
 import { generateDocumentNumber } from '../utils/documentNumber';
 import { getOpenFiscalYear } from '../utils/fiscalYear';
 import { validateBody } from '../utils/validate';
@@ -299,7 +299,7 @@ router.post('/', roleMiddleware(['Admin', 'Accountant', 'StaffProduksi']), async
         await updateAccountBalance(tx, accountId, data.amount, 0); // ASSET: debit → +balance
       }
       await updateAccountBalance(tx, apAccount.id, 0, grandTotalNum); // LIABILITY: credit → +balance
-      await tx.party.update({ where: { id: body.partyId }, data: { outstandingAmount: { increment: grandTotalNum } } });
+      await recalcPartyOutstanding(tx, body.partyId);
 
       // Auto-create stock movements for items linked to inventory
       for (const item of invoice.items) {
@@ -453,10 +453,7 @@ router.post('/:id/cancel', roleMiddleware(['Admin']), async (req: AuthRequest, r
         await updateAccountBalance(tx, apAccount.id, Number(invoice.grandTotal), 0);
       }
 
-      await tx.party.update({
-        where: { id: invoice.partyId },
-        data: { outstandingAmount: { decrement: Number(invoice.grandTotal) } },
-      });
+      await recalcPartyOutstanding(tx, invoice.partyId);
 
       // Reverse stock movements created from this invoice
       const stockMovements = await tx.stockMovement.findMany({

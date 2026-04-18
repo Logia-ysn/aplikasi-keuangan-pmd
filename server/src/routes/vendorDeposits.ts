@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 import Decimal from 'decimal.js';
 import { prisma } from '../lib/prisma';
 import { AuthRequest, roleMiddleware } from '../middleware/auth';
-import { updateAccountBalance } from '../utils/accountBalance';
+import { updateAccountBalance, recalcPartyOutstanding } from '../utils/accountBalance';
 import { generateDocumentNumber } from '../utils/documentNumber';
 import { getOpenFiscalYear } from '../utils/fiscalYear';
 import { validateBody } from '../utils/validate';
@@ -307,11 +307,9 @@ router.post('/apply', roleMiddleware(['Admin', 'Accountant']), async (req: AuthR
       // Update party balances
       await tx.party.update({
         where: { id: invoice.partyId },
-        data: {
-          outstandingAmount: { decrement: applyAmountNum },
-          depositBalance: { decrement: applyAmountNum },
-        },
+        data: { depositBalance: { decrement: applyAmountNum } },
       });
+      await recalcPartyOutstanding(tx, invoice.partyId);
 
       // Create application record
       const application = await tx.vendorDepositApplication.create({
@@ -380,11 +378,9 @@ router.post('/apply/:id/cancel', roleMiddleware(['Admin']), async (req: AuthRequ
       // Restore party balances
       await tx.party.update({
         where: { id: invoice.partyId },
-        data: {
-          outstandingAmount: { increment: applyAmountNum },
-          depositBalance: { increment: applyAmountNum },
-        },
+        data: { depositBalance: { increment: applyAmountNum } },
       });
+      await recalcPartyOutstanding(tx, invoice.partyId);
 
       // Mark application as cancelled
       await tx.vendorDepositApplication.update({

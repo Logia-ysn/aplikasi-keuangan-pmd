@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 import Decimal from 'decimal.js';
 import { prisma } from '../lib/prisma';
 import { AuthRequest, roleMiddleware } from '../middleware/auth';
-import { updateAccountBalance } from '../utils/accountBalance';
+import { updateAccountBalance, recalcPartyOutstanding } from '../utils/accountBalance';
 import { generateDocumentNumber } from '../utils/documentNumber';
 import { getOpenFiscalYear } from '../utils/fiscalYear';
 import { validateBody } from '../utils/validate';
@@ -400,39 +400,12 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
       // Auto-allocate payment to oldest outstanding invoices
       const unallocatedAmount = await autoAllocatePayment(tx, payment.id, body.partyId, body.paymentType, numAmount);
 
-      // Update party outstanding:
-      // 1. Decrement by invoice-allocated amount
-      // 2. If there's unallocated remainder AND party still has outstanding
-      //    (e.g. opening balance piutang without a formal invoice), also decrement that
-      const allocatedToInvoices = new Decimal(numAmount).minus(new Decimal(unallocatedAmount)).toNumber();
-      let totalDecrement = allocatedToInvoices;
-
       if (unallocatedAmount > 0.01) {
-        const currentParty = await tx.party.findUnique({
-          where: { id: body.partyId },
-          select: { outstandingAmount: true },
-        });
-        const partyOutstanding = new Decimal(currentParty?.outstandingAmount?.toString() ?? '0');
-        const remainingOutstanding = partyOutstanding.minus(new Decimal(allocatedToInvoices));
-        if (remainingOutstanding.gt(0)) {
-          // Party still has outstanding not covered by invoices (e.g. opening balance)
-          const extraDecrement = Decimal.min(new Decimal(unallocatedAmount), remainingOutstanding).toNumber();
-          totalDecrement += extraDecrement;
-          const finalUnallocated = new Decimal(unallocatedAmount).minus(new Decimal(extraDecrement)).toNumber();
-          if (finalUnallocated > 0.01) {
-            logger.warn({ paymentId: payment.id, unallocatedAmount: finalUnallocated }, 'Overpayment: sisa pembayaran tidak teralokasi');
-          }
-        } else {
-          logger.warn({ paymentId: payment.id, unallocatedAmount }, 'Overpayment: sisa pembayaran tidak teralokasi');
-        }
+        logger.warn({ paymentId: payment.id, unallocatedAmount }, 'Overpayment: sisa pembayaran tidak teralokasi');
       }
 
-      if (totalDecrement > 0) {
-        await tx.party.update({
-          where: { id: body.partyId },
-          data: { outstandingAmount: { decrement: totalDecrement } },
-        });
-      }
+      // Recalc party outstanding from invoice data (source of truth)
+      await recalcPartyOutstanding(tx, body.partyId);
 
       return { ...payment, party, unallocatedAmount };
     }, { timeout: 15000 }); // 15s timeout for advisory lock safety
@@ -541,12 +514,8 @@ router.post('/:id/cancel', roleMiddleware(['Admin']), async (req: AuthRequest, r
         await updateAccountBalance(tx, apAccount.id, 0, numAmountVal);
       }
 
-      // Reverse party outstanding — full payment amount (matches GL reversal)
-      // Covers both invoice-allocated and non-invoice portions (e.g. opening balance)
-      await tx.party.update({
-        where: { id: payment.partyId },
-        data: { outstandingAmount: { increment: numAmountVal } },
-      });
+      // Recalc party outstanding from invoice data (source of truth)
+      await recalcPartyOutstanding(tx, payment.partyId);
 
       // Mark payment as cancelled
       await tx.payment.update({

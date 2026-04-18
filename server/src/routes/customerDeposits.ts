@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 import Decimal from 'decimal.js';
 import { prisma } from '../lib/prisma';
 import { AuthRequest, roleMiddleware } from '../middleware/auth';
-import { updateAccountBalance } from '../utils/accountBalance';
+import { updateAccountBalance, recalcPartyOutstanding } from '../utils/accountBalance';
 import { generateDocumentNumber } from '../utils/documentNumber';
 import { getOpenFiscalYear } from '../utils/fiscalYear';
 import { validateBody } from '../utils/validate';
@@ -310,11 +310,9 @@ router.post('/apply', roleMiddleware(['Admin', 'Accountant']), async (req: AuthR
       // Update party balances
       await tx.party.update({
         where: { id: invoice.partyId },
-        data: {
-          outstandingAmount: { decrement: applyAmountNum },
-          customerDepositBalance: { decrement: applyAmountNum },
-        },
+        data: { customerDepositBalance: { decrement: applyAmountNum } },
       });
+      await recalcPartyOutstanding(tx, invoice.partyId);
 
       // Create application record
       const application = await tx.customerDepositApplication.create({
@@ -383,11 +381,9 @@ router.post('/apply/:id/cancel', roleMiddleware(['Admin']), async (req: AuthRequ
       // Restore party balances
       await tx.party.update({
         where: { id: invoice.partyId },
-        data: {
-          outstandingAmount: { increment: applyAmountNum },
-          customerDepositBalance: { increment: applyAmountNum },
-        },
+        data: { customerDepositBalance: { increment: applyAmountNum } },
       });
+      await recalcPartyOutstanding(tx, invoice.partyId);
 
       // Mark application as cancelled
       await tx.customerDepositApplication.update({
@@ -521,10 +517,7 @@ router.post('/:id/refund', roleMiddleware(['Admin', 'Accountant']), async (req: 
 
           await tx.party.update({
             where: { id: deposit.partyId },
-            data: {
-              outstandingAmount: { decrement: applyNum },
-              customerDepositBalance: { decrement: applyNum },
-            },
+            data: { customerDepositBalance: { decrement: applyNum } },
           });
 
           remainingOffset = remainingOffset.minus(apply);
@@ -535,6 +528,7 @@ router.post('/:id/refund', roleMiddleware(['Admin', 'Accountant']), async (req: 
             `Piutang pelanggan tidak cukup untuk offset. Sisa offset yang tidak teralokasi: Rp ${remainingOffset.toFixed(2)}.`,
           );
         }
+        await recalcPartyOutstanding(tx, deposit.partyId);
       }
 
       // ── 2. Refund kas ke bank ────────────────────────────────────────────

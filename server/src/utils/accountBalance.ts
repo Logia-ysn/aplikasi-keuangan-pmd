@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client';
 import Decimal from 'decimal.js';
+import { logger } from '../lib/logger';
 
 /**
  * Returns the correct balance impact for a given account root type.
@@ -91,4 +92,50 @@ export async function recalculateAccountBalances(
       data: { balance },
     });
   }
+}
+
+/**
+ * Recalculate party outstanding_amount from the sum of non-cancelled invoice outstanding.
+ * This is the source-of-truth approach that prevents drift from increment/decrement logic.
+ */
+export async function recalcPartyOutstanding(
+  tx: Prisma.TransactionClient,
+  partyId: string
+): Promise<void> {
+  const party = await tx.party.findUnique({
+    where: { id: partyId },
+    select: { partyType: true, outstandingAmount: true },
+  });
+  if (!party) return;
+
+  let newOutstanding = new Decimal(0);
+
+  if (party.partyType === 'Supplier' || party.partyType === 'Both') {
+    const piSum = await tx.purchaseInvoice.aggregate({
+      where: { partyId, status: { not: 'Cancelled' } },
+      _sum: { outstanding: true },
+    });
+    newOutstanding = newOutstanding.plus(new Decimal((piSum._sum.outstanding ?? 0).toString()));
+  }
+
+  if (party.partyType === 'Customer' || party.partyType === 'Both') {
+    const siSum = await tx.salesInvoice.aggregate({
+      where: { partyId, status: { not: 'Cancelled' } },
+      _sum: { outstanding: true },
+    });
+    newOutstanding = newOutstanding.plus(new Decimal((siSum._sum.outstanding ?? 0).toString()));
+  }
+
+  const oldOutstanding = new Decimal(party.outstandingAmount.toString());
+  if (!oldOutstanding.eq(newOutstanding)) {
+    logger.info(
+      { partyId, old: oldOutstanding.toNumber(), new: newOutstanding.toNumber() },
+      'recalcPartyOutstanding: correcting drift'
+    );
+  }
+
+  await tx.party.update({
+    where: { id: partyId },
+    data: { outstandingAmount: newOutstanding.toNumber() },
+  });
 }
