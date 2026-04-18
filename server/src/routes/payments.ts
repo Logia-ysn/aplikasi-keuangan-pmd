@@ -400,11 +400,29 @@ router.post('/', roleMiddleware(['Admin', 'Accountant']), async (req: AuthReques
       // Auto-allocate payment to oldest outstanding invoices
       const unallocatedAmount = await autoAllocatePayment(tx, payment.id, body.partyId, body.paymentType, numAmount);
 
+      // Reduce opening balance with unallocated remainder (pre-app receivables/payables)
       if (unallocatedAmount > 0.01) {
-        logger.warn({ paymentId: payment.id, unallocatedAmount }, 'Overpayment: sisa pembayaran tidak teralokasi');
+        const currentParty = await tx.party.findUnique({
+          where: { id: body.partyId },
+          select: { openingOutstanding: true },
+        });
+        const openingBal = new Decimal(currentParty?.openingOutstanding?.toString() ?? '0');
+        if (openingBal.gt(0)) {
+          const reduction = Decimal.min(new Decimal(unallocatedAmount), openingBal).toNumber();
+          await tx.party.update({
+            where: { id: body.partyId },
+            data: { openingOutstanding: { decrement: reduction } },
+          });
+          const finalUnallocated = new Decimal(unallocatedAmount).minus(new Decimal(reduction)).toNumber();
+          if (finalUnallocated > 0.01) {
+            logger.warn({ paymentId: payment.id, unallocatedAmount: finalUnallocated }, 'Overpayment: sisa pembayaran tidak teralokasi');
+          }
+        } else {
+          logger.warn({ paymentId: payment.id, unallocatedAmount }, 'Overpayment: sisa pembayaran tidak teralokasi');
+        }
       }
 
-      // Recalc party outstanding from invoice data (source of truth)
+      // Recalc party outstanding from invoice data + opening balance (source of truth)
       await recalcPartyOutstanding(tx, body.partyId);
 
       return { ...payment, party, unallocatedAmount };

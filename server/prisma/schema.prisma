@@ -68,6 +68,7 @@ model Party {
   address                String?
   taxId                  String?                 @map("tax_id")
   outstandingAmount      Decimal                 @default(0) @map("outstanding_amount") @db.Decimal(15, 2)
+  openingOutstanding     Decimal                 @default(0) @map("opening_outstanding") @db.Decimal(15, 2)
   depositBalance         Decimal                 @default(0) @map("deposit_balance") @db.Decimal(15, 2)
   customerDepositBalance Decimal                 @default(0) @map("customer_deposit_balance") @db.Decimal(15, 2)
   isActive               Boolean                 @default(true) @map("is_active")

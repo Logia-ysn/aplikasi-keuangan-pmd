@@ -104,11 +104,11 @@ export async function recalcPartyOutstanding(
 ): Promise<void> {
   const party = await tx.party.findUnique({
     where: { id: partyId },
-    select: { partyType: true, outstandingAmount: true },
+    select: { partyType: true, outstandingAmount: true, openingOutstanding: true },
   });
   if (!party) return;
 
-  let newOutstanding = new Decimal(0);
+  let newOutstanding = new Decimal(party.openingOutstanding.toString());
 
   if (party.partyType === 'Supplier' || party.partyType === 'Both') {
     const piSum = await tx.purchaseInvoice.aggregate({
