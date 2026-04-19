@@ -8,9 +8,9 @@ Font.registerHyphenationCallback((word) => [word]);
 
 // ─── Color palette ────────────────────────────────────────────────────────────
 const C = {
-  primary:    '#1e40af', // blue-800
-  primaryLt:  '#dbeafe', // blue-100
-  accent:     '#0369a1', // sky-700
+  primary:    '#374151', // gray-700
+  primaryLt:  '#f3f4f6', // gray-100
+  accent:     '#4b5563', // gray-600
   dark:       '#111827', // gray-900
   mid:        '#374151', // gray-700
   muted:      '#6b7280', // gray-500
