@@ -2,7 +2,21 @@ import React, { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import api from '../../lib/api';
-import { Save, Loader2, Upload, X, ImageIcon } from 'lucide-react';
+import { Save, Loader2, Upload, X, ImageIcon, Plus, Trash2 } from 'lucide-react';
+
+interface InvoiceFormatSettings {
+  sales?: {
+    bankAccounts?: string;
+    footerNote?: string;
+    showSignature?: boolean;
+    signatureLabels?: string[];
+  };
+  purchase?: {
+    footerNote?: string;
+    showSignature?: boolean;
+    signatureLabels?: string[];
+  };
+}
 
 export const CompanySettingsTab: React.FC = () => {
   const queryClient = useQueryClient();
@@ -16,6 +30,10 @@ export const CompanySettingsTab: React.FC = () => {
     taxId: '',
     defaultCurrency: 'IDR',
     logoUrl: null as string | null,
+  });
+  const [invoiceSettings, setInvoiceSettings] = useState<InvoiceFormatSettings>({
+    sales: { bankAccounts: '', footerNote: '', showSignature: true, signatureLabels: ['Disiapkan oleh', 'Disetujui oleh', 'Diterima oleh'] },
+    purchase: { footerNote: '', showSignature: true, signatureLabels: ['Disiapkan oleh', 'Disetujui oleh', 'Diterima oleh'] },
   });
 
   const { data: settings } = useQuery({
@@ -38,6 +56,22 @@ export const CompanySettingsTab: React.FC = () => {
         defaultCurrency: settings.defaultCurrency || settings.currency || 'IDR',
         logoUrl: settings.logoUrl || null,
       }));
+      if (settings.invoiceSettings) {
+        const s = settings.invoiceSettings as InvoiceFormatSettings;
+        setInvoiceSettings({
+          sales: {
+            bankAccounts: s.sales?.bankAccounts || '',
+            footerNote: s.sales?.footerNote || '',
+            showSignature: s.sales?.showSignature !== false,
+            signatureLabels: s.sales?.signatureLabels?.length ? s.sales.signatureLabels : ['Disiapkan oleh', 'Disetujui oleh', 'Diterima oleh'],
+          },
+          purchase: {
+            footerNote: s.purchase?.footerNote || '',
+            showSignature: s.purchase?.showSignature !== false,
+            signatureLabels: s.purchase?.signatureLabels?.length ? s.purchase.signatureLabels : ['Disiapkan oleh', 'Disetujui oleh', 'Diterima oleh'],
+          },
+        });
+      }
     }
   }, [settings, isDirty]);
 
@@ -46,10 +80,23 @@ export const CompanySettingsTab: React.FC = () => {
     setIsDirty(true);
   };
 
+  const updateInvoiceSetting = (
+    section: 'sales' | 'purchase',
+    key: string,
+    value: string | boolean | string[]
+  ) => {
+    setInvoiceSettings((prev) => ({
+      ...prev,
+      [section]: { ...prev[section], [key]: value },
+    }));
+    setIsDirty(true);
+  };
+
   const saveMutation = useMutation({
     mutationFn: async (data: any) => api.put('/settings/company', data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['company-settings'] });
+      queryClient.invalidateQueries({ queryKey: ['company-settings-pdf'] });
       setIsDirty(false);
       toast.success('Pengaturan berhasil disimpan.');
     },
@@ -159,7 +206,185 @@ export const CompanySettingsTab: React.FC = () => {
 
         <div className="flex justify-end pt-2 border-t border-gray-100">
           <button
-            onClick={() => saveMutation.mutate(formData)}
+            onClick={() => saveMutation.mutate({ ...formData, invoiceSettings })}
+            disabled={saveMutation.isPending}
+            className="btn-primary"
+          >
+            {saveMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+            Simpan Pengaturan
+          </button>
+        </div>
+      </div>
+
+      {/* ── Invoice Format Settings ── */}
+      <div className="mt-8">
+        <h2 className="text-base font-semibold text-gray-900">Format Faktur</h2>
+        <p className="text-sm text-gray-500 mt-0.5">Konfigurasi tampilan faktur penjualan dan pembelian (PDF).</p>
+      </div>
+
+      <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-6">
+        {/* Sales Invoice Settings */}
+        <div>
+          <h3 className="text-sm font-semibold text-gray-800 mb-3">Faktur Penjualan</h3>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">
+                Info Rekening Bank
+              </label>
+              <textarea
+                value={invoiceSettings.sales?.bankAccounts || ''}
+                onChange={(e) => updateInvoiceSetting('sales', 'bankAccounts', e.target.value)}
+                placeholder="BRI: 0123-4567-8901 a.n. PT Pangan Masa Depan&#10;Mandiri: 1234-5678-9012 a.n. PT Pangan Masa Depan"
+                rows={3}
+                className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 focus:ring-2 focus:ring-blue-400 outline-none"
+              />
+              <p className="text-xs text-gray-400 mt-1">Ditampilkan di faktur penjualan untuk membantu pelanggan melakukan pembayaran.</p>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Catatan Kaki</label>
+              <input
+                type="text"
+                value={invoiceSettings.sales?.footerNote || ''}
+                onChange={(e) => updateInvoiceSetting('sales', 'footerNote', e.target.value)}
+                placeholder="Terima kasih atas kepercayaan Anda."
+                className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 focus:ring-2 focus:ring-blue-400 outline-none"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="sales-sig"
+                checked={invoiceSettings.sales?.showSignature !== false}
+                onChange={(e) => updateInvoiceSetting('sales', 'showSignature', e.target.checked)}
+                className="rounded border-gray-300"
+              />
+              <label htmlFor="sales-sig" className="text-sm text-gray-700">Tampilkan area tanda tangan</label>
+            </div>
+            {invoiceSettings.sales?.showSignature !== false && (
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-2">Label Tanda Tangan</label>
+                <div className="space-y-2">
+                  {(invoiceSettings.sales?.signatureLabels || []).map((label, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={label}
+                        onChange={(e) => {
+                          const labels = [...(invoiceSettings.sales?.signatureLabels || [])];
+                          labels[i] = e.target.value;
+                          updateInvoiceSetting('sales', 'signatureLabels', labels);
+                        }}
+                        className="flex-1 px-3 py-1.5 text-sm rounded-lg border border-gray-200 focus:ring-2 focus:ring-blue-400 outline-none"
+                      />
+                      {(invoiceSettings.sales?.signatureLabels || []).length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const labels = (invoiceSettings.sales?.signatureLabels || []).filter((_, j) => j !== i);
+                            updateInvoiceSetting('sales', 'signatureLabels', labels);
+                          }}
+                          className="text-red-400 hover:text-red-600"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                  {(invoiceSettings.sales?.signatureLabels || []).length < 5 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const labels = [...(invoiceSettings.sales?.signatureLabels || []), ''];
+                        updateInvoiceSetting('sales', 'signatureLabels', labels);
+                      }}
+                      className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800"
+                    >
+                      <Plus size={12} /> Tambah kolom tanda tangan
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="border-t border-gray-100" />
+
+        {/* Purchase Invoice Settings */}
+        <div>
+          <h3 className="text-sm font-semibold text-gray-800 mb-3">Faktur Pembelian</h3>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Catatan Kaki</label>
+              <input
+                type="text"
+                value={invoiceSettings.purchase?.footerNote || ''}
+                onChange={(e) => updateInvoiceSetting('purchase', 'footerNote', e.target.value)}
+                placeholder="Barang yang sudah dibeli tidak dapat dikembalikan."
+                className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 focus:ring-2 focus:ring-blue-400 outline-none"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="purchase-sig"
+                checked={invoiceSettings.purchase?.showSignature !== false}
+                onChange={(e) => updateInvoiceSetting('purchase', 'showSignature', e.target.checked)}
+                className="rounded border-gray-300"
+              />
+              <label htmlFor="purchase-sig" className="text-sm text-gray-700">Tampilkan area tanda tangan</label>
+            </div>
+            {invoiceSettings.purchase?.showSignature !== false && (
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-2">Label Tanda Tangan</label>
+                <div className="space-y-2">
+                  {(invoiceSettings.purchase?.signatureLabels || []).map((label, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={label}
+                        onChange={(e) => {
+                          const labels = [...(invoiceSettings.purchase?.signatureLabels || [])];
+                          labels[i] = e.target.value;
+                          updateInvoiceSetting('purchase', 'signatureLabels', labels);
+                        }}
+                        className="flex-1 px-3 py-1.5 text-sm rounded-lg border border-gray-200 focus:ring-2 focus:ring-blue-400 outline-none"
+                      />
+                      {(invoiceSettings.purchase?.signatureLabels || []).length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const labels = (invoiceSettings.purchase?.signatureLabels || []).filter((_, j) => j !== i);
+                            updateInvoiceSetting('purchase', 'signatureLabels', labels);
+                          }}
+                          className="text-red-400 hover:text-red-600"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                  {(invoiceSettings.purchase?.signatureLabels || []).length < 5 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const labels = [...(invoiceSettings.purchase?.signatureLabels || []), ''];
+                        updateInvoiceSetting('purchase', 'signatureLabels', labels);
+                      }}
+                      className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800"
+                    >
+                      <Plus size={12} /> Tambah kolom tanda tangan
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="flex justify-end pt-2 border-t border-gray-100">
+          <button
+            onClick={() => saveMutation.mutate({ ...formData, invoiceSettings })}
             disabled={saveMutation.isPending}
             className="btn-primary"
           >

@@ -141,6 +141,20 @@ export interface InvoicePDFItem {
   potonganItem?: number | string | null;
 }
 
+export interface InvoiceFormatSettings {
+  sales?: {
+    bankAccounts?: string;
+    footerNote?: string;
+    showSignature?: boolean;
+    signatureLabels?: string[];
+  };
+  purchase?: {
+    footerNote?: string;
+    showSignature?: boolean;
+    signatureLabels?: string[];
+  };
+}
+
 export interface InvoicePDFProps {
   type: 'sales' | 'purchase';
   invoiceNumber: string;
@@ -175,6 +189,7 @@ export interface InvoicePDFProps {
     taxId?: string | null;
     logoUrl?: string | null;
   };
+  invoiceSettings?: InvoiceFormatSettings | null;
 }
 
 // ─── Status pill color ────────────────────────────────────────────────────────
@@ -193,12 +208,20 @@ const InvoicePDF: React.FC<InvoicePDFProps> = (props) => {
     taxPct = 0, potongan = 0, biayaLain = 0,
     labelPotongan, labelBiaya, grandTotal,
     outstanding, paidFromCash, paidFromDeposit, partyDepositBalance,
-    party, items, company,
+    party, items, company, invoiceSettings,
   } = props;
 
   const isSales = type === 'sales';
   const title = isSales ? 'FAKTUR PENJUALAN' : 'FAKTUR PEMBELIAN';
   const partyLabel = isSales ? 'Kepada Yth.' : 'Dari Supplier';
+
+  const fmt = isSales ? invoiceSettings?.sales : invoiceSettings?.purchase;
+  const showSignature = fmt?.showSignature !== false;
+  const sigLabels = fmt?.signatureLabels?.length
+    ? fmt.signatureLabels
+    : ['Disiapkan oleh', 'Disetujui oleh', 'Diterima oleh'];
+  const footerNote = fmt?.footerNote || null;
+  const bankAccounts = isSales ? (invoiceSettings?.sales?.bankAccounts || null) : null;
 
   const numTax   = Number(taxPct);
   const numPot   = Number(potongan);
@@ -441,6 +464,14 @@ const InvoicePDF: React.FC<InvoicePDFProps> = (props) => {
           );
         })()}
 
+        {/* ── BANK ACCOUNTS (sales only) ── */}
+        {bankAccounts && (
+          <View style={S.notesBox}>
+            <Text style={S.notesLabel}>INFORMASI PEMBAYARAN</Text>
+            <Text style={S.notesText}>{bankAccounts}</Text>
+          </View>
+        )}
+
         {/* ── NOTES ── */}
         {notes && (
           <View style={S.notesBox}>
@@ -449,21 +480,24 @@ const InvoicePDF: React.FC<InvoicePDFProps> = (props) => {
           </View>
         )}
 
+        {/* ── FOOTER NOTE ── */}
+        {footerNote && (
+          <View style={{ marginTop: 8 }}>
+            <Text style={{ fontSize: 7.5, color: C.muted, lineHeight: 1.5 }}>{footerNote}</Text>
+          </View>
+        )}
+
         {/* ── SIGNATURE ── */}
-        <View style={S.sigRow}>
-          <View style={S.sigBox}>
-            <View style={S.sigLine} />
-            <Text style={S.sigLabel}>Disiapkan oleh</Text>
+        {showSignature && (
+          <View style={S.sigRow}>
+            {sigLabels.map((label, i) => (
+              <View key={i} style={S.sigBox}>
+                <View style={S.sigLine} />
+                <Text style={S.sigLabel}>{label}</Text>
+              </View>
+            ))}
           </View>
-          <View style={S.sigBox}>
-            <View style={S.sigLine} />
-            <Text style={S.sigLabel}>Disetujui oleh</Text>
-          </View>
-          <View style={S.sigBox}>
-            <View style={S.sigLine} />
-            <Text style={S.sigLabel}>Diterima oleh</Text>
-          </View>
-        </View>
+        )}
 
         {/* ── FOOTER ── */}
         <View style={S.footer} fixed>

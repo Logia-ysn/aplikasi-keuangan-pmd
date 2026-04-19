@@ -451,6 +451,7 @@ model CompanySettings {
   logoUrl              String? @map("logo_url")
   defaultCurrency      String  @default("IDR") @map("default_currency")
   fiscalYearStartMonth Int     @default(1) @map("fiscal_year_start_month")
+  invoiceSettings      Json?   @map("invoice_settings")
 
   @@map("company_settings")
 }

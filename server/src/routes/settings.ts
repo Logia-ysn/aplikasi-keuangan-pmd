@@ -2,6 +2,7 @@ import { Router } from 'express';
 import os from 'os';
 import path from 'path';
 import Decimal from 'decimal.js';
+import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { roleMiddleware } from '../middleware/auth';
 import { validateBody } from '../utils/validate';
@@ -99,6 +100,11 @@ router.put('/company', roleMiddleware(['Admin']), async (req, res) => {
       defaultCurrency: body.currency || rawBody.defaultCurrency || 'IDR',
       fiscalYearStartMonth: body.fiscalYearStartMonth ?? 1,
       ...(body.logoUrl !== undefined && { logoUrl: body.logoUrl || null }),
+      ...(body.invoiceSettings !== undefined && {
+        invoiceSettings: body.invoiceSettings === null
+          ? Prisma.DbNull
+          : (body.invoiceSettings as Prisma.InputJsonValue),
+      }),
     };
 
     const result = await prisma.companySettings.upsert({

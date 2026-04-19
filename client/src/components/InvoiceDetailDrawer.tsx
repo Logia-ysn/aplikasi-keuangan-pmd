@@ -235,6 +235,7 @@ const InvoiceDetailDrawer: React.FC<Props> = ({ type, invoiceId, onClose, onEdit
             potonganItem: it.potonganItem,
           }))}
           company={company}
+          invoiceSettings={company.invoiceSettings}
         />
       );
       const invoiceBlob = await pdf(invoiceDoc).toBlob();
@@ -374,6 +375,7 @@ const InvoiceDetailDrawer: React.FC<Props> = ({ type, invoiceId, onClose, onEdit
                       potonganItem: it.potonganItem,
                     }))}
                     company={company}
+                    invoiceSettings={company.invoiceSettings}
                   />
                 }
               />

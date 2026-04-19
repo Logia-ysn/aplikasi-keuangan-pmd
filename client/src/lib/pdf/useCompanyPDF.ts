@@ -1,6 +1,20 @@
 import { useQuery } from '@tanstack/react-query';
 import api from '../api';
 
+export interface InvoiceFormatSettings {
+  sales?: {
+    bankAccounts?: string;
+    footerNote?: string;
+    showSignature?: boolean;
+    signatureLabels?: string[];
+  };
+  purchase?: {
+    footerNote?: string;
+    showSignature?: boolean;
+    signatureLabels?: string[];
+  };
+}
+
 export interface CompanyPDF {
   name: string;
   address: string | null;
@@ -8,6 +22,7 @@ export interface CompanyPDF {
   email: string | null;
   taxId: string | null;
   logoUrl: string | null;
+  invoiceSettings: InvoiceFormatSettings | null;
 }
 
 const FALLBACK: CompanyPDF = {
@@ -17,6 +32,7 @@ const FALLBACK: CompanyPDF = {
   email: null,
   taxId: null,
   logoUrl: null,
+  invoiceSettings: null,
 };
 
 /**
@@ -42,5 +58,6 @@ export function useCompanyPDF(): CompanyPDF {
     email:   data.email        || null,
     taxId:   data.taxId        || null,
     logoUrl: data.logoUrl      || null,
+    invoiceSettings: data.invoiceSettings || null,
   };
 }

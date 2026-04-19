@@ -185,6 +185,19 @@ export const UpdateCompanySettingsSchema = z.object({
   currency: z.string().optional(),
   dateFormat: z.string().optional(),
   fiscalYearStartMonth: z.coerce.number().int().min(1, 'Bulan harus antara 1-12.').max(12, 'Bulan harus antara 1-12.').optional(),
+  invoiceSettings: z.object({
+    sales: z.object({
+      bankAccounts: z.string().optional(),
+      footerNote: z.string().optional(),
+      showSignature: z.boolean().optional(),
+      signatureLabels: z.array(z.string()).optional(),
+    }).optional(),
+    purchase: z.object({
+      footerNote: z.string().optional(),
+      showSignature: z.boolean().optional(),
+      signatureLabels: z.array(z.string()).optional(),
+    }).optional(),
+  }).nullable().optional(),
 });
 
 // ─── Fiscal Year ──────────────────────────────────────────────────────────────
