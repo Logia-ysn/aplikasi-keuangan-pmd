@@ -5,8 +5,8 @@ Font.registerHyphenationCallback((word) => [word]);
 
 // ─── Palette ──────────────────────────────────────────────────────────────────
 const C = {
-  primary:   '#1e40af',
-  primaryLt: '#dbeafe',
+  primary:   '#374151',
+  primaryLt: '#f3f4f6',
   dark:      '#111827',
   mid:       '#374151',
   muted:     '#6b7280',

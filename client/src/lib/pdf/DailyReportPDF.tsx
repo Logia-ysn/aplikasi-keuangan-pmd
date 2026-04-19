@@ -5,7 +5,7 @@ import type { CompanyInfo } from './ReportPDF';
 Font.registerHyphenationCallback((word) => [word]);
 
 const C = {
-  primary: '#1e40af', primaryLt: '#dbeafe',
+  primary: '#374151', primaryLt: '#f3f4f6',
   dark: '#111827', mid: '#374151', muted: '#6b7280', faint: '#9ca3af',
   border: '#e5e7eb', bgLight: '#f9fafb', white: '#ffffff',
   red: '#dc2626', green: '#16a34a',

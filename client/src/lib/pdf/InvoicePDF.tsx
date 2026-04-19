@@ -198,7 +198,7 @@ function statusStyle(status: string) {
   if (status === 'PartiallyPaid') return { bg: '#fef9c3', text: '#a16207' };
   if (status === 'Overdue') return { bg: '#fee2e2', text: '#b91c1c' };
   if (status === 'Cancelled') return { bg: '#f3f4f6', text: '#6b7280' };
-  return { bg: '#dbeafe', text: '#1d4ed8' }; // Submitted / Draft
+  return { bg: '#f3f4f6', text: '#374151' }; // Submitted / Draft
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────

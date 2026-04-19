@@ -4,7 +4,7 @@ import { Document, Page, View, Text, StyleSheet, Font } from '@react-pdf/rendere
 Font.registerHyphenationCallback((word) => [word]);
 
 const C = {
-  primary: '#1e40af',
+  primary: '#374151',
   dark: '#111827',
   mid: '#374151',
   muted: '#6b7280',
